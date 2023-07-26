@@ -74,6 +74,62 @@ def vwind_sb99_ostar(Mstar, Age, iso):
 ####  VINK ET AL. 2000,2001 ####
 ################################
 
+def mdot_vink_ostar_useGamma(Mstar, Age, iso):
+    # Gives the mass loss prescription adopted in Vink et al. 2001
+    # This is laid out most clearly in Section 8 of that paper and
+    # depends upon Equations 15 and Equation 23-25
+    # this is determined from Monte Carlo radiation transfer solutions
+    # Mstar : stellar mass in units of Msun
+    # Age   : log10(age/year)
+    # iso   : MIST Isochrone file to be read from
+    # returns log10(Mdot_wind/Msun/year)
+
+    # age index for MIST ischrone file
+    age_ind = iso.age_index(Age)
+    # array of initial masses for isochrone file
+    imass = iso.isos[age_ind]['initial_mass']
+
+    # logLbol  : log10(Bolometric luminosity in units of Lsun)
+    logLbol = np.interp(Mstar, imass, iso.isos[age_ind]['log_L'],right=-1)
+    # logTeff  : log10(Effective Stellar Atmospheric Temperature (K))
+    logTeff = np.interp(Mstar, imass, iso.isos[age_ind]['log_Teff'])
+    # logZ     : log10(Atmospheric metallicity mass fraction)
+    logZ = np.interp(Mstar, imass, iso.isos[age_ind]['log_surf_z'])
+    
+    # log10(Zsun), taken from MIST Files
+    logZsun = -1.8450984742990064
+
+    # Effective temperature of transition across the primary 
+    # bi-stability jump, given in kiloKelvin (converted to K here)
+    # Equations 14 & 15 of Vink et al. 2001
+    # this assumes Gamma_e = 0.434 which isn't generally true
+    Gamma = 7.66E-5 * 0.325 * (10**logLbol)/Mstar
+    charrho = -14.94 + (3.1857 * Gamma) + (0.85 * (logZ - logZsun)) ; 
+    TEff_jump = 1e3*(61.2 + 2.59*charrho)
+
+    # Equation 25 of Vink et al 2001 for the mass loss
+    # on the cool side of the primary bi-stability jump
+    # constant term accounts for vinf/vesc = 1.3 term
+    term1_lo = -6.388 + 2.210*(logLbol - 5) - 1.339*np.log10(Mstar/30)
+    term2_lo = 1.07*(logTeff - np.log10(2e4)) + 0.85*(logZ-logZsun)
+
+    # Equation 24 of Vink et al 2001 for the mass loss
+    # on the hot side of the primary bi-stability jump
+    # constant term accounts for vinf/vesc = 2.6 term
+    term1_hi = -6.837 + 2.194*(logLbol - 5) - 1.313*np.log10(Mstar/30)
+    term2_hi = 0.933*(logTeff - np.log10(4e4)) - 10.92*((logTeff - np.log10(4e4))**2) + 0.85*(logZ-logZsun)
+
+    # Break Results into those meant to be applied above
+    # and below the bi-stability jump
+    term_lo = (term1_lo + term2_lo)*(10**logTeff<TEff_jump)
+    term_hi = (term1_hi + term2_hi)*(10**logTeff>TEff_jump)
+    result = term_lo + term_hi
+
+    # make sure that exploded stars are not counted
+    minval = np.min(result) - 3
+    result = (term_lo + term_hi)*(logLbol > 0) + minval*(logLbol < 0)
+    return result
+
 def mdot_vink_ostar(Mstar, Age, iso):
     # Gives the mass loss prescription adopted in Vink et al. 2001
     # This is laid out most clearly in Section 8 of that paper and

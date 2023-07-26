@@ -143,7 +143,7 @@ def gen_MSN(ms_list, iso_mist, m_remnant = 1.4):
     ages = [round(x,2) for x in np.array(iso_mist.ages)]
 
     # arrays to return that give the explosion masses and ages for each SN
-    Mexp_list = []
+    (Mw_list, Mexp_list) = ([],[])
     # loop through mass samples
     for ms in ms_list:
         # get sorted massive stars that will supernova
@@ -155,6 +155,7 @@ def gen_MSN(ms_list, iso_mist, m_remnant = 1.4):
         mp = 0
         # arrays to add the SN explosion masses and 
         # estimate ages at which they explode
+        Mws = np.zeros(np.array(ages).shape)
         Mexps = np.zeros(np.array(ages).shape)
         for (k,age) in enumerate(ages):
             # age index for MIST ischrone file
@@ -175,6 +176,7 @@ def gen_MSN(ms_list, iso_mist, m_remnant = 1.4):
                 # to get mass added back to the ISM
                 mstar_end = np.interp(Ms[mp],imass_old,star_mass)
                 Mexps[k] += mstar_end-m_remnant
+                Mws[k] += Ms[mp] - mstar_end
                 mp += 1
                 # enter another loop in order to avoid re-loading
                 # the "old "isochrone data
@@ -184,9 +186,11 @@ def gen_MSN(ms_list, iso_mist, m_remnant = 1.4):
                     Mexps[k] += mstar_end-m_remnant
                     mp += 1
         Mexp_list.append(np.cumsum(Mexps))
+        Mw_list.append(np.cumsum(Mws))
     # an array containing arrays for each cumulative mass evolution
     # as a function of time for each mass list in ms_list
     Mexp_list = np.array(Mexp_list)
+    Mw_list = np.array(Mw_list)
 
     # returns median cumulative mass evolution in time
-    return (np.array(ages),np.median(Mexp_list,axis=0))
+    return (np.array(ages),np.median(Mexp_list,axis=0),np.median(Mw_list,axis=0))
