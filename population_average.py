@@ -114,6 +114,79 @@ def get_mdot_evol(ms_list, iso_mist, ages, mdot_func, op = "OB"):
     # return in array format
     return (np.array(Mdot_25),np.array(Mdot),np.array(Mdot_75))
 
+def gen_Lwind(ms, iso_mist, age, mdot_func, vwind_func, op = "OB"):
+    # gives the sum of mechanical wind luminosites according to
+    # the "mdot_func" and "vwind_func"
+    # prescription based on interpolating masses to "iso_mist" isochrone
+    # ms: list of masses in solar masses
+    # iso_mist: MIST isochrone file
+    # age: log10(age/year) has to be between 5.0 and 1.3 in 0.05 increment
+    # mdot_func: function to provide log10(Mdot) takes (Mstar, Age, iso)
+    # vwind_func : function to provide v_wind for OB Stars takes (Mstar, Age, iso)
+    # op : string, either "OB" or "WR" selects which stars should be passed
+    #      onward for mass loss calculation
+    # returns in units of Lwind/(Msun/year (km/s)^2)
+
+    # get siochrone information from MIST File
+    age_ind = iso_mist.age_index(age)
+    logTeff = iso_mist.isos[age_ind]['log_Teff']
+    imass = iso_mist.isos[age_ind]['initial_mass']
+    surfX = iso_mist.isos[age_ind]['surface_h1']
+
+    # interpolate onto the masses being considered
+    lTs = np.interp(ms,imass,logTeff)
+    sXs = np.interp(ms,imass,surfX)
+
+    if (op=="OB"):
+        # definition of what an Ostar is from Leitherer et al. 1992
+        # log(Teff)> 3.9 and surface_X > 0.4
+        # also select stars with M > 8 Msun
+        ssel = np.intersect1d(np.where(lTs>3.9),np.where(sXs>0.4))
+        ssel = np.intersect1d(np.where(ms>8)[0],ssel)
+    elif (op=="WR"):
+        # use the Leitherer et al. 1992 definition since MIST 
+        # definition apparently has overlap with the MS
+        # also select stars with M > 8 Msun
+        ssel = np.intersect1d(np.where(lTs>4.4),np.where(sXs<0.4))
+        ssel = np.intersect1d(np.where(ms>8)[0],ssel)
+    else:
+        print("Called with star option that isn't supported...")
+        assert(False)
+    
+    if (len(ssel)==0):
+        return 0.0
+    else:
+        mdots = 10**mdot_func(ms[ssel],age,iso_mist)
+        vwinds = 10**vwind_func(ms[ssel],age,iso_mist)
+        return np.sum(0.5*mdots*(vwinds**2))
+
+def get_Lwind_evol(ms_list, iso_mist, ages, mdot_func, vwind_func, op = "OB"):
+    # for a given set of mass_samples (ms_list) this generates the 
+    # wind luminosity evolution over the list of ages for a given
+    # mass loss precription (mdot_func) and wind prescription (vwind_func) 
+    # and returns the median and interquartile range of the evolution
+    # returns in units of solar masses per year * (km/s)^2
+    # ms_list     : list of mass arrays in units of Msun
+    # iso_mist    : theoretical MIST ischrone file to interpolate from
+    # ages        : list of ages in log10(age/year)
+    # mdot_func : function to provide log10(Mdot) for OB Stars takes (Mstar, Age, iso)
+    # vwind_func : function to provide v_wind for OB Stars takes (Mstar, Age, iso)
+    # op : string, either "OB" or "WR" selects which stars should be passed
+    #      onward for mass loss calculation
+
+    # loop over ages and call gen_Lwind() function for each
+    (Lwind,Lwind_25,Lwind_75) = ([],[],[])
+    for age in ages:
+        # get total array of total Lwind for each mass sample
+        Lwindsum_list = np.array([gen_Lwind(ms, iso_mist, age, mdot_func, vwind_func, op) for ms in ms_list])
+        # derive median and interquartile range over independent mass samples
+        Lwind.append(np.median(Lwindsum_list))
+        Lwind_25.append(np.quantile(Lwindsum_list,0.25))
+        Lwind_75.append(np.quantile(Lwindsum_list,0.75))
+
+    # return in array format
+    return (np.array(Lwind_25),np.array(Lwind),np.array(Lwind_75))
+
 def gen_NSN(ms, iso_mist, age):
     # returns the number of SNe that have exploded for a set of stars with 
     # intitial masses "ms" at "age" for isochrone "iso_mist" 
