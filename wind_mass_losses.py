@@ -319,7 +319,7 @@ def vwind_VS21_ostar(Mstar, Age, iso, use2001=False):
     # Age   : log10(age/year)
     # iso   : MIST Isochrone file to be read from
     # use2001 : boolean to choose a from Z^a relation either 2001 or 2021
-    # returns log10(Mdot_wind/Msun/year)
+    # returns log10(vwind/km/s)
 
     # Start by reading in all necessary information from MIST 
     # age index for MIST ischrone file
