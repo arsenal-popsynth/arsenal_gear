@@ -32,6 +32,22 @@ def gen_mass_samp(Mstar_tot, Nlist):
 
     return mass_samples
 
+def gen_Lbol(ms, iso_mist, age):
+    # gives the summed bolometric luminosity for a mass sample of stars "ms"
+    # prescription based on interpolating masses to "iso_mist" isochrone
+    # ms: list of masses in solar masses
+    # iso_mist: MIST isochrone file
+    # age: log10(age/year) has to be between 5.0 and 1.3 in 0.05 increment
+
+    # get siochrone information from MIST File
+    age_ind = iso_mist.age_index(age)
+    logLbol = iso_mist.isos[age_ind]['log_Lbol']
+    imass = iso_mist.isos[age_ind]['initial_mass']
+
+    # interpolate onto the masses being considered
+    lLbs = np.interp(ms,imass,logLbol)
+    return np.sum(10**lLbs)
+
 def gen_mdot(ms, iso_mist, age, mdot_func, op = "OB"):
     # gives the sum of mass loss rates according to the "mdot_func"
     # prescription based on interpolating masses to "iso_mist" isochrone
