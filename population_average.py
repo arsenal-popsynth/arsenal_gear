@@ -38,15 +38,39 @@ def gen_Lbol(ms, iso_mist, age):
     # ms: list of masses in solar masses
     # iso_mist: MIST isochrone file
     # age: log10(age/year) has to be between 5.0 and 1.3 in 0.05 increment
+    # returns in units of solar luminosities
 
     # get siochrone information from MIST File
     age_ind = iso_mist.age_index(age)
-    logLbol = iso_mist.isos[age_ind]['log_Lbol']
+    logLbol = iso_mist.isos[age_ind]['log_L']
     imass = iso_mist.isos[age_ind]['initial_mass']
 
     # interpolate onto the masses being considered
     lLbs = np.interp(ms,imass,logLbol)
     return np.sum(10**lLbs)
+
+def get_Lbol_evol(ms_list, iso_mist, ages):
+    # for a given set of mass_samples (ms_list) this generates the 
+    # Bolometric luminosity evolution over the list of ages for a given
+    # isochrone (iso_mist) and returns the median and 
+    # interquartile range of the evolution
+    # ms_list     : list of mass arrays in units of Msun
+    # iso_mist    : theoretical MIST ischrone file to interpolate from
+    # ages        : list of ages in log10(age/year)
+    # returns in units of solar luminosities
+
+    # loop over ages and call gen_Lbol() function for each
+    (Lbol,Lbol_25,Lbol_75) = ([],[],[])
+    for age in ages:
+        # get total array of total Mdot for each mass sample
+        Lbolsum_list = np.array([gen_Lbol(ms, iso_mist, age) for ms in ms_list])
+        # derive median and interquartile range over independent mass samples
+        Lbol.append(np.median(Lbolsum_list))
+        Lbol_25.append(np.quantile(Lbolsum_list,0.25))
+        Lbol_75.append(np.quantile(Lbolsum_list,0.75))
+
+    # return in array format
+    return (np.array(Lbol_25),np.array(Lbol),np.array(Lbol_75))
 
 def gen_mdot(ms, iso_mist, age, mdot_func, op = "OB"):
     # gives the sum of mass loss rates according to the "mdot_func"
