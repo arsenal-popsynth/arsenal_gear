@@ -1,2 +1,11 @@
 figures/
 mist_iso_theory/
+
+#Python build files
+build/
+dist/
+__pycache__/
+*.py[cod]
+*.egg-info
+*.egg
+*.installed.cfg

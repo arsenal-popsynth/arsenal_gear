@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+
+[project]
+name = "arsenal-gear"
+authors = [
+    {name="BW Keller", email="bkeller1@memphis.edu"},
+    {name="Zachary Wyatt", email="zdwyatt@memphis.edu"},
+    {name="Lachlan Lancaster", email="ltl2125@columbia.edu"},
+    {name="Claude Cournoyer-Cloutier", email="cournoyc@mcmaster.ca"},
+]
+description = "arsenal gear feedback population synthesis"
+readme = "README.md"
+requires-python = ">=3.5"
+dependencies = [
+    "numpy>=2.0",
+    ]
+dynamic = ["version"]
