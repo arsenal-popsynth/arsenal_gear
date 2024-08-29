@@ -1,3 +1,5 @@
+.envrc 
+
 figures/
 mist_iso_theory/
 
@@ -9,3 +11,7 @@ __pycache__/
 *.egg-info
 *.egg
 *.installed.cfg
+
+# Sphinx Documentation
+_build
+_autosummary
