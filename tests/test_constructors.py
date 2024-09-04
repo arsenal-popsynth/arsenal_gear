@@ -12,6 +12,11 @@ def test_star():
     tform = u.Myr*np.zeros(100)
     star = arsenal_gear.population.StarPopulation(mass=mass,metals=metals,tform=tform)
 
+    assert_array_equal(star["mass"], mass)
+    assert_array_equal(star["metals"], metals)
+    assert_array_equal(star["tform"], tform)
+
+
 def test_binary():
     mass = u.Msun*np.ones(100)
     metals = 0.1*np.ones(100)

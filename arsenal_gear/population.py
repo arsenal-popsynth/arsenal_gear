@@ -11,7 +11,7 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-__all__ = ['population']
+__all__ = ['StarPopulation', 'BinaryPopulation']
 
 class StarPopulation(dict):
     """This class is used to instantiate populations of individual stars.
