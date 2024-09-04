@@ -1,27 +1,36 @@
+import astropy.units as u
+import numpy as np
 import pytest
+from numpy.testing import assert_array_equal
 
 import arsenal_gear
 
+
 def test_star():
-    star = arsenal_gear.star.Star(mass=1.0,metals=0.02,age=1.0)
-    assert star.mass == 1.0
-    assert star.metals == 0.02
-    assert star.age == 1.0
+    mass = u.Msun*np.ones(100)
+    metals = 0.1*np.ones(100)
+    tform = u.Myr*np.zeros(100)
+    star = arsenal_gear.population.StarPopulation(mass=mass,metals=metals,tform=tform)
 
 def test_binary():
-    star1 = arsenal_gear.star.Star(mass=1.0,metals=0.02,age=1.0)
-    star2 = arsenal_gear.star.Star(mass=2.0,metals=0.01,age=0.0)
-    binary = arsenal_gear.binary.Binary(star_1=star1, star_2=star2, radius=10, eccentricity=0.1)
+    mass = u.Msun*np.ones(100)
+    metals = 0.1*np.ones(100)
+    tform = u.Myr*np.zeros(100)
+    star1 = arsenal_gear.population.StarPopulation(mass=mass,metals=metals,tform=tform)
+    star2 = arsenal_gear.population.StarPopulation(mass=2*mass,metals=metals,tform=tform)
+    semimajor = u.kpc*np.ones(100)
+    eccentricity = 0.5*np.ones(100)
+    binary = arsenal_gear.population.BinaryPopulation(primary=star1, secondary=star2, semimajor=semimajor, eccentricity=eccentricity)
     # Check the first star
-    assert binary.star_1.mass == star1.mass
-    assert binary.star_1.metals == star1.metals
-    assert binary.star_1.age == star1.age
+    assert_array_equal(binary.primary["mass"], star1["mass"])
+    assert_array_equal(binary.primary["metals"], star1["metals"])
+    assert_array_equal(binary.primary["tform"], star1["tform"])
 
     # Check the second star
-    assert binary.star_2.mass == star2.mass
-    assert binary.star_2.metals == star2.metals
-    assert binary.star_2.age == star2.age
+    assert_array_equal(binary.secondary["mass"], star2["mass"])
+    assert_array_equal(binary.secondary["metals"], star2["metals"])
+    assert_array_equal(binary.secondary["tform"], star2["tform"])
 
     # Check binary properties
-    assert binary.radius == 10
-    assert binary.eccentricity == 0.1
+    assert_array_equal(binary["semimajor"], semimajor)
+    assert_array_equal(binary["eccentricity"], eccentricity)
