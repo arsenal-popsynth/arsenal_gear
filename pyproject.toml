@@ -20,4 +20,6 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools]
-packages = ["arsenal_gear"]
+packages = ["arsenal_gear", 
+    "arsenal_gear.dist_funcs",
+    "arsenal_gear.feedbacks",]

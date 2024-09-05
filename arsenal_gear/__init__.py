@@ -9,4 +9,4 @@ relevant for stellar feedback from massive stars.
 from . import dist_funcs, population
 
 __version__ = '0.0.1'
-__all__ = ['population', 'dist_funcs']
+__all__ = ['population', 'dist_funcs', 'feedbacks']
