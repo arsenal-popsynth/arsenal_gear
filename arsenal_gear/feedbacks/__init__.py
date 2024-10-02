@@ -19,13 +19,13 @@ class FBMechanism():
         self.end = end
         pass
 
-    def radiation(self, bands:np.float64): -> np.float64 # What units should we put out here for each band? photons? energy?
+    def radiation(self, bands:np.float64) -> np.float64: # What units should we put out here for each band? photons? energy?
         pass
 
-    def ejecta_mass(self) -> Quantitity["mass"]:
+    def ejecta_mass(self) -> Quantity["mass"]:
         pass
 
-    def ejecta_velocity(self) -> Quantitity["velocity"]:
+    def ejecta_velocity(self) -> Quantity["velocity"]:
         pass
 
     def metal_yields(self) -> Quantity["mass"]:
