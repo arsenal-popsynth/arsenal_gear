@@ -18,30 +18,31 @@ class ProbDistFunc():
     """
     This class is the superclass of all PDFs that arsenal will use.
 
-    :param pdf_min: Lower limit for the PDF.  Probabilities for values below this will be zero
+    :param pdf_min: Lower limit for the PDF.
+                    Probabilities for values below this will be zero
     :type pdf_min: float
-    :param pdf_max: Upper limit for the PDF.  Probabilities for values above this will be zero
+    :param pdf_max: Upper limit for the PDF.
+                    Probabilities for values above this will be zero
     :type pdf_max: float
-    :param normalized: Should we return a normalized version of the probability when called, or just a function proportional to it?
+    :param normalized: Should we return a normalized version of the
+                       probability when called, or just a function proportional to it?
     :type normalized: bool
     """
     def __init__(self, pdf_min:float, pdf_max:float, normalized:bool=False) -> None:
         self.min = pdf_min
         self.max = pdf_max
-        if normalized:
-            self.norm = self.normalization()
-        else:
-            self.norm = 1
+        self.norm = self.normalization() if normalized else 1
 
     def normalization(self) -> float:
         """
-        Return the normalization for this PDF.  The default base class returns a uniform distribution.
+        Return the normalization for this PDF.
+        The default base class returns a uniform distribution.
 
         :return: The normalization for the PDF (it's integral from self.min to self.max)
         :rtype: float
         """
         return self.max - self.min
-
+    
     def prob(self, x: np.float64) -> np.float64:
         """
         Return the NON-NORMALIZED probability for value(s) x.
