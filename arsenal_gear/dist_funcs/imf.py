@@ -36,7 +36,7 @@ class IMF(ProbDistFunc):
 
     # This is identical to base method, but we'd like type annotation here.
     def prob(self, masses: Quantity["mass"]) -> np.float64:
-        return np.ones(masses.shape)
+        return np.ones(masses.shape)/self.norm
 
     def __call__(self, x: Quantity["mass"]) -> np.float64:
         """
@@ -53,7 +53,7 @@ class IMF(ProbDistFunc):
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
-        return p/self.norm
+        return p
 
 class Salpeter(IMF):
     """
@@ -81,4 +81,4 @@ class Salpeter(IMF):
         return (upper-lower)/(1-self.alpha)
 
     def prob(self, masses: Quantity["mass"]) -> np.float64:
-        return np.power(masses.to(u.Msun).value, -self.alpha)
+        return np.power(masses.to(u.Msun).value, -self.alpha)/self.norm
