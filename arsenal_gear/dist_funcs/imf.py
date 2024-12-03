@@ -59,6 +59,19 @@ class IMF(ProbDistFunc):
         p[select_range] = 0
         return np.ones(masses.shape)/self.norm
 
+    def inv_cdf(self, c: float) -> Quantity["mass"]:
+        """
+        For a given value in (0,1) this returns the inverse
+        of the CDF for that value, corresponding to a point in the measure space.
+        TODO(ltlancas) : assure that c is in (0,1)
+
+        :param c: float between 0 and 1
+        :type c: np.float64
+        :return: m such that CDF(X) = c
+        :rtype: Quantity["mass"]
+        """
+        return c*self.max_mass + (1-c)*self.min_mass
+
     def __call__(self, x: Quantity["mass"]) -> np.float64:
         """
         Simply calls the pdf method.
@@ -105,3 +118,9 @@ class Salpeter(IMF):
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         (p[lb],p[hb]) = (0., 1.)
         return p
+
+    def inv_cdf(self, c: float) -> Quantity["mass"]:
+        upper = np.power(self.max_mass_msun, 1-self.alpha)
+        lower = np.power(self.min_mass_msun, 1-self.alpha)
+        m = np.power(c*(upper-lower)+lower, 1/(1-self.alpha))
+        return c*u.Msun

@@ -69,6 +69,20 @@ class ProbDistFunc():
         p[np.logical_or(x < self.min, x > self.max)] = 0
         return p
 
+    def inv_cdf(self, c: np.float64) -> np.float64:
+        """
+        Returns for a given value in (0,1) this returns the inverse
+        of the CDF for that value, corresponding to a point in the measure space.
+        TODO(ltlancas) : assure that c is in (0,1)
+
+        :param c: float between 0 and 1
+        :type c: np.float64
+        :return: x such that CDF(X) = c
+        :rtype: np.float64
+        """
+        x = c*self.max + (1-c)*self.min
+        return x
+
     def __call__(self, x: np.float64) -> np.float64:
         """
         Simply calls the pdf method.
