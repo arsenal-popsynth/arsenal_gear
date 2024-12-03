@@ -104,7 +104,8 @@ class Salpeter(IMF):
         return (upper-lower)/(1-self.alpha)
 
     def pdf(self, masses: Quantity["mass"]) -> np.float64:
-        p = np.power(masses.to(u.Msun).value, -self.alpha)
+        xmsun = masses.to(u.Msun).value
+        p = np.power(xmsun, -self.alpha)
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
