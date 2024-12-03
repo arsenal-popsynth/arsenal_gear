@@ -38,6 +38,23 @@ class IMF(ProbDistFunc):
     def prob(self, masses: Quantity["mass"]) -> np.float64:
         return np.ones(masses.shape)
 
+    def __call__(self, x: Quantity["mass"]) -> np.float64:
+        """
+        Return the probability for value(s) x, normalized if the PDF is initialized
+        with normalized = True
+
+        :param x: The values to sample P(x) for.
+        :type x: np.float64
+        :return: The probability for x, normalized if desired.
+        :rtype: np.float64
+        """
+        xmsun = x.to(u.Msun).value
+        p = self.prob(x)
+        (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
+        select_range = np.logical_and(lb, hb)
+        p[select_range] = 0
+        return p/self.norm
+
 class Salpeter(IMF):
     """
     A simple, classic Salpeter 1955 (slope 2.35) IMF.
