@@ -44,6 +44,19 @@ class IMF(ProbDistFunc):
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
+        return p/self.norm
+
+    def cdf(self, masses: Quantity["mass"]) -> np.float64:
+        """
+        Return the cumulative distribution function at x.
+
+        :masses: The values to sample CDF(x) for.
+        """
+        p = (masses - self.min_mass)/(self.max_mass-self.min_mass)
+        p = p.to(" ").value
+        (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
+        select_range = np.logical_and(lb, hb)
+        p[select_range] = 0
         return np.ones(masses.shape)/self.norm
 
     def __call__(self, x: Quantity["mass"]) -> np.float64:
@@ -83,3 +96,12 @@ class Salpeter(IMF):
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
         return p/self.norm
+
+    def cdf(self, masses: Quantity["mass"]) -> np.float64:
+        upper = np.power(self.max_mass_msun, 1-self.alpha)
+        lower = np.power(self.min_mass_msun, 1-self.alpha)
+        p = np.power(masses.to(u.Msun).value, -self.alpha)
+        p = (p-lower)/(upper-lower)
+        (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
+        (p[lb],p[hb]) = (0., 1.)
+        return p

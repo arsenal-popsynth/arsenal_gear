@@ -49,12 +49,25 @@ class ProbDistFunc():
 
         :param x: The values to sample P(x) for.
         :type x: np.float64
-        :return: The non-normalized probability for x
+        :return: The normalized probability for x
         :rtype: np.float64
         """
         p = np.ones(x.shape)
         p[np.logical_or(x < self.min, x > self.max)] = 0
         return p/self.norm
+
+    def cdf(self, x: np.float64) -> np.float64:
+        """
+        Returns the value of the cumulative probability distribution function.
+
+        :param x: The values to sample P(x) for.
+        :type x: np.float64
+        :return: The CDF value at x
+        :rtype: np.float64
+        """
+        p = (x-self.min)/(self.max-self.min)
+        p[np.logical_or(x < self.min, x > self.max)] = 0
+        return p
 
     def __call__(self, x: np.float64) -> np.float64:
         """
