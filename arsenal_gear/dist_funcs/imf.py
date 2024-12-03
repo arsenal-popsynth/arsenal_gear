@@ -32,6 +32,7 @@ class IMF(ProbDistFunc):
         self.max_mass: Quantity["mass"] = max_mass
         self.min_mass_msun: float = self.min_mass.to(u.Msun).value
         self.max_mass_msun: float = self.max_mass.to(u.Msun).value
+        self.mavg: Quantity["mass"] = 0.5*(self.min_mass + self.max_mass)
         super().__init__(min_mass.value, max_mass.value, normalized)
 
     def pdf(self, masses: Quantity["mass"]) -> np.float64:
@@ -72,6 +73,19 @@ class IMF(ProbDistFunc):
         """
         return c*self.max_mass + (1-c)*self.min_mass
 
+    def sample(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
+        """
+        Draw a sample from the IMF with target total mass
+
+        :param mtot: Targer total mass of the sample
+        :type mtot: Quantity["mass"]
+        :return: List of masses of stars
+        :rtype: Quantity["mass"]
+        """
+        N_samp = round((mtot/self.mavg).to(" ").value)
+        c = np.random.uniform(0, 1, N_samp)
+        return self.inv_cdf(c)
+
     def __call__(self, x: Quantity["mass"]) -> np.float64:
         """
         Simply calls the pdf method.
@@ -97,11 +111,21 @@ class Salpeter(IMF):
                  normalized:bool=False, alpha:float=2.35) -> None:
         self.alpha = alpha
         super().__init__(min_mass, max_mass, normalized)
+        self.mavg = self.get_mavg()
 
     def normalization(self) -> float:
         upper = np.power(self.max_mass_msun, 1-self.alpha)
         lower = np.power(self.min_mass_msun, 1-self.alpha)
         return (upper-lower)/(1-self.alpha)
+
+    def get_mavg(self) -> Quantity["mass"]:
+        upper1 = np.power(self.max_mass_msun, 1-self.alpha)
+        lower1 = np.power(self.min_mass_msun, 1-self.alpha)
+        upper2 = np.power(self.max_mass_msun, 2-self.alpha)
+        lower2 = np.power(self.min_mass_msun, 2-self.alpha)
+        t1 = (1-self.alpha)/(2-self.alpha)
+        t2 = (upper2-lower2)/(upper1-lower1)
+        return t1*t2*u.Msun
 
     def pdf(self, masses: Quantity["mass"]) -> np.float64:
         xmsun = masses.to(u.Msun).value
@@ -121,7 +145,7 @@ class Salpeter(IMF):
         return p
 
     def inv_cdf(self, c: float) -> Quantity["mass"]:
-        upper = np.power(self.max_mass_msun, 1-self.alpha)
-        lower = np.power(self.min_mass_msun, 1-self.alpha)
-        m = np.power(c*(upper-lower)+lower, 1/(1-self.alpha))
-        return c*u.Msun
+        upper = self.max_mass_msun**(1.-self.alpha)
+        lower = self.min_mass_msun**(1.-self.alpha)
+        m = (c*(upper-lower)+lower)**(1./(1-self.alpha))
+        return m*u.Msun

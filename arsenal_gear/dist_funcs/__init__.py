@@ -83,6 +83,17 @@ class ProbDistFunc():
         x = c*self.max + (1-c)*self.min
         return x
 
+    def sample(self, N:int) -> np.float64:
+        """
+        Return an N-element numpy array of elements drawn from the PDF.
+
+        :param N: the number of elements drawn
+        :type N: int
+        :rtype: np.float64
+        """
+        uni_samp = np.random.uniform(0, 1, N)
+        return self.inv_cdf(uni_samp)
+
     def __call__(self, x: np.float64) -> np.float64:
         """
         Simply calls the pdf method.
