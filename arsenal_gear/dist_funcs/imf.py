@@ -34,26 +34,23 @@ class IMF(ProbDistFunc):
         self.max_mass_msun: float = self.max_mass.to(u.Msun).value
         super().__init__(min_mass.value, max_mass.value, normalized)
 
-    # This is identical to base method, but we'd like type annotation here.
-    def prob(self, masses: Quantity["mass"]) -> np.float64:
+    def pdf(self, masses: Quantity["mass"]) -> np.float64:
+        """
+        Return the normalized probability for value(s) x.
+
+        :masses: The values to sample P(x) for.
+        """
+        p = np.ones(masses.shape)
+        (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
+        select_range = np.logical_and(lb, hb)
+        p[select_range] = 0
         return np.ones(masses.shape)/self.norm
 
     def __call__(self, x: Quantity["mass"]) -> np.float64:
         """
-        Return the probability for value(s) x, normalized if the PDF is initialized
-        with normalized = True
-
-        :param x: The values to sample P(x) for.
-        :type x: np.float64
-        :return: The probability for x, normalized if desired.
-        :rtype: np.float64
+        Simply calls the pdf method.
         """
-        xmsun = x.to(u.Msun).value
-        p = self.prob(x)
-        (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
-        select_range = np.logical_and(lb, hb)
-        p[select_range] = 0
-        return p
+        return self.pdf(x)
 
 class Salpeter(IMF):
     """
@@ -80,5 +77,9 @@ class Salpeter(IMF):
         lower = np.power(self.min_mass_msun, 1-self.alpha)
         return (upper-lower)/(1-self.alpha)
 
-    def prob(self, masses: Quantity["mass"]) -> np.float64:
-        return np.power(masses.to(u.Msun).value, -self.alpha)/self.norm
+    def pdf(self, masses: Quantity["mass"]) -> np.float64:
+        p = np.power(masses.to(u.Msun).value, -self.alpha)
+        (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
+        select_range = np.logical_and(lb, hb)
+        p[select_range] = 0
+        return p/self.norm
