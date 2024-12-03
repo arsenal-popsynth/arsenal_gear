@@ -28,11 +28,11 @@ class IMF(ProbDistFunc):
     """
     def __init__(self, min_mass: Quantity["mass"], max_mass: Quantity["mass"],
                  normalized:bool=False) -> None:
-        super().__init__(min_mass.value, max_mass.value, normalized)
         self.min_mass: Quantity["mass"] = min_mass
         self.max_mass: Quantity["mass"] = max_mass
         self.min_mass_msun: float = self.min_mass.to(u.Msun).value
         self.max_mass_msun: float = self.max_mass.to(u.Msun).value
+        super().__init__(min_mass.value, max_mass.value, normalized)
 
     # This is identical to base method, but we'd like type annotation here.
     def prob(self, masses: Quantity["mass"]) -> np.float64:
