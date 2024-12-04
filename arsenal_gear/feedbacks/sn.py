@@ -14,7 +14,7 @@ from astropy.units import Quantity
 
 from ..population import StarPopulation
 
-def lifetimes_raiteri(stars: StarPopulation) -> Quantity["time"]:
+def lifetimes_Raiteri(stars: StarPopulation) -> Quantity["time"]:
     """
     Stellar lifetimes calculated from Raiteri+ 1996 
     (https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract)
