@@ -1,0 +1,23 @@
+outputs: SN_events
+
+formation:
+  binaries: False
+  ages:
+    type: instant
+    tform: 0
+  metals:
+    type: constant
+    metals: 0.012
+  imf:
+    type: Salpeter
+    min_mass: 0.5
+    max_mass: 100
+    N: 1e6
+
+evolution:
+  SN:
+    type: Raiteri
+    min_mass: 8
+    max_mass: 100
+    calculate: [energy]
+    energy: 1e51
