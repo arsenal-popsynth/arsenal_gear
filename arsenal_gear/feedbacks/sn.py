@@ -19,6 +19,11 @@ def lifetimes_raiteri(stars: StarPopulation) -> Quantity["time"]:
     Stellar lifetimes calculated from Raiteri+ 1996 
     (https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract)
     Equation 3.
+
+    :param stars: Stellar Population
+    :type stars: StarPopulation
+    :return: lifetime of each star in the population
+    :rtype: Quantity["time"]
     """
     a0 = 10.13 + 0.07547*np.log10(stars['metals']) - 0.008084*np.power(np.log10(stars['metals']), 2)
     a1 = -4.424 - 0.7939*np.log10(stars['metals']) - 0.1187*np.power(np.log10(stars['metals']), 2)
