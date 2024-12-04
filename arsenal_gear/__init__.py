@@ -35,7 +35,7 @@ class StellarPopulation():
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 
-        mbase = "/Users/lachlanlancaster/Documents/Columbia/Research/pop_synth/wind_pop_synthesis/mist_iso_theory/MIST_v1.2_vvcrit0.0_full_isos/"
+        mbase = "<path-to-mist>/"
         isofname = mbase + "MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.0_full.iso"
         self.iso = stellar_evolution.isochrone.MIST(isofname)
 
