@@ -10,7 +10,7 @@ from typing import Type
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
-from scipy.stats import rv_continuous, sampling 
+from scipy.stats import rv_continuous 
 
 
 class IMF(rv_continuous):
