@@ -41,11 +41,16 @@ class IMF(ProbDistFunc):
 
         :masses: The values to sample P(x) for.
         """
+        if masses.isscalar:
+            masses = np.array([masses.value])*masses.unit
         p = np.ones(masses.shape)
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
-        return p/self.norm
+        if len(p) == 1:
+            return p[0]/self.norm
+        else:
+            return p/self.norm
 
     def cdf(self, masses: Quantity["mass"]) -> np.float64:
         """
@@ -53,12 +58,18 @@ class IMF(ProbDistFunc):
 
         :masses: The values to sample CDF(x) for.
         """
+        if masses.isscalar:
+            masses = np.array([masses.value])*masses.unit
         p = (masses - self.min_mass)/(self.max_mass-self.min_mass)
         p = p.to(" ").value
+        xmsun = masses.to(u.Msun).value
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
-        return np.ones(masses.shape)/self.norm
+        if len(p) == 1:
+            return p[0]/self.norm
+        else:
+            return np.ones(masses.shape)/self.norm
 
     def inv_cdf(self, c: float) -> Quantity["mass"]:
         """
@@ -128,21 +139,32 @@ class Salpeter(IMF):
         return t1*t2*u.Msun
 
     def pdf(self, masses: Quantity["mass"]) -> np.float64:
+        if masses.isscalar:
+            masses = np.array([masses.value])*masses.unit
         xmsun = masses.to(u.Msun).value
         p = np.power(xmsun, -self.alpha)
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         select_range = np.logical_and(lb, hb)
         p[select_range] = 0
-        return p/self.norm
+        if len(p) == 1:
+            return p[0]/self.norm
+        else:
+            return p/self.norm
 
     def cdf(self, masses: Quantity["mass"]) -> np.float64:
+        if masses.isscalar:
+            masses = np.array([masses.value])*masses.unit
         upper = np.power(self.max_mass_msun, 1-self.alpha)
         lower = np.power(self.min_mass_msun, 1-self.alpha)
-        p = np.power(masses.to(u.Msun).value, -self.alpha)
+        xmsun = masses.to(u.Msun).value
+        p = np.power(xmsun, 1-self.alpha)
         p = (p-lower)/(upper-lower)
         (lb,hb) = (xmsun <= self.min_mass_msun, xmsun >= self.max_mass_msun)
         (p[lb],p[hb]) = (0., 1.)
-        return p
+        if len(p) == 1:
+            return p[0]
+        else:
+            return p
 
     def inv_cdf(self, c: float) -> Quantity["mass"]:
         upper = self.max_mass_msun**(1.-self.alpha)
