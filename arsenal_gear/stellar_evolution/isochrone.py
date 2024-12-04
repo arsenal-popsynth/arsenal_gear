@@ -130,7 +130,7 @@ class MIST(Isochrone):
         """
     
         lage = np.log10(age.to(u.yr).value)
-        diff_arr = abs(np.array(self.ages) - lage)
+        diff_arr = np.array(self.ages) - lage
         age_index = np.where(diff_arr < 0)[0][-1]
     
         if ((lage > max(self.ages)) | (lage < min(self.ages))):
