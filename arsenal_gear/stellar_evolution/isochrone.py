@@ -130,25 +130,31 @@ class MIST(Isochrone):
         """
     
         lage = np.log10(age.to(u.yr).value)
-        diff_arr = np.array(self.ages) - lage
-        age_index = np.where(diff_arr < 0)[0][-1]
-    
-        if ((lage > max(self.ages)) | (lage < min(self.ages))):
+        ais = [np.where(np.array(self.ages) - la < 0)[0][-1] for la in lage]
+        ais = np.array(ais, dtype=int)
+
+        if ((max(lage) > max(self.ages)) | (min(lage) < min(self.ages))):
             print('The requested age is outside the range. Try between ' + str(min(self.ages)) + ' and ' + str(max(self.ages)))
-        
-        return age_index
+            
+        return ais
 
     def get_Mmax(self, age: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
         died yet (in e.g. a SN) as a funciton of age
         """
+        if np.isscalar(age.value):
+            age = np.array([age.value])*age.unit
+
         ai = self.age_index(age)
         lage = np.log10(age.to(u.yr).value)
-        a_lo = self.ages[ai]
-        a_hi = self.ages[ai+1]
-        mmax_lo = np.max(self.isos[ai]['initial_mass'])
-        mmax_hi = np.max(self.isos[ai+1]['initial_mass'])
+        a_lo = np.array([self.ages[i] for i in ai])
+        a_hi = np.array([self.ages[i+1] for i in ai])
+        mmax_lo = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
+        mmax_hi = np.array([np.max(self.isos[i+1]['initial_mass']) for i in ai])
         s = (mmax_hi - mmax_lo)/(a_hi - a_lo)
         os = mmax_lo - s*a_lo
-        return (s*lage + os)*u.Msun
+        if len(age) == 1:
+            return (s*lage + os)[0]*u.Msun
+        else:
+            return (s*lage + os)*u.Msun
