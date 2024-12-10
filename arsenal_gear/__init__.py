@@ -13,7 +13,7 @@ import astropy.units as u
 from astropy.units import Quantity
 
 __version__ = '0.0.1'
-__all__ = ['population', 'dist_funcs', 'feedbacks']
+__all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution']
 
 class StarMaker():
     """
