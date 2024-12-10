@@ -43,29 +43,61 @@ class ProbDistFunc():
         """
         return self.max - self.min
     
-    def prob(self, x: np.float64) -> np.float64:
+    def pdf(self, x: np.float64) -> np.float64:
         """
-        Return the NON-NORMALIZED probability for value(s) x.
+        Return the normalized probability for value(s) x.
 
         :param x: The values to sample P(x) for.
         :type x: np.float64
-        :return: The non-normalized probability for x
+        :return: The normalized probability for x
         :rtype: np.float64
         """
-        return np.ones(x.shape)
+        p = np.ones(x.shape)
+        p[np.logical_or(x < self.min, x > self.max)] = 0
+        return p/self.norm
+
+    def cdf(self, x: np.float64) -> np.float64:
+        """
+        Returns the value of the cumulative probability distribution function.
+
+        :param x: The values to sample P(x) for.
+        :type x: np.float64
+        :return: The CDF value at x
+        :rtype: np.float64
+        """
+        p = (x-self.min)/(self.max-self.min)
+        p[np.logical_or(x < self.min, x > self.max)] = 0
+        return p
+
+    def inv_cdf(self, c: np.float64) -> np.float64:
+        """
+        Returns for a given value in (0,1) this returns the inverse
+        of the CDF for that value, corresponding to a point in the measure space.
+        TODO(ltlancas) : assure that c is in (0,1)
+
+        :param c: float between 0 and 1
+        :type c: np.float64
+        :return: x such that CDF(X) = c
+        :rtype: np.float64
+        """
+        x = c*self.max + (1-c)*self.min
+        return x
+
+    def sample(self, N:int) -> np.float64:
+        """
+        Return an N-element numpy array of elements drawn from the PDF.
+
+        :param N: the number of elements drawn
+        :type N: int
+        :rtype: np.float64
+        """
+        uni_samp = np.random.uniform(0, 1, N)
+        return self.inv_cdf(uni_samp)
 
     def __call__(self, x: np.float64) -> np.float64:
         """
-        Return the probability for value(s) x, normalized if the PDF is initialized
-        with normalized = True
-
-        :param x: The values to sample P(x) for.
-        :type x: np.float64
-        :return: The probability for x, normalized if desired.
-        :rtype: np.float64
+        Simply calls the pdf method.
         """
-        p = self.prob(x)
-        p[np.logical_or(x < self.min, x > self.max)] = 0
-        return p/self.norm
+        return self.prob(x)
 
 from . import imf
