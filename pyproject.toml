@@ -23,5 +23,5 @@ dynamic = ["version"]
 [tool.setuptools]
 packages = ["arsenal_gear", 
     "arsenal_gear.dist_funcs",
-    "arsenal_gear.feedbacks",]
+    "arsenal_gear.feedbacks",
     "arsenal_gear.stellar_evolution",]
