@@ -15,7 +15,7 @@ from astropy.units import Quantity
 __version__ = '0.0.1'
 __all__ = ['population', 'dist_funcs', 'feedbacks']
 
-class StellarPopulation():
+class StarMaker():
     """
     This class will act as the primary API for aresenal
     Ideally it will take an input yaml file or accept default values for 
@@ -31,11 +31,11 @@ class StellarPopulation():
         self.metallicity = 1.0
         # generate masses
         if self.discrete:
-            self.masses = self.imf.sample(self.Mtot)
+            self.masses = self.imf.sample_mass(self.Mtot)
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 
-        mbase = "<path-to-mist>/"
+        mbase = "<path-to-mist>"
         isofname = mbase + "MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.0_full.iso"
         self.iso = stellar_evolution.isochrone.MIST(isofname)
 
@@ -45,14 +45,13 @@ class StellarPopulation():
         """
         Mmax = self.iso.get_Mmax(t)
         if self.discrete:
-            nsn = np.array([len(np.intersect1d(np.where(self.masses > m),np.where(self.masses > 8*u.Msun))) for m in Mmax])
+            return self.masses[self.masses >= max(8*u.Msun, Mmax)].size
         else:
             # fraction of stars that have exploded
             fexp_8 = 1 - self.imf.cdf(8*u.Msun)
             fexp = 1 - self.imf.cdf(Mmax)
             fexp = fexp*(fexp < fexp_8) + fexp_8*(fexp >= fexp_8)
-            nsn = (fexp*self.Mtot/self.imf.mavg).to("").value
-        return nsn
+            return (fexp*self.Mtot/self.imf.mean()).value
     
 
     def __call__(self, N:int) -> population.StarPopulation:

@@ -30,6 +30,29 @@ class IMF(rv_continuous):
         self.max_mass: float = max_mass.to(u.Msun).value
         super().__init__(a=self.min_mass, b=self.max_mass, name=name)
 
+    def sample_mass(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
+        """
+        Draw a sample from the IMF with target total mass
+
+        :param mtot: Targer total mass of the sample
+        :type mtot: Quantity["mass"]
+        :return: List of masses of stars
+        :rtype: Quantity["mass"]
+        """
+        N_samp = round((mtot/self.mean()).value)
+        return self.sample(N_samp)
+
+    def sample(self, N: int) -> Quantity["mass"]:
+        """
+        Draw a sample from the IMF with a specific number of stars
+
+        :param N: Number of stars to draw
+        :type N: int
+        :return: List of masses of stars
+        :rtype: Quantity["mass"]
+        """
+        return self.rvs(size=N)*u.Msun
+
 class Salpeter(IMF):
     """
     A simple, classic Salpeter 1955 (slope 2.35) IMF.
@@ -54,3 +77,8 @@ class Salpeter(IMF):
         lower = np.power(self.min_mass, 1-self.alpha)
         norm = (upper-lower)/(1-self.alpha)
         return np.power(x, -self.alpha)/norm
+
+    def _ppf(self, x: np.float64) -> np.float64:
+        upper = np.power(self.max_mass, 1-self.alpha)
+        lower = np.power(self.min_mass, 1-self.alpha)
+        return (x*(upper-lower)+lower)**(1./(1-self.alpha))
