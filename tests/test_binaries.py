@@ -24,7 +24,7 @@ def test_fraction():
     stars = arsenal_gear.population.StarPopulation(mass=mass,metals=metals,tform=tform)
     #print(star)
     # Test the binary fraction sampler
-    _binaries = arsenal_gear.dist_funcs.binaries.Step([0, 1], 10*u.Msun, stars).sample()
+    _binaries = arsenal_gear.dist_funcs.binaries.StepFraction([0, 1], 10*u.Msun, stars).sample()
     #print(_binaries)
     # Create the BinaryPopulation
     primaries = arsenal_gear.population.StarPopulation(mass=mass[_binaries],metals=metals[_binaries],tform=tform[_binaries])
