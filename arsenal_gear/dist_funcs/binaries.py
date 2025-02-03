@@ -11,7 +11,7 @@ from typing import Type
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
-from scipy.stats import rv_continuous, rv_histogram
+from scipy.stats import rv_continuous, rv_histogram, loguniform
 
 from arsenal_gear.population import StarPopulation
 
@@ -75,49 +75,50 @@ class SMA(rv_continuous):
     """
     This class is the superclass of all semi-major axis distributions
 
+    :param min_a: Minimum semi-major axis
+    :type min_a: astropy length unit
+    :param max_a: Maximum semi-major axis
+    :type max_a: astropy length unit
     :param stars: Primaries
     :type stars: StarPopulation
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
-    def __init__(self, stars: StarPopulation, name=""):
-        self.stars: float = stars["mass"].to(u.Msun).value
-        super().__init__(a=self.stars, name=name)
+    def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"], name=""):
+        self.min_a: float = min_a.to(u.au).value
+        self.max_a: float = max_a.to(u.au).value
+        assert self.min_a > 0
+        assert self.max_a > self.min_a
+        super().__init__(a=self.min_a, b=self.max_a, name=name)
+        
+    def sample(self, N: int) -> Quantity["length"]:
+        """
+        :param N: Number of stars to draw
+        :type N: int
+        :return: List of semi-major axes of stars
+        :rtype: Quantity["length"]
+        """
+        return self.rvs(size=N)*u.au
         
         
-class StepSMA(SMA):
+class LogUniformSMA(SMA):
     """
-    A simple step function distribution of semi-major axes, with a log-uniform
-    distribution above and below the changeover semi-major axis
-
-    :param sma: Changeover semi-major axis
-    :type sma: astropy length unit
-    :param ratio: Ratio of probabilities for close and wide binaries
-    :type ratio: float
+    A simple loguniform distribution of semi-major axes
     """
+    
+    def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"]):
+        self.name = "loguniform"
+        super().__init__(min_a, max_a, name=self.name)
 
-    #def sample_mass(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
-    #    """
-    #    Draw a sample from the IMF with target total mass
+    def _pdf(self, x: np.float64) -> np.float64:
+        rv = loguniform(self.min_a, self.max_a)
+        return rv.pdf(x)
+   
+    def _ppf(self, x: np.float64) -> np.float64:
+        rv = loguniform(self.min_a, self.max_a)
+        return rv.ppf(x)
 
-    #    :param mtot: Targer total mass of the sample
-    #    :type mtot: Quantity["mass"]
-    #    :return: List of masses of stars
-    #    :rtype: Quantity["mass"]
-    #    """
-    #    N_samp = round((mtot/self.mean()).value)
-    #    return self.sample(N_samp)
-
-    #def sample(self, N: int) -> Quantity["mass"]:
-    #    """
-    #    Draw a sample from the IMF with a specific number of stars
-    #
-    #    :param N: Number of stars to draw
-    #    :type N: int
-    #    :return: List of masses of stars
-    #    :rtype: Quantity["mass"]
-    #    """
-    #    return self.rvs(size=N)*u.Msun
+    
 
     
 
