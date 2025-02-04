@@ -11,7 +11,7 @@ from typing import Type
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
-from scipy.stats import rv_continuous, rv_histogram, loguniform
+from scipy.stats import rv_continuous, rv_histogram, loguniform, uniform
 
 from arsenal_gear.population import StarPopulation
 
@@ -69,12 +69,65 @@ class StepFraction(Fraction):
         _select = np.where(_sample <= self.binary_fraction())
         _binary[_select] = np.ones(len(_select), dtype=bool)
         return _binary
+ 
     
+class MassRatio(rv_continuous):
+    """
+    This class is the superclass of all mass ratio distributions
+    TODO (CCC, 04/02/2025): q is currently independent of M1 and a
+
+    :param min_q: Minimum mass ratio
+    :type min_q: float
+    :param max_q: Maximum mass ratio
+    :type max_q: float
+    :param stars: Primaries
+    :type stars: StarPopulation
+    :param name: Name for the scipy.stats rv_continuous instance
+    :type name: str
+    """
+    def __init__(self, min_q: float, max_q: float, name=""):
+        self.min_q = min_q
+        self.max_q = max_q
+        assert self.min_q > 0
+        assert self.max_q >= min_q
+        assert self.max_q <= 1
+        super().__init__(a=self.min_q, b=self.max_q, name=name)
+        
+    def sample(self, N: int) -> Quantity["length"]:
+        """
+        :param N: Number of stars to draw
+        :type N: int
+        :return: List of semi-major axes of stars
+        :rtype: Quantity["length"]
+        """
+        return self.rvs(size=N)
+        
+        
+class UniformMassRatio(MassRatio):
+    """
+    A simple loguniform distribution of semi-major axes
+    with lower and upper bounds
+    """
+    
+    def __init__(self, min_q: float, max_q: float):
+        self.name = "uniform"
+        super().__init__(min_q, max_q, name=self.name)
+
+    def _pdf(self, x: np.float64) -> np.float64:
+        rv = uniform(self.min_q, self.max_q - self.min_q)
+        # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
+        return rv.pdf(x)
+   
+    def _ppf(self, x: np.float64) -> np.float64:
+        rv = uniform(self.min_q, self.max_q - self.min_q)
+        # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
+        return rv.ppf(x)
+    
+
     
 class SMA(rv_continuous):
     """
     This class is the superclass of all semi-major axis distributions
-
     :param min_a: Minimum semi-major axis
     :type min_a: astropy length unit
     :param max_a: Maximum semi-major axis
@@ -84,6 +137,9 @@ class SMA(rv_continuous):
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
+    def __init__(self, stars: StarPopulation, name=""):
+        self.stars: float = stars["mass"].to(u.Msun).value
+        super().__init__(a=self.stars, name=name)
     def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"], name=""):
         self.min_a: float = min_a.to(u.au).value
         self.max_a: float = max_a.to(u.au).value
@@ -99,17 +155,22 @@ class SMA(rv_continuous):
         :rtype: Quantity["length"]
         """
         return self.rvs(size=N)*u.au
-        
-        
+
+
 class LogUniformSMA(SMA):
     """
+    A simple step function distribution of semi-major axes, with a log-uniform
+    distribution above and below the changeover semi-major axis
+    :param sma: Changeover semi-major axis
+    :type sma: astropy length unit
+    :param ratio: Ratio of probabilities for close and wide binaries
+    :type ratio: float
     A simple loguniform distribution of semi-major axes
     """
     
     def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"]):
         self.name = "loguniform"
         super().__init__(min_a, max_a, name=self.name)
-
     def _pdf(self, x: np.float64) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
         return rv.pdf(x)
@@ -117,9 +178,59 @@ class LogUniformSMA(SMA):
     def _ppf(self, x: np.float64) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
         return rv.ppf(x)
-
     
+    
+class Eccentricity(rv_continuous):
+    """
+    This class is the superclass of all eccentricity distributions
+    TODO (CCC, 04/02/2025): q is currently independent of M1 and a
 
+    :param min_e: Minimum mass ratio
+    :type min_e: float
+    :param max_e: Maximum mass ratio
+    :type max_e: float
+    :param stars: Primaries
+    :type stars: StarPopulation
+    :param name: Name for the scipy.stats rv_continuous instance
+    :type name: str
+    """
+    def __init__(self, min_e: float, max_e: float, name=""):
+        self.min_e = min_e
+        self.max_e = max_e
+        assert self.min_e >= 0
+        assert self.max_e >= min_e
+        assert self.max_e < 1
+        super().__init__(a=self.min_e, b=self.max_e, name=name)
+        
+    def sample(self, N: int) -> Quantity["length"]:
+        """
+        :param N: Number of stars to draw
+        :type N: int
+        :return: List of semi-major axes of stars
+        :rtype: Quantity["length"]
+        """
+        return self.rvs(size=N)
+        
+        
+class UniformEccentricity(Eccentricity):
+    """
+    A simple loguniform distribution of semi-major axes
+    with lower and upper bounds
+    """
+    
+    def __init__(self, min_e: float, max_e: float):
+        self.name = "uniform"
+        super().__init__(min_e, max_e, name=self.name)
+
+    def _pdf(self, x: np.float64) -> np.float64:
+        rv = uniform(self.min_e, self.max_e - self.min_e)
+        # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
+        return rv.pdf(x)
+   
+    def _ppf(self, x: np.float64) -> np.float64:
+        rv = uniform(self.min_e, self.max_e - self.min_e)
+        # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
+        return rv.ppf(x)
     
 
 
