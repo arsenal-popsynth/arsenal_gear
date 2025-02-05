@@ -13,8 +13,8 @@ from ..population import StarPopulation
 
 def lifetimes_Raiteri(stars: StarPopulation) -> Quantity["time"]:
     """
-    Stellar lifetimes calculated from Raiteri+ 1996
-    (https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract)
+    Stellar lifetimes calculated from
+    `Raiteri+ 1996 <https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract>`__
     Equation 3.
 
     :param stars: Stellar Population
