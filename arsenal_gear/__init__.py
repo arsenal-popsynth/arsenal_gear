@@ -5,12 +5,11 @@ arsenal-gear
 A lightweight population synthesis code with an emphasis on the quantities
 relevant for stellar feedback from massive stars.
 """
+import astropy.units as u
+import numpy as np
+from astropy.units import Quantity
 
 from . import dist_funcs, feedbacks, population, stellar_evolution
-
-import numpy as np
-import astropy.units as u
-from astropy.units import Quantity
 
 __version__ = '0.0.1'
 __all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution']
@@ -18,8 +17,8 @@ __all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution']
 class StarMaker():
     """
     This class will act as the primary API for aresenal
-    Ideally it will take an input yaml file or accept default values for 
-    certain parameters and return a population of stars with 
+    Ideally it will take an input yaml file or accept default values for
+    certain parameters and return a population of stars with
     pre-calculated parameters for the feedback and radiaiton.
     """
 
@@ -46,16 +45,13 @@ class StarMaker():
         Mmax = self.iso.get_Mmax(t)
         if self.discrete:
             return self.masses[self.masses >= max(8*u.Msun, Mmax)].size
-        else:
-            # fraction of stars that have exploded
-            fexp_8 = 1 - self.imf.cdf(8*u.Msun)
-            fexp = 1 - self.imf.cdf(Mmax)
-            fexp = fexp*(fexp < fexp_8) + fexp_8*(fexp >= fexp_8)
-            return (fexp*self.Mtot/self.imf.mean()).value
-    
+        # fraction of stars that have exploded
+        fexp_8 = 1 - self.imf.cdf(8*u.Msun)
+        fexp = 1 - self.imf.cdf(Mmax)
+        fexp = fexp*(fexp < fexp_8) + fexp_8*(fexp >= fexp_8)
+        return (fexp*self.Mtot/self.imf.mean()).value
 
     def __call__(self, N:int) -> population.StarPopulation:
         """
         Return a
         """
-        pass

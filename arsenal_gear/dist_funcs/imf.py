@@ -5,12 +5,10 @@ imf
 This submodule contains all the code required to sample from an IMF.
 """
 
-from typing import Type
-
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
-from scipy.stats import rv_continuous 
+from scipy.stats import rv_continuous
 
 
 class IMF(rv_continuous):
@@ -69,16 +67,16 @@ class Salpeter(IMF):
                  alpha:float=2.35):
         self.alpha = alpha
         self.name = "Salpeter"
-        assert(alpha >= 0)
+        assert alpha >= 0
         super().__init__(min_mass, max_mass, self.name)
 
-    def _pdf(self, x: np.float64) -> np.float64:
+    def _pdf(self, x: np.float64, *args) -> np.float64:
         upper = np.power(self.max_mass, 1-self.alpha)
         lower = np.power(self.min_mass, 1-self.alpha)
         norm = (upper-lower)/(1-self.alpha)
         return np.power(x, -self.alpha)/norm
 
-    def _ppf(self, x: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64, *args) -> np.float64:
         upper = np.power(self.max_mass, 1-self.alpha)
         lower = np.power(self.min_mass, 1-self.alpha)
-        return (x*(upper-lower)+lower)**(1./(1-self.alpha))
+        return (q*(upper-lower)+lower)**(1./(1-self.alpha))

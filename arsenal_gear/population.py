@@ -5,8 +5,6 @@ population
 This submodule defines the classes for "populations", collections of single or binary stars.
 """
 
-from typing import Type
-
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
