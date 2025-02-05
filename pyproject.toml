@@ -7,6 +7,7 @@ authors = [
     {name="BW Keller", email="bkeller1@memphis.edu"},
     {name="Zachary Wyatt", email="zdwyatt@memphis.edu"},
     {name="Lachlan Lancaster", email="ltl2125@columbia.edu"},
+    {name="Eric Andersson", email="eandersson@amnh.org"},
     {name="Claude Cournoyer-Cloutier", email="cournoyc@mcmaster.ca"},
 ]
 description = "arsenal gear feedback population synthesis"
@@ -21,7 +22,7 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools]
-packages = ["arsenal_gear", 
+packages = ["arsenal_gear",
     "arsenal_gear.dist_funcs",
     "arsenal_gear.feedbacks",
     "arsenal_gear.stellar_evolution",]
