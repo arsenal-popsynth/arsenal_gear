@@ -13,9 +13,11 @@ This code has been a collaborative effort on the parts of Benjamin Keller,
 Lachlan Lancaster, Eric Andersson, Zachary Wyatt, and Claude
 Cournoyer-Cloutier.
 
+Contents
+--------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    quickstart.rst
    parameters.rst
