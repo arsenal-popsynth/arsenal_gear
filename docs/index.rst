@@ -9,10 +9,9 @@ evolution and star formation models to sample the breadth of currently explored
 parameter space of the physics that determines the mass, metals, and energies
 deposited by a population of stars into the surrounding ISM.
 
-This code has been a collaborative effort on the parts of Benjamin Keller,
-Lachlan Lancaster, Eric Andersson, Zachary Wyatt, and Claude
-Cournoyer-Cloutier.
-
+This code has been a collaborative effort on the parts of Eric Andersson,
+Claude Cournoyer-Cloutier, Ben Keller, Lachlan Lancaster, Marta Reina-Campos,
+James Wadsley, and Zachary Wyatt.
 Contents
 --------
 

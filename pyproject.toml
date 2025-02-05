@@ -8,6 +8,8 @@ authors = [
     {name="Zachary Wyatt", email="zdwyatt@memphis.edu"},
     {name="Lachlan Lancaster", email="ltl2125@columbia.edu"},
     {name="Eric Andersson", email="eandersson@amnh.org"},
+    {name="Marta Reina-Campos", email="reinacampos@cita.utoronto.ca"},
+    {name="James Wadsley", email="wadsley@mcmaster.ca"},
     {name="Claude Cournoyer-Cloutier", email="cournoyc@mcmaster.ca"},
 ]
 description = "arsenal gear feedback population synthesis"
