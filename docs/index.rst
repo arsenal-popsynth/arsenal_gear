@@ -12,6 +12,7 @@ deposited by a population of stars into the surrounding ISM.
 This code has been a collaborative effort on the parts of Eric Andersson,
 Claude Cournoyer-Cloutier, Ben Keller, Lachlan Lancaster, Marta Reina-Campos,
 James Wadsley, and Zachary Wyatt.
+
 Contents
 --------
 
