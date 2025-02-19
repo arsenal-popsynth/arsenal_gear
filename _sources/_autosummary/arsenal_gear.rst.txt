@@ -1,0 +1,22 @@
+﻿arsenal\_gear
+=============
+
+.. automodule:: arsenal_gear
+
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      StarMaker
+   
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   dist_funcs
+   feedbacks
+   population
+   stellar_evolution

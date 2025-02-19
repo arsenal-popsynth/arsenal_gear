@@ -1,0 +1,12 @@
+arsenal\_gear.feedbacks.sn
+==========================
+
+.. automodule:: arsenal_gear.feedbacks.sn
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      lifetimes_Raiteri
+   

@@ -1,0 +1,13 @@
+arsenal\_gear.dist\_funcs.imf
+=============================
+
+.. automodule:: arsenal_gear.dist_funcs.imf
+
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      IMF
+      Salpeter
+   
