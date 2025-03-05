@@ -1,0 +1,13 @@
+arsenal\_gear.population
+========================
+
+.. automodule:: arsenal_gear.population
+
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      BinaryPopulation
+      StarPopulation
+   
