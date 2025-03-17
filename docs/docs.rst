@@ -1,3 +1,4 @@
+============================
 Arsenal Sphinx Documentation
 ============================
 Arsenal gear uses the `Sphinx <http://sphinx-doc.org/>`_ documentation engine
@@ -6,7 +7,7 @@ to generate its documentation. The documentation is written in `reStructuredText
 ``docs/`` directory of the `repository <https://github.com/arsenal-popsynth/arsenal_gear>`_. 
 
 Testing the Documentation Locally
----------------------------------
+=================================
 
 Before deploying a change to the documentation, you may want to test the build
 locally. This is a fairly straightforward, four-step process.
@@ -17,7 +18,7 @@ locally. This is a fairly straightforward, four-step process.
 4. Open a web browser and navigate to ``http://localhost:1337`` to view the documentation.
 
 Deploying Documentation to GitHub Pages
----------------------------------------
+=======================================
 
 Arsenal gear uses GitHub actions to automatically deploy the documentation to `arsenal-popsynth.github.io/arsenal_gear <https://arsenal-popsynth.github.io/arsenal_gear>`_ whenever a change is merged to the ``main`` branch.
 The actions workflow is defined in ``.github/workflows/docs.yml``. 
