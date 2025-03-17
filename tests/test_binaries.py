@@ -1,7 +1,5 @@
 import astropy.units as u
 import numpy as np
-import pytest
-from scipy.stats import sampling
 from numpy.testing import assert_allclose
 
 import arsenal_gear
@@ -23,7 +21,8 @@ class TestLogUniformSemimajor:
 
     def test_mean(self):
         a = self.sma.sample(self.N)
-        assert_allclose(np.mean(a), u.au*self.sma.mean(), rtol=0, atol=5*self.sma.var())
+        assert_allclose(np.mean(a), u.au*self.sma.mean(), 
+                        rtol=0, atol=5*self.sma.var())
 
 class TestUniformMassRatio:
     N = int(1e6)
@@ -42,7 +41,8 @@ class TestUniformMassRatio:
 
     def test_mean(self):
         q = self.mratio.sample(self.N)
-        assert_allclose(np.mean(q), self.mratio.mean(), rtol=0, atol=5*self.mratio.var())
+        assert_allclose(np.mean(q), self.mratio.mean(), 
+                        rtol=0, atol=5*self.mratio.var())
 
 class TestUniformEccentricity:
     N = int(1e6)
@@ -61,4 +61,5 @@ class TestUniformEccentricity:
 
     def test_mean(self):
         e = self.ecc.sample(self.N)
-        assert_allclose(np.mean(e), self.ecc.mean(), rtol=0, atol=5*self.ecc.var())
+        assert_allclose(np.mean(e), self.ecc.mean(), 
+                        rtol=0, atol=5*self.ecc.var())
