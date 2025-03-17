@@ -34,9 +34,9 @@ class Fraction:
         self.fraction:  float = fraction
         self.mass_bins: float = mass_bins.to(u.Msun).value
         self.stars:     float = stars["mass"].to(u.Msun).value
-        assert(np.min(self.fraction) >= 0)
-        assert(np.max(self.fraction) <= 1)
-        assert(np.min(self.mass_bins) >= 0)
+        assert np.min(self.fraction) >= 0
+        assert np.max(self.fraction) <= 1
+        assert np.min(self.mass_bins) >= 0 
 
     
 class StepFraction(Fraction):
@@ -54,6 +54,11 @@ class StepFraction(Fraction):
         super().__init__(fraction, mass_bins, stars, name=self.name)
 
     def binary_fraction(self) -> np.float64:
+        """
+        Binary fraction as a function of stellar mass
+        for the step function binary fraction
+        Returns the probability to be in a binary
+        """
         prob = np.piecewise(self.stars, 
                             [self.stars < self.mass_bins, 
                              self.stars >= self.mass_bins], 
@@ -123,7 +128,6 @@ class UniformMassRatio(MassRatio):
    
     def _ppf(self, x: np.float64) -> np.float64:
         rv = uniform(self.min_q, self.max_q - self.min_q)
-        # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
         return rv.ppf(x)
     
 
@@ -140,9 +144,7 @@ class Semimajor(rv_continuous):
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
-    def __init__(self, stars: StarPopulation, name=""):
-        self.stars: float = stars["mass"].to(u.Msun).value
-        super().__init__(a=self.stars, name=name)
+
     def __init__(self, min_a: Quantity["length"], 
                  max_a: Quantity["length"], name=""):
         self.min_a: float = min_a.to(u.au).value
@@ -175,6 +177,7 @@ class LogUniformSemimajor(Semimajor):
     def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"]):
         self.name = "loguniform"
         super().__init__(min_a, max_a, name=self.name)
+        
     def _pdf(self, x: np.float64) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
         return rv.pdf(x)
@@ -198,6 +201,7 @@ class Eccentricity(rv_continuous):
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
+    
     def __init__(self, min_e: float, max_e: float, name=""):
         self.min_e = min_e
         self.max_e = max_e
@@ -233,8 +237,4 @@ class UniformEccentricity(Eccentricity):
    
     def _ppf(self, x: np.float64) -> np.float64:
         rv = uniform(self.min_e, self.max_e - self.min_e)
-        # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
         return rv.ppf(x)
-    
-
-
