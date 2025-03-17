@@ -1,5 +1,6 @@
-API Documentation
-=================
+================
+Arsenal Gear API
+================
 
 .. autosummary::
    :toctree: _autosummary

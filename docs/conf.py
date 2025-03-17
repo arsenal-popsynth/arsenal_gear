@@ -20,7 +20,8 @@ author = 'BW Keller'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = ['sphinx.ext.autodoc',
-              'sphinx.ext.autosummary'
+              'sphinx.ext.autosummary',
+              'sphinx.ext.mathjax'
               ]
 
 autosummary_generate = True
