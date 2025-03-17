@@ -6,8 +6,6 @@ This submodule contains all the code required to sample from mass-dependent a
 binary fraction and distributions of orbital parameters.
 """
 
-from typing import Type
-
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
@@ -50,7 +48,7 @@ class StepFraction(Fraction):
     def __init__(self, fraction: float, mass_bins: Quantity["mass"], 
                  stars: StarPopulation):
         self.name = "Step"
-        assert(len(fraction) == 2)
+        assert len(fraction) == 2
         super().__init__(fraction, mass_bins, stars, name=self.name)
 
     def binary_fraction(self) -> np.float64:
