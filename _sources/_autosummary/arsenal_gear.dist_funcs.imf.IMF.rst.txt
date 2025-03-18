@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.imf.IMF
+=================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.imf
+
+.. autoclass:: IMF
+   :members:
+   :show-inheritance:
