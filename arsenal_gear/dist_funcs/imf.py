@@ -10,6 +10,7 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.stats import rv_continuous
 
+__all__ = ["IMF", "Salpeter"]
 
 class IMF(rv_continuous):
     """
