@@ -2,8 +2,13 @@
 Arsenal Gear API
 ================
 
+.. currentmodule:: arsenal_gear
+
 .. autosummary::
    :toctree: _autosummary
    :recursive:
 
-    arsenal_gear
+   dist_funcs
+   feedbacks
+   population
+   stellar_evolution
