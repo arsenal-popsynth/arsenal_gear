@@ -3,12 +3,21 @@
 ==========================================
 The Arsenal Gear Population Synthesis Code
 ==========================================
-Welcome to the documentation for the arsenal_gear population synthesis code.
-Arsenal is designed to generate feedback inputs for simulations of star
-and galaxy formation.  It allows you to draw from a wide range of stellar
-evolution and star formation models to sample the breadth of currently explored
-parameter space of the physics that determines the mass, metals, and energies
-deposited by a population of stars into the surrounding ISM. 
+Arsenal Gear is a Stellar Population Synthesis (SPS) code. The main driving goals of its
+development are:
+
+#. **Flexibility** of choices related to input physics
+#. **Ease of use** from both the command line and within a python script
+#. **Stellar Feedback** is our primary modeling goal
+#. **Binary Stars** are easily modeled within the code
+
+Arsenal Gear is intended to work in modes where stars are both sampled from an IMF
+(stochastic mode) and when it is meant to be representative of a well-sampled 
+population and therefore quantities are computed via integrals over the IMF 
+(integrating mode). It is also intended to work both for calculations from within a
+piece of python code or iPython notebook as well as being able to be called from the
+command line or from within C++/Fortran code for compatability with large
+hydrodynamical simulations.
 
 This code has been a collaborative effort on the parts of Eric Andersson,
 Claude Cournoyer-Cloutier, Ben Keller, Lachlan Lancaster, Marta Reina-Campos,
