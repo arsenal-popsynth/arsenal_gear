@@ -7,6 +7,11 @@ through interpreting and processing their isochrones
 """
 
 import os
+import requests
+from pathlib import Path
+from tqdm import tqdm
+import tarfile
+import time
 
 import astropy.units as u
 import numpy as np
@@ -17,18 +22,69 @@ class Isochrone():
     """
     This class is used to load and interpret isochrones from various sources
     """
-    def __init__(self) -> None:
+    def __init__(self, met:np.float32) -> None:
         # laying out the basic attributed of the isochrone class
         self.filename = ""
         # the metallicity of the isochrone relative to solar
-        self.metallicity = 1.0
+        self.met = met
 
+    @staticmethod
+    def downloader(fname, url, message):
+        """
+        Method for downloading isochrone data from the web where available.
+
+        Args:
+            fname (str or Path): The file name or path to save the downloaded file.
+            url (str): The URL of the file to download.
+            message (str): Optional message to display before downloading.
+
+        Raises:
+            Exception: If the download fails.
+
+        """
+        if message is not None:
+            print(message)
+
+        response = requests.get(url, stream=True)
+        if not response.ok:
+            raise Exception('Failed to download file. Check URL.')
+
+        # Get file size
+        total_size = int(response.headers.get('content-length', 0))
+        # create a progress bar
+        tqdm_args = dict(desc='Downloading', total=total_size, unit='B',
+                        unit_scale=True, unit_divisor=1024)
+        # write the file
+        with open(fname, 'wb') as f, tqdm(**tqdm_args) as bar:
+                for chunk in response.iter_content(chunk_size=1024):
+                    f.write(chunk)
+                    bar.update(len(chunk))
+
+    @staticmethod
+    def is_valid_txz(fname):
+        """
+        Check if a .txz file is valid.
+
+        Parameters:
+        - fname (str): The path to the .txz file.
+
+        Returns:
+        - bool: True if the .txz file is valid, False otherwise.
+        """
+        try:
+            with tarfile.open(fname, "r:xz") as tar:
+                tar.getmembers()
+            return True
+        except (tarfile.TarError, ValueError, OSError, EOFError) as e:
+            print(f"Invalid .txz file: {e}")
+            return False
 
     def get_Mmax(self, age:Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
         died yet (in e.g. a SN) as a function of age
         """
+        return 0.0*u.Msun
 
 class MIST(Isochrone):
     """
@@ -37,10 +93,16 @@ class MIST(Isochrone):
 
 
     """
-    def __init__(self, filename : str, verbose:bool=False) -> None:
+    # basic options for MIST isochrones
+    url_temp = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit{}_basic_isos.txz"
+    vcrits   = ["0.0", "0.4"]
+    mets     = ["m4.00", "m3.50", "m3.00", "m2.50", "m2.00", "m1.75", "m1.50", "m1.25",\
+                "m1.00", "m0.75", "m0.50", "m0.25", "p0.00", "p0.25", "p0.50"]
+    def __init__(self, met:np.float32, vvcrit:str="0.0", rootdir:str=None,
+                 force_download:bool=False, verbose:bool=False) -> None:
         """
         Args:
-            filename: the name of .iso file.
+            met: the metallicity of the isochrone relative to solar
 
         Usage:
             >> iso = read_mist_models.ISO('MIST_v1.0_feh_p0.00_afe_p0.0_vvcrit0.4.iso')
@@ -58,13 +120,94 @@ class MIST(Isochrone):
             hdr_list    List of column headers.
             isos        Data.
         """
-        self.filename = filename
+        # set input parameters
+        super().__init__(met)
+        if met<0:
+            self.metstr = "m{:.2f}".format(-met)
+        else:
+            self.metstr = "p{:.2f}".format(met)
+        if self.metstr not in self.mets:
+            raise ValueError("Metallicity must be one of: " + str(self.mets))
+        if vvcrit not in ["0.0", "0.4"]:
+            raise ValueError("vvcrit must be either 0.0 or 0.4 for MIST isochrones")
+        self.vvcrit = vvcrit
+        self.rootdir = rootdir
+        self.force_download = force_download
+        self.verbose = verbose
+
+        # set directories, download data if necessary
+        data_acq_start = time.time()
+        self.get_data()
+        data_acq_end = time.time()
         if verbose:
-            print('Reading in: ' + self.filename)
+            print("Time to acquire data: ", data_acq_end - data_acq_start)
+
+        if verbose:
+            print('Reading in: ' + self.isofile)
 
         self.ages, self.hdr_list, self.isos = self.read_iso_file()
         self.metallicity = self.abun['[Fe/H]']
-        super().__init__()
+
+    def get_data(self):
+        # set model directory, tarfile, and filename
+        mod_temp = "MIST_v1.2_vvcrit{}_basic_isos"
+        self.modeldir = mod_temp.format(self.vvcrit)
+        tar_temp = "MIST_v1.2_vvcrit{}_basic_isos.txz"
+        self.tarfile = tar_temp.format(self.vvcrit)
+        iso_fname_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_basic.iso"
+        self.isofile = iso_fname_temp.format(self.metstr, self.vvcrit)
+
+        # make data storage directory if it doesn't exist
+        rootdir = self.rootdir
+        if rootdir is None:
+            rootdir = Path(__file__).parent.absolute() / 'data/mist'
+            if not rootdir.is_dir():
+                rootdir.mkdir(parents=True, exist_ok=True)
+        self.rootdir = Path(rootdir)
+
+        # check if the file exists and download otherwise
+        force_download = self.force_download
+        if not force_download:
+            if not (self.rootdir / self.modeldir).is_dir():
+                # model directory doesn't exist -> check for tarfile
+                if not (self.rootdir / self.tarfile).is_file():
+                    # if it doesn't exist, download it
+                    force_download = True                
+                elif not self.is_valid_txz(self.rootdir / self.tarfile):
+                    # if it's not a valid tar file, download it again
+                    force_download = True
+            elif not (self.rootdir / self.modeldir / self.isofile).is_file():
+                # model directory exists but isochrone file doesn't -> force download
+                force_download = True
+        self.force_download = force_download
+        if self.verbose:
+            print("Force download: ", self.force_download)
+
+        if self.force_download:
+            url = self.url_temp.format(self.vvcrit)
+            message = "Downloading MIST isochrone data"
+            # download the tarfile
+            self.downloader(self.rootdir / self.tarfile, url, message)
+            self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=False)
+    
+    @staticmethod
+    def extract_one(fname, extractdir, delete_txz=False):
+        """
+        Unzips a single ZIP file.
+        """
+        # Ensure output directory exists
+        os.makedirs(extractdir, exist_ok=True)
+        if not tarfile.is_tarfile(fname):
+            raise IOError(f'{fname} is not a valid txz file. '
+                          'Try again with `force_download=True`')
+        with tarfile.open(fname, 'r:xz') as tar:
+            tar.extractall(path=extractdir)
+
+        if delete_txz and fname.exists():
+            print(fname)
+            fname.unlink()
+
+        return extractdir
 
     def read_iso_file(self):
         """
@@ -75,10 +218,10 @@ class MIST(Isochrone):
             filename: the name of .iso file.
 
         """
-        print(os.getcwd())
 
-        #open file and read it in
-        with open(self.filename, encoding='utf-8') as f:
+        # open file and read it in
+        fname = self.rootdir / self.modeldir / self.isofile
+        with open(fname, encoding='utf-8') as f:
             content = [line.split() for line in f]
         self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
         self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
@@ -134,6 +277,7 @@ class MIST(Isochrone):
         if np.isscalar(age.value):
             age = np.array([age.value])*age.unit
 
+        # linear interpolation in log(age) to get the maximum mass
         ai = self.age_index(age)
         lage = np.log10(age.to(u.yr).value)
         a_lo = np.array([self.ages[i] for i in ai])
