@@ -7,11 +7,12 @@ through interpreting and processing their isochrones
 """
 
 import os
-import requests
 from pathlib import Path
-from tqdm import tqdm
 import tarfile
 import time
+
+import requests
+from tqdm import tqdm
 
 import astropy.units as u
 import numpy as np
@@ -45,9 +46,12 @@ class Isochrone():
         if message is not None:
             print(message)
 
-        response = requests.get(url, stream=True)
-        if not response.ok:
-            raise Exception('Failed to download file. Check URL.')
+        try:
+            response = requests.get(url, stream=True, timeout=10)
+        except requests.exceptions.Timeout:
+            raise Exception('Request timed out. Check your internet connection.')
+        except requests.exceptions.RequestException as e:
+            raise Exception(f'Request failed: {e}')
 
         # Get file size
         total_size = int(response.headers.get('content-length', 0))
@@ -55,10 +59,10 @@ class Isochrone():
         tqdm_args = dict(desc='Downloading', total=total_size, unit='B',
                         unit_scale=True, unit_divisor=1024)
         # write the file
-        with open(fname, 'wb') as f, tqdm(**tqdm_args) as bar:
-                for chunk in response.iter_content(chunk_size=1024):
-                    f.write(chunk)
-                    bar.update(len(chunk))
+        with open(fname, 'wb') as f, tqdm(**tqdm_args) as prog_bar:
+            for chunk in response.iter_content(chunk_size=1024):
+                f.write(chunk)
+                prog_bar.update(len(chunk))
 
     @staticmethod
     def is_valid_txz(fname):
@@ -123,9 +127,9 @@ class MIST(Isochrone):
         # set input parameters
         super().__init__(met)
         if met<0:
-            self.metstr = "m{:.2f}".format(-met)
+            self.metstr = f"m{-1*met:.2f}"
         else:
-            self.metstr = "p{:.2f}".format(met)
+            self.metstr = f"p{met:.2f}"
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
         if vvcrit not in ["0.0", "0.4"]:
@@ -149,6 +153,13 @@ class MIST(Isochrone):
         self.metallicity = self.abun['[Fe/H]']
 
     def get_data(self):
+        """
+        Retrieves the MIST isochrone data from a local directory or downloads it if
+        necessary.
+
+        Returns:
+            None
+        """
         # set model directory, tarfile, and filename
         mod_temp = "MIST_v1.2_vvcrit{}_basic_isos"
         self.modeldir = mod_temp.format(self.vvcrit)

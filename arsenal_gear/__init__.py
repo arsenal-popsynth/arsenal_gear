@@ -5,10 +5,11 @@ arsenal-gear
 A lightweight population synthesis code with an emphasis on the quantities
 relevant for stellar feedback from massive stars.
 """
+import time
+
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
-import time
 
 from . import dist_funcs, feedbacks, population, stellar_evolution
 
@@ -34,8 +35,8 @@ class StellarPopulation():
             start_samp = time.time()
             self.masses = self.imf.sample_mass(self.Mtot)
             end_samp = time.time()
-        if verbose:
-            print("Time to sample masses: ", end_samp - start_samp)
+            if verbose:
+                print("Time to sample masses: ", end_samp - start_samp)
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 
