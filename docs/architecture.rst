@@ -17,12 +17,14 @@ stellar sub-populations::
         fbin                   (total binary fraction)
     member classes
         SingleStarPop
-        SingleStellarEvolution
         BinaryPop
-        BinaryStellarEvolution
-        Atmosphere
-        MechanicalFeedback
+        StellarOutput
+            Atmosphere
+            MechanicalFeedback
+            Yields
     methods
+        __init__()
+        output(times)
         wind_mass_loss(times)
         radiation(times, band_data)
         sn_rate(times)
@@ -33,15 +35,17 @@ Abstract Stellar Population Classes
 ***********************************
 
 These classes contain information on the initial population of single stars and binaries
-as well as ::
+as well as methods for evolving them, which are stellar evolution instances::
 
     SingleStarPop
     params
         IMF               (kroupa, chabrier, etc.)
+        Evolution         (MIST, PARSEC, etc.)
 
     BinaryPop
     params
         IMF               (IMF of the primary)
+        Evolution         (BPASS...)
         fbin_dist         (binary fraction distribution)
         q_dist            (mass ratio distribution)
         P_dist            (period distribution)
