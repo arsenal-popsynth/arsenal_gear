@@ -2,7 +2,6 @@
 *.swp
 
 figures/
-mist_iso_theory/
 
 #Python build files
 build/
@@ -16,3 +15,6 @@ __pycache__/
 # Sphinx Documentation
 _build
 _autosummary
+
+# Isochrone data
+arsenal_gear/stellar_evolution/data/

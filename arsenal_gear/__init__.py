@@ -47,7 +47,7 @@ class StellarPopulation():
         """
         Return the number of supernovae that have gone off by time t
         """
-        Mmax = self.iso.get_Mmax(t)
+        Mmax = self.iso.get_Mmax3(t)
         #if self.discrete:
         #    res = [len(np.where(self.masses.value >= max(8, mmi.value))[0]) for mmi in Mmax]
         #    return np.array(res)

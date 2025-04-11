@@ -16,6 +16,8 @@ from tqdm import tqdm
 
 import astropy.units as u
 import numpy as np
+from numpy.polynomial.polynomial import Polynomial
+from scipy.interpolate import lagrange
 from astropy.units import Quantity
 
 
@@ -150,6 +152,9 @@ class MIST(Isochrone):
             print('Reading in: ' + self.isofile)
 
         self.ages, self.hdr_list, self.isos = self.read_iso_file()
+        # get the maximum mass still alive for each isochrone
+        ai = np.arange(len(self.ages))
+        self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
         self.metallicity = self.abun['[Fe/H]']
 
     def get_data(self):
@@ -300,3 +305,42 @@ class MIST(Isochrone):
         if len(age) == 1:
             return (s*lage + o_s)[0]*u.Msun
         return (s*lage + o_s)*u.Msun
+
+    def get_Mmax2(self, age: Quantity["time"]) -> Quantity["mass"]:
+        """
+        get the maximum mass of the stellar population that hasn't
+        died yet (in e.g. a SN) as a funciton of age
+        """
+        if np.isscalar(age.value):
+            age = np.array([age.value])*age.unit
+
+        # linear interpolation in log(age) to get the maximum mass
+        ai = self.age_index(age)
+        lage = np.log10(age.to(u.yr).value)
+        a_lo = np.array([self.ages[i] for i in ai])
+        a_hi = np.array([self.ages[i+1] for i in ai])
+        mmax_lo = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
+        mmax_hi = np.array([np.max(self.isos[i+1]['initial_mass']) for i in ai])
+        s = (np.log10(mmax_hi) - np.log10(mmax_lo))/(a_hi - a_lo)
+        o_s = np.log10(mmax_lo) - s*a_lo
+        if len(age) == 1:
+            return (10**(s*lage + o_s))[0]*u.Msun
+        return (10**(s*lage + o_s))*u.Msun
+
+    def get_Mmax3(self, age: Quantity["time"]) -> Quantity["mass"]:
+        """
+        get the maximum mass of the stellar population that hasn't
+        died yet (in e.g. a SN) as a funciton of age
+        """
+        if np.isscalar(age.value):
+            age = np.array([age.value])*age.unit
+
+        # quartic interpolation in log(age) to get the maximum mass
+        lages = self.ages
+        ai = self.age_index(age)
+        lage = np.log10(age.to(u.yr).value)
+        mmax = self.mmaxes
+        aranges = [lages[max(i-1,0):i+3] for i in ai]
+        mranges = [mmax[max(i-1,0):i+3] for i in ai]
+        fs = [Polynomial(lagrange(aranges[j],mranges[j]).coef[::-1]) for j in range(len(ai))]
+        return np.array([fs[j](lage[j]) for j in range(len(ai))])*u.Msun
