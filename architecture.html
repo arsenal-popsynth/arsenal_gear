@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Arsenal Gear Code Architecture &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Troubleshooting and Known Issues" href="troubleshooting.html" />
+    <link rel="prev" title="Models Used in Existing Hydrocodes" href="code-models.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="troubleshooting.html" title="Troubleshooting and Known Issues"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="code-models.html" title="Models Used in Existing Hydrocodes"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Arsenal Gear Code Architecture</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="arsenal-gear-code-architecture">
+<h1>Arsenal Gear Code Architecture<a class="headerlink" href="#arsenal-gear-code-architecture" title="Link to this heading">¶</a></h1>
+<section id="top-level-population-class">
+<h2>Top-Level Population Class<a class="headerlink" href="#top-level-population-class" title="Link to this heading">¶</a></h2>
+<p>The main way that users should interact with the code in python scripts is through the
+top level <code class="docutils literal notranslate"><span class="pre">StellarPopulation</span></code> class. It has member classes for both single and binary
+stellar sub-populations:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">StellarPopulation</span>
+<span class="n">params</span>
+    <span class="n">samp_mode</span>              <span class="p">(</span><span class="n">stochastic</span><span class="p">,</span> <span class="n">integrative</span><span class="p">)</span>
+    <span class="n">mstar</span>                  <span class="p">(</span><span class="n">total</span> <span class="n">stellar</span> <span class="n">mass</span><span class="p">)</span>
+    <span class="n">metallicity</span>            <span class="p">(</span><span class="n">stellar</span> <span class="n">metallicity</span><span class="p">)</span>
+    <span class="n">fbin</span>                   <span class="p">(</span><span class="n">total</span> <span class="n">binary</span> <span class="n">fraction</span><span class="p">)</span>
+<span class="n">member</span> <span class="n">classes</span>
+    <span class="n">SingleStarPop</span>
+    <span class="n">BinaryPop</span>
+    <span class="n">StellarOutput</span>
+        <span class="n">Atmosphere</span>
+        <span class="n">MechanicalFeedback</span>
+        <span class="n">Yields</span>
+<span class="n">methods</span>
+    <span class="fm">__init__</span><span class="p">()</span>
+    <span class="n">output</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">wind_mass_loss</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">radiation</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">band_data</span><span class="p">)</span>
+    <span class="n">sn_rate</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">yields</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">save_outputs</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="abstract-stellar-population-classes">
+<h2>Abstract Stellar Population Classes<a class="headerlink" href="#abstract-stellar-population-classes" title="Link to this heading">¶</a></h2>
+<p>These classes contain information on the initial population of single stars and binaries
+as well as methods for evolving them, which are stellar evolution instances:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SingleStarPop</span>
+<span class="n">params</span>
+    <span class="n">IMF</span>               <span class="p">(</span><span class="n">kroupa</span><span class="p">,</span> <span class="n">chabrier</span><span class="p">,</span> <span class="n">etc</span><span class="o">.</span><span class="p">)</span>
+    <span class="n">Evolution</span>         <span class="p">(</span><span class="n">MIST</span><span class="p">,</span> <span class="n">PARSEC</span><span class="p">,</span> <span class="n">etc</span><span class="o">.</span><span class="p">)</span>
+
+<span class="n">BinaryPop</span>
+<span class="n">params</span>
+    <span class="n">IMF</span>               <span class="p">(</span><span class="n">IMF</span> <span class="n">of</span> <span class="n">the</span> <span class="n">primary</span><span class="p">)</span>
+    <span class="n">Evolution</span>         <span class="p">(</span><span class="n">BPASS</span><span class="o">...</span><span class="p">)</span>
+    <span class="n">fbin_dist</span>         <span class="p">(</span><span class="n">binary</span> <span class="n">fraction</span> <span class="n">distribution</span><span class="p">)</span>
+    <span class="n">q_dist</span>            <span class="p">(</span><span class="n">mass</span> <span class="n">ratio</span> <span class="n">distribution</span><span class="p">)</span>
+    <span class="n">P_dist</span>            <span class="p">(</span><span class="n">period</span> <span class="n">distribution</span><span class="p">)</span>
+    <span class="n">e_dist</span>            <span class="p">(</span><span class="n">eccentricity</span> <span class="n">distribution</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="abstract-stellar-evolution-classes">
+<h2>Abstract Stellar Evolution Classes<a class="headerlink" href="#abstract-stellar-evolution-classes" title="Link to this heading">¶</a></h2>
+<p>These classes contain interfaces to stellar evolution codes:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SingleStellarEvolution</span>
+<span class="n">params</span>
+    <span class="n">SingleStarPop</span>
+<span class="n">methods</span>
+    <span class="n">props</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>          <span class="p">(</span><span class="n">get</span> <span class="n">stellar</span> <span class="n">properties</span><span class="p">)</span>
+
+<span class="n">BinaryStellarEvolution</span>
+<span class="n">params</span>
+    <span class="n">BinaryPop</span>
+<span class="n">methods</span>
+    <span class="n">props_i</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">e</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>              <span class="p">(</span><span class="n">eccentricity</span> <span class="n">evolution</span><span class="p">)</span>
+    <span class="n">P</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>              <span class="p">(</span><span class="n">Period</span> <span class="n">evolution</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The  <code class="docutils literal notranslate"><span class="pre">props</span></code> methods will return <code class="docutils literal notranslate"><span class="pre">StellarProperties</span></code> structures which are containers
+for all of the properies of a star that are important for its radiation and feedback.</p>
+</section>
+<section id="abstract-atmosphere-classes">
+<h2>Abstract Atmosphere Classes<a class="headerlink" href="#abstract-atmosphere-classes" title="Link to this heading">¶</a></h2>
+<p>This provides the radiative output of a star based on its properties such as bolometric
+luminosity, mass, radius, effective temperature, metallicity:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Atmosphere</span>
+<span class="n">params</span>
+    <span class="n">StellarProperties</span>
+<span class="n">methods</span>
+    <span class="n">get_band</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">band_data</span><span class="p">)</span>
+    <span class="n">get_spec</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="abstract-mechanical-feedback-classes">
+<h2>Abstract Mechanical Feedback Classes<a class="headerlink" href="#abstract-mechanical-feedback-classes" title="Link to this heading">¶</a></h2>
+<p>Classes related to the return of mass, energy, and elements to the ISM:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">MechanicalFeedback</span>
+<span class="n">params</span>
+    <span class="n">inputs</span>
+<span class="n">member</span> <span class="n">classes</span>
+    <span class="n">Winds</span>
+    <span class="n">Supernovae</span>
+    <span class="n">Yields</span>
+
+<span class="n">Winds</span>
+<span class="n">params</span>
+    <span class="n">StellarProperties</span>
+<span class="n">methods</span>
+    <span class="n">mdotw</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>        <span class="p">(</span><span class="n">wind</span> <span class="n">mass</span> <span class="n">loss</span> <span class="n">rates</span><span class="p">)</span>
+    <span class="n">vwind</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>        <span class="p">(</span><span class="n">wind</span> <span class="n">velocities</span><span class="p">)</span>
+
+<span class="n">Supernovae</span>
+<span class="n">params</span>
+    <span class="n">StellarEvolution</span>    <span class="p">(</span><span class="ow">not</span> <span class="n">necessary</span> <span class="n">depending</span> <span class="n">on</span> <span class="n">choices</span><span class="p">)</span>
+<span class="n">methods</span>
+    <span class="n">get_mmax</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>     <span class="p">(</span><span class="n">get</span> <span class="n">maximum</span> <span class="n">mass</span> <span class="n">still</span> <span class="n">alive</span><span class="p">)</span>
+
+<span class="n">Yields</span>
+<span class="n">params</span>
+    <span class="n">wind_ops</span>
+    <span class="n">sn_ops</span>
+<span class="n">methods</span>
+    <span class="n">yi_wind</span>             <span class="p">(</span><span class="n">wind</span> <span class="n">yields</span><span class="p">)</span>
+    <span class="n">yi_sn</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>            <span class="p">(</span><span class="n">supernova</span> <span class="n">yields</span> <span class="k">as</span> <span class="n">a</span> <span class="n">funciton</span> <span class="n">of</span> <span class="n">mass</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Arsenal Gear Code Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#top-level-population-class">Top-Level Population Class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#abstract-stellar-population-classes">Abstract Stellar Population Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#abstract-stellar-evolution-classes">Abstract Stellar Evolution Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#abstract-atmosphere-classes">Abstract Atmosphere Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#abstract-mechanical-feedback-classes">Abstract Mechanical Feedback Classes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tests.html">Automated Tests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="code-models.html"
+                          title="previous chapter">Models Used in Existing Hydrocodes</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="troubleshooting.html"
+                          title="next chapter">Troubleshooting and Known Issues</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/architecture.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="troubleshooting.html" title="Troubleshooting and Known Issues"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="code-models.html" title="Models Used in Existing Hydrocodes"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Arsenal Gear Code Architecture</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

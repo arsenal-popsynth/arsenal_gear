@@ -1,0 +1,31 @@
+﻿arsenal\_gear.dist\_funcs
+=========================
+
+.. automodule:: arsenal_gear.dist_funcs
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   imf
+
