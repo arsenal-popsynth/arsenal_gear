@@ -16,8 +16,7 @@ from tqdm import tqdm
 
 import astropy.units as u
 import numpy as np
-from numpy.polynomial.polynomial import Polynomial
-from scipy.interpolate import lagrange
+from scipy.interpolate import CubicSpline
 from astropy.units import Quantity
 
 
@@ -85,7 +84,7 @@ class Isochrone():
             print(f"Invalid .txz file: {e}")
             return False
 
-    def get_Mmax(self, age:Quantity["time"]) -> Quantity["mass"]:
+    def mmax(self, age:Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
         died yet (in e.g. a SN) as a function of age
@@ -285,52 +284,27 @@ class MIST(Isochrone):
 
         return ais
 
-    def get_Mmax(self, age: Quantity["time"]) -> Quantity["mass"]:
+    def mmax(self, age: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
-        died yet (in e.g. a SN) as a funciton of age
+        died yet (in e.g. a SN) as a funciton of age, using a cubic spline
+        based on maximum mass reported in the isochrone data
         """
         if np.isscalar(age.value):
             age = np.array([age.value])*age.unit
 
-        # linear interpolation in log(age) to get the maximum mass
+        # cubic spline interpolation in log(age) to get the maximum mass
+        lages = self.ages
         ai = self.age_index(age)
         lage = np.log10(age.to(u.yr).value)
-        a_lo = np.array([self.ages[i] for i in ai])
-        a_hi = np.array([self.ages[i+1] for i in ai])
-        mmax_lo = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
-        mmax_hi = np.array([np.max(self.isos[i+1]['initial_mass']) for i in ai])
-        s = (mmax_hi - mmax_lo)/(a_hi - a_lo)
-        o_s = mmax_lo - s*a_lo
-        if len(age) == 1:
-            return (s*lage + o_s)[0]*u.Msun
-        return (s*lage + o_s)*u.Msun
+        mmax = self.mmaxes
+        return CubicSpline(lages,mmax,bc_type="clamped")(lage)*u.Msun
 
-    def get_Mmax2(self, age: Quantity["time"]) -> Quantity["mass"]:
+    
+    def mmaxdot(self, age: Quantity["time"]) -> Quantity["mass"]:
         """
-        get the maximum mass of the stellar population that hasn't
-        died yet (in e.g. a SN) as a funciton of age
-        """
-        if np.isscalar(age.value):
-            age = np.array([age.value])*age.unit
-
-        # linear interpolation in log(age) to get the maximum mass
-        ai = self.age_index(age)
-        lage = np.log10(age.to(u.yr).value)
-        a_lo = np.array([self.ages[i] for i in ai])
-        a_hi = np.array([self.ages[i+1] for i in ai])
-        mmax_lo = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
-        mmax_hi = np.array([np.max(self.isos[i+1]['initial_mass']) for i in ai])
-        s = (np.log10(mmax_hi) - np.log10(mmax_lo))/(a_hi - a_lo)
-        o_s = np.log10(mmax_lo) - s*a_lo
-        if len(age) == 1:
-            return (10**(s*lage + o_s))[0]*u.Msun
-        return (10**(s*lage + o_s))*u.Msun
-
-    def get_Mmax3(self, age: Quantity["time"]) -> Quantity["mass"]:
-        """
-        get the maximum mass of the stellar population that hasn't
-        died yet (in e.g. a SN) as a funciton of age
+        get the rate of change of the maximum mass of the stellar population
+        with respect to time. Uses a cubic spline and takes the derivative
         """
         if np.isscalar(age.value):
             age = np.array([age.value])*age.unit
@@ -340,7 +314,6 @@ class MIST(Isochrone):
         ai = self.age_index(age)
         lage = np.log10(age.to(u.yr).value)
         mmax = self.mmaxes
-        aranges = [lages[max(i-1,0):i+3] for i in ai]
-        mranges = [mmax[max(i-1,0):i+3] for i in ai]
-        fs = [Polynomial(lagrange(aranges[j],mranges[j]).coef[::-1]) for j in range(len(ai))]
-        return np.array([fs[j](lage[j]) for j in range(len(ai))])*u.Msun
+        # return the first derivative of the cubic spline
+        unitfac = u.Msun/age.to(u.Myr)/np.log(10)
+        return CubicSpline(lages,mmax,bc_type="clamped")(lage, 1)*unitfac

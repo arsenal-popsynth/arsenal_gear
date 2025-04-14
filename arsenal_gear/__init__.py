@@ -27,6 +27,8 @@ class StellarPopulation():
     def __init__(self, verbose:bool=False, discrete:bool=True) -> None:
         self.Mtot = 1e6*u.Msun
         self.imf = dist_funcs.imf.Salpeter(0.08*u.Msun, 100*u.Msun, alpha=2.3)
+        # expected number of stars
+        self.Nstar = (self.Mtot/self.imf.mean()).value
         self.discrete = discrete
         # relative to solar
         self.metallicity = 1.0
@@ -40,14 +42,15 @@ class StellarPopulation():
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 
+        # initialize the isochrone
         self.metallicity = 0.0
         self.iso = stellar_evolution.isochrone.MIST(self.metallicity,verbose=verbose)
 
-    def get_NSN(self, t:Quantity["time"]) -> int:
+    def nsn(self, t:Quantity["time"]) -> int:
         """
         Return the number of supernovae that have gone off by time t
         """
-        Mmax = self.iso.get_Mmax3(t)
+        Mmax = self.iso.mmax(t)
         #if self.discrete:
         #    res = [len(np.where(self.masses.value >= max(8, mmi.value))[0]) for mmi in Mmax]
         #    return np.array(res)
@@ -55,7 +58,15 @@ class StellarPopulation():
         fexp_8 = 1 - self.imf.cdf(8*u.Msun)
         fexp = 1 - self.imf.cdf(Mmax)
         fexp = fexp*(fexp < fexp_8) + fexp_8*(fexp >= fexp_8)
-        return (fexp*self.Mtot/self.imf.mean()).value
+        return fexp*self.Nstar
+
+    def ndotsn(self, t:Quantity["time"]) -> int:
+        """
+        Return the rate of supernovae at time t: the derivative of nsn
+        """
+        Mmax = self.iso.mmax(t)
+        Mmaxdot = self.iso.mmaxdot(t)
+        return -self.imf.pdf(Mmax)*Mmaxdot*(Mmax.value>8)*self.Nstar
 
     def __call__(self, N:int) -> population.StarPopulation:
         """
