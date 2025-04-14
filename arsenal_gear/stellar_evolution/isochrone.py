@@ -88,8 +88,19 @@ class Isochrone():
         """
         get the maximum mass of the stellar population that hasn't
         died yet (in e.g. a SN) as a function of age
+
+        default function in base class
         """
         return 0.0*u.Msun
+
+    def mmaxdot(self, age: Quantity["time"]) -> Quantity["mass"]:
+        """
+        get the rate of change of the maximum mass of the stellar population
+        with respect to time.
+
+        Default function in base class
+        """
+        return 0.0*u.Msun/u.Myr
 
 class MIST(Isochrone):
     """
