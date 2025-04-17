@@ -10,25 +10,38 @@ import os
 from pathlib import Path
 import tarfile
 import time
+from functools import reduce
 
 import requests
 from tqdm import tqdm
 
 import astropy.units as u
 import numpy as np
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline, pchip_interpolate
 from astropy.units import Quantity
 
+from . import utils as se_utils
 
 class Isochrone():
     """
     This class is used to load and interpret isochrones from various sources
     """
-    def __init__(self, met:np.float32) -> None:
+    def __init__(self, **kwargs) -> None:
         # laying out the basic attributed of the isochrone class
         self.filename = ""
         # the metallicity of the isochrone relative to solar
-        self.met = met
+        self.met = kwargs.get('met', 0.0)
+        # determines whether or not thie isochrone instance
+        # is being used for testing or not. This changes the 
+        # selection of the isochrone data to leave out the 
+        # data being compared against.
+        self.test = kwargs.get('test', False)
+        # decides on verbose output
+        self.verbose = kwargs.get('verbose', False)
+        # whether or not to print output related to code profiling
+        self.profile = kwargs.get('profile', False)
+        # decides whether or not to force a download of the isochrone data
+        self.force_download = kwargs.get('force_download', False)
 
     @staticmethod
     def downloader(fname, url, message):
@@ -84,23 +97,39 @@ class Isochrone():
             print(f"Invalid .txz file: {e}")
             return False
 
-    def mmax(self, age:Quantity["time"]) -> Quantity["mass"]:
+    def mmax(self, t:Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
-        died yet (in e.g. a SN) as a function of age
+        died yet (in e.g. a SN) as a function of age, t
 
         default function in base class
         """
         return 0.0*u.Msun
 
-    def mmaxdot(self, age: Quantity["time"]) -> Quantity["mass"]:
+    def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the rate of change of the maximum mass of the stellar population
         with respect to time.
 
         Default function in base class
+        Args:
+            t: the age of the isochrone.
         """
         return 0.0*u.Msun/u.Myr
+
+    def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+        """
+        get the bolometric luminosity of a star of initial mass mini at age age
+
+        Default function in base class
+        
+        Args:
+            mini: the initial mass of the star.
+            t: the age of the isochrone.
+        Returns:
+            Quantity["power"]: the bolometric luminosity of the star.
+        """
+        return 0.0*u.erg/u.s
 
 class MIST(Isochrone):
     """
@@ -110,19 +139,18 @@ class MIST(Isochrone):
 
     """
     # basic options for MIST isochrones
-    url_temp = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit{}_basic_isos.txz"
+    mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit{}_basic_isos.txz"
     vcrits   = ["0.0", "0.4"]
     mets     = ["m4.00", "m3.50", "m3.00", "m2.50", "m2.00", "m1.75", "m1.50", "m1.25",\
                 "m1.00", "m0.75", "m0.50", "m0.25", "p0.00", "p0.25", "p0.50"]
-    def __init__(self, met:np.float32, vvcrit:str="0.0", rootdir:str=None,
-                 force_download:bool=False, verbose:bool=False) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         Args:
             met: the metallicity of the isochrone relative to solar
 
         Usage:
             >> iso = read_mist_models.ISO('MIST_v1.0_feh_p0.00_afe_p0.0_vvcrit0.4.iso')
-            >> age_ind = iso.age_index(8.0)
+            >> age_ind = iso._age_index(8.0)
             >> logTeff = iso.isos[age_ind]['log_Teff']
             >> logL = iso.isos[age_ind]['log_L']
             >> plt.plot(logTeff, logL) #plot the HR diagram for logage = 8.0
@@ -137,34 +165,34 @@ class MIST(Isochrone):
             isos        Data.
         """
         # set input parameters
-        super().__init__(met)
-        if met<0:
-            self.metstr = f"m{-1*met:.2f}"
+        super().__init__(**kwargs)
+        self.vvcrit = kwargs.get("vvcrit", "0.0")
+        self.rootdir = kwargs.get("rootdir", None)
+
+        if self.met<0:
+            self.metstr = f"m{-1*self.met:.2f}"
         else:
-            self.metstr = f"p{met:.2f}"
+            self.metstr = f"p{self.met:.2f}"
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
-        if vvcrit not in ["0.0", "0.4"]:
+        if self.vvcrit not in ["0.0", "0.4"]:
             raise ValueError("vvcrit must be either 0.0 or 0.4 for MIST isochrones")
-        self.vvcrit = vvcrit
-        self.rootdir = rootdir
-        self.force_download = force_download
-        self.verbose = verbose
 
         # set directories, download data if necessary
         data_acq_start = time.time()
         self.get_data()
         data_acq_end = time.time()
-        if verbose:
+        if self.verbose:
             print("Time to acquire data: ", data_acq_end - data_acq_start)
 
-        if verbose:
+        if self.verbose:
             print('Reading in: ' + self.isofile)
 
         self.ages, self.hdr_list, self.isos = self.read_iso_file()
         # get the maximum mass still alive for each isochrone
         ai = np.arange(len(self.ages))
         self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
+        self.MMAX = self.mmaxes[0]
         self.metallicity = self.abun['[Fe/H]']
 
     def get_data(self):
@@ -210,7 +238,7 @@ class MIST(Isochrone):
             print("Force download: ", self.force_download)
 
         if self.force_download:
-            url = self.url_temp.format(self.vvcrit)
+            url = self.mist_url.format(self.vvcrit)
             message = "Downloading MIST isochrone data"
             # download the tarfile
             self.downloader(self.rootdir / self.tarfile, url, message)
@@ -275,7 +303,7 @@ class MIST(Isochrone):
             counter+= 3+num_eeps+2
         return ages, hdr_list, iso_set
 
-    def age_index(self, age : Quantity["time"]) -> int:
+    def _age_index(self, age : Quantity["time"]) -> int:
         """
 
         Returns the index of the isochrone closest to the requested age
@@ -286,45 +314,234 @@ class MIST(Isochrone):
 
         """
         lage = np.log10(age.to(u.yr).value)
-        ais = [np.where(np.array(self.ages) - la < 0)[0][-1] for la in lage]
-        ais = np.array(ais, dtype=int)
-
         if (max(lage) > max(self.ages)) or (min(lage) < min(self.ages)):
             print('The requested age is outside the range. Try between '
                   + str(min(self.ages)) + ' and ' + str(max(self.ages)))
+            raise ValueError("Age is outside the range of the isochrones")
+
+        ais = [np.where(np.array(self.ages) - la < 0)[0][-1] for la in lage]
+        ais = np.array(ais, dtype=int)
 
         return ais
 
-    def mmax(self, age: Quantity["time"]) -> Quantity["mass"]:
+    def _get_ai_range(self, ai:int, n:int)-> int:
+        """
+        Gets the range of age indices to use for isochrone interpolation
+        on n nearby points around age index ai. Leaves out the nearest
+        isochrone if in testing mode.
+        Args:
+            ai: the index of the isochrone.
+            n: the number of nearby points to use for interpolation.
+        Returns:
+            ais: the indices of the isochrones to use for interpolation.
+        """
+        nages = len(self.ages)
+
+        if (self.test and ((ai==0) or (ai == nages-1))):
+            raise ValueError("Test Isochrone must be in middle of isochrone range")
+        if (n<=1):
+            raise ValueError("Must Request more than one point for interpolation")
+    
+        # decide on right range of isochrone indices
+        if (ai-n//2 <= 0):
+            if self.test:
+                ais = np.concatenate((np.arange(0, ai), np.arange(ai+1, n+1)))
+            else:
+                ais = np.arange(0, n)
+        elif (ai+n//2+1 >= nages):
+            if self.test:
+                ais = np.concatenate((np.arange(nages-n-1, ai), np.arange(ai+1, nages)))
+            else:
+                ais = np.arange(nages-n, nages)
+        else:
+            if n%2 == 0:
+                if self.test:
+                    ais = np.concatenate((np.arange(ai-n//2, ai),np.arange(ai+1, ai+n//2+1)))
+                else:
+                    ais = np.arange(ai-n//2+1, ai+n//2+1)
+            else:
+                if self.test:
+                    ais = np.concatenate((np.arange(ai-n//2, ai),np.arange(ai+1,ai+n//2+2)))
+                else:
+                    ais = np.arange(ai-n//2, ai+n//2+1)
+        return np.array(ais,dtype=int)
+
+    @staticmethod
+    def _fixed_eep_q(j:int, eeps:list, qs:list):
+        """
+        Returns the value of a isochrone quantity at a fixed EEP
+        across severl isochrones at different times.
+        Args:
+            j: the index of the EEP to get values for
+            eeps: the list of EEPs for each isochrone.
+            qs: the list of quantities for each isochrone.
+        Returns:
+            qj: the quantity at the fixed EEP.
+        """
+        return [q[np.where(eep == j)[0][0]] for (q,eep) in zip(qs,eeps)]
+
+    def _interp_iso_quantity(self, t:Quantity["time"], label:str,
+                             method:str="pchip", make_monotonic:bool=False) -> (np.float64, np.float64):
+        """
+        Interpolates between isochrones using the EEP values to create an
+        intermediate age isochrone
+        Args:
+            t: The age of the isochrone to be generated, should a single value.
+            label: The label of the quantity to be interpolated.
+        Returns:
+            qi: The specified quantity at the requested age. This is a function of
+                initial mass which can also be generated in this way.
+            eepi: The EEP values corresponding to the interpolated isochrone.
+        """
+        if not(np.isscalar(t.value)):
+            # throw error
+            raise ValueError("t must be a scalar")
+        else:
+            t = np.array([t.value])*t.unit
+    
+        start = time.time()
+        ai = self._age_index(t)[0]
+        ais = self._get_ai_range(ai, 4)
+        lages = [self.ages[i] for i in ais]
+        lt = np.log10(t.to(u.yr).value)
+        qs = [self.isos[i][label] for i in ais]
+        eeps = [self.isos[i]['EEP'] for i in ais]
+
+        # eeps present in all isochrones
+        eepi = reduce(np.intersect1d, tuple(eeps))
+        if (method == "pchip"):
+            f = lambda x,x0,y0: pchip_interpolate(x0,y0,x)[0]
+        elif (method == "linear"):
+            f = lambda x,x0,y0: np.interp(x,x0,y0)[0]
+        else:
+            raise ValueError("method must be either pchip or linear")
+        end = time.time()
+        if self.profile:
+            print("\t\tSet up of inerpolation took: ", end-start)
+
+        # interpolate in log(age) at each eep
+        start = time.time()
+        qi = np.array([f(lt, lages, self._fixed_eep_q(j,eeps,qs)) for j in eepi])
+        end = time.time()
+        if self.profile:
+            print("\t\tInterpolation took: ", end-start)
+
+
+        if make_monotonic:
+            start = time.time()
+            if np.any(np.diff(qi) < 0):
+                se_utils._make_monotonic(eepi,qi)
+            end = time.time()
+            if self.profile:
+                print("\t\tMonotonic interpolation took: ", end-start)
+
+        return (eepi,qi)
+
+    def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
         died yet (in e.g. a SN) as a funciton of age, using a cubic spline
         based on maximum mass reported in the isochrone data
         """
-        if np.isscalar(age.value):
-            age = np.array([age.value])*age.unit
+        if np.isscalar(t.value):
+            t = np.array([t.value])*t.unit
 
         # cubic spline interpolation in log(age) to get the maximum mass
         lages = self.ages
-        ai = self.age_index(age)
-        lage = np.log10(age.to(u.yr).value)
+        ai = self._age_index(t)
+        lt = np.log10(t.to(u.yr).value)
         mmax = self.mmaxes
-        return CubicSpline(lages,mmax,bc_type="clamped")(lage)*u.Msun
+        return CubicSpline(lages,mmax,bc_type="clamped")(lt)*u.Msun
 
     
-    def mmaxdot(self, age: Quantity["time"]) -> Quantity["mass"]:
+    def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the rate of change of the maximum mass of the stellar population
         with respect to time. Uses a cubic spline and takes the derivative
         """
-        if np.isscalar(age.value):
-            age = np.array([age.value])*age.unit
+        if np.isscalar(t.value):
+            t = np.array([t.value])*t.unit
 
-        # quartic interpolation in log(age) to get the maximum mass
+        # cubic spline interpolation in log(age) followed by derivative
         lages = self.ages
-        ai = self.age_index(age)
-        lage = np.log10(age.to(u.yr).value)
+        ai = self._age_index(t)
+        lt = np.log10(t.to(u.yr).value)
         mmax = self.mmaxes
         # return the first derivative of the cubic spline
-        unitfac = u.Msun/age.to(u.Myr)/np.log(10)
-        return CubicSpline(lages,mmax,bc_type="clamped")(lage, 1)*unitfac
+        unitfac = u.Msun/t.to(u.Myr)/np.log(10)
+        return CubicSpline(lages,mmax,bc_type="clamped")(lt, 1)*unitfac
+
+    def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+        """
+        get the bolometric luminosity of a star of initial mass mini at age t
+        Args:
+            mini: the initial mass of the star. Can be an array
+            t: the age of the isochrone. Should be a single time (for now...)
+        Returns:
+            Quantity["power"]: the bolometric luminosity of the star.
+        """
+
+        if np.isscalar(mini.value):
+            mini = np.array([mini.value])*mini.unit
+        
+        # construct isochrone for mass/luminosity relationship
+        start = time.time()
+        (eepi,logLi) = self._interp_iso_quantity(t, 'log_L')
+        end = time.time()
+        if self.profile:
+            print("\tTime to interpolate Lbol: ", end-start)
+        start = time.time()
+        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass', make_monotonic=True)
+        end = time.time()
+        if self.profile:
+            print("\tTime to interpolate mass: ", end-start)
+
+        logLbol_res = pchip_interpolate(massi, logLi, mini.value)
+        Lbol_res = np.power(10, logLbol_res)*u.Lsun
+        Lbol_res *= np.logical_and(mini.value > min(massi), mini.value < max(massi))
+        return Lbol_res
+
+    def teff(self, mini:Quantity["mass"], t: Quantity["time"],method:str="pchip") -> Quantity["temperature"]:
+        """
+        get the atmospheric effective temperature of a star of initial mass mini
+        at age t
+        Args:
+            mini: the initial mass of the star. Can be an array
+            t: the age of the isochrone. Should be a single time (for now...)
+        Returns:
+            Quantity["power"]: the bolometric luminosity of the star.
+        """
+
+        if np.isscalar(mini.value):
+            mini = np.array([mini.value])*mini.unit
+
+        # construct isochrone for mass/temperature relationship
+        start = time.time()
+        (eepi,logTi) = self._interp_iso_quantity(t, 'log_Teff',method=method)
+        end = time.time()
+        if self.profile:
+            print("\tTime to interpolate Teff: ", end-start)
+        start = time.time()
+        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass',make_monotonic=True)
+        end = time.time()
+        if self.profile:
+            print("\tTime to interpolate mass: ", end-start)
+
+        logTeff_res = pchip_interpolate(massi, logTi, mini.value)
+        Teff_res = np.power(10, logTeff_res)*u.K
+        Teff_res *= np.logical_and(mini.value > min(massi), mini.value < max(massi))
+        return Teff_res
+
+    def mini(self, t: Quantity["time"],method:str="pchip") -> Quantity["temperature"]:
+        """
+        get the atmospheric effective temperature of a star of initial mass mini
+        at age t
+        Args:
+            mini: the initial mass of the star. Can be an array
+            t: the age of the isochrone. Should be a single time (for now...)
+        Returns:
+            Quantity["power"]: the bolometric luminosity of the star.
+        """
+
+        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass')
+        return (eepi,massi)

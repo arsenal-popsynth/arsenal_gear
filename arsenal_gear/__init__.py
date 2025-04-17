@@ -24,27 +24,30 @@ class StellarPopulation():
     pre-calculated parameters for the feedback and radiaiton.
     """
 
-    def __init__(self, verbose:bool=False, discrete:bool=True) -> None:
-        self.Mtot = 1e6*u.Msun
+    def __init__(self, **kwargs) -> None:
+        # unpack kwarg parameters
+        # total mass of the population
+        self.Mtot = kwargs.get("Mtot",1e6*u.Msun)
+        self.verbose = kwargs.get("verbose", False)
+        self.discrete = kwargs.get("discrete", True)
+
         self.imf = dist_funcs.imf.Salpeter(0.08*u.Msun, 100*u.Msun, alpha=2.3)
         # expected number of stars
         self.Nstar = (self.Mtot/self.imf.mean()).value
-        self.discrete = discrete
-        # relative to solar
-        self.metallicity = 1.0
+        # log10(Z/Zsun)
+        self.metallicity = kwargs.get("metallicity", 0.0)
         # generate masses
         if self.discrete:
             start_samp = time.time()
             self.masses = self.imf.sample_mass(self.Mtot)
             end_samp = time.time()
-            if verbose:
+            if self.verbose:
                 print("Time to sample masses: ", end_samp - start_samp)
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 
         # initialize the isochrone
-        self.metallicity = 0.0
-        self.iso = stellar_evolution.isochrone.MIST(self.metallicity,verbose=verbose)
+        self.iso = stellar_evolution.isochrone.MIST(**kwargs)
 
     def nsn(self, t:Quantity["time"]) -> int:
         """
