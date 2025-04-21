@@ -552,7 +552,7 @@ class MIST(Isochrone):
 
         (lages, mmax) = self._get_mmax_age_interp()
         # cubic spline interpolation in log(age)
-        interp = CubicSpline(lages,mmax,bc_type="clamped")(lt)
+        interp = pchip_interpolate(lages,mmax, lt)
         interp[np.where(lt < min(lages))] = self.MMAX
         interp[np.where(lt > max(lages))] = 0.0
         return interp*u.Msun
@@ -571,7 +571,7 @@ class MIST(Isochrone):
         (lages, mmax) = self._get_mmax_age_interp()
         # return the first derivative of the cubic spline
         unitfac = u.Msun/t.to(u.Myr)/np.log(10)
-        interp = CubicSpline(lages,mmax,bc_type="clamped")(lt, 1)*unitfac
+        interp = pchip_interpolate(lages,mmax, lt, der=1)*unitfac
         interp *= np.logical_and(lt > min(lages), lt < max(lages)) 
         return interp
 

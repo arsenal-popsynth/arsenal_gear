@@ -35,13 +35,12 @@ def _index_monotonic(y: np.float64) -> np.ndarray:
     j = 0
     out = []
     while(j < len(y)-1):
+        out.append(j)
         if y[j] > y[j+1]:
             k = j+1
             while(y[j]>y[k]):
                 k += 1
-            out.append(k)
             j = k+1
         else:
-            out.append(j)
             j += 1
     return np.array(out, dtype=int)
