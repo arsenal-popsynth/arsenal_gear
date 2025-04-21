@@ -6,11 +6,13 @@ This submodule defines the interface to various stellar evolution codes
 through interpreting and processing their isochrones
 """
 
+from functools import reduce
+import glob
 import os
+import os.path as osp
 from pathlib import Path
 import tarfile
 import time
-from functools import reduce
 
 import requests
 from tqdm import tqdm
@@ -27,8 +29,6 @@ class Isochrone():
     This class is used to load and interpret isochrones from various sources
     """
     def __init__(self, **kwargs) -> None:
-        # laying out the basic attributed of the isochrone class
-        self.filename = ""
         # log10(Z/Zsun)
         self.met = kwargs.get('met', 0.0)
         # determines whether or not thie isochrone instance
@@ -96,6 +96,38 @@ class Isochrone():
         except (tarfile.TarError, ValueError, OSError, EOFError) as e:
             print(f"Invalid .txz file: {e}")
             return False
+
+    @staticmethod
+    def extract_one(fname, extractdir, delete_txz=False):
+        """
+        Unzips a single ZIP file.
+        """
+        # Ensure output directory exists
+        os.makedirs(extractdir, exist_ok=True)
+        if not tarfile.is_tarfile(fname):
+            raise IOError(f'{fname} is not a valid txz file. '
+                          'Try again with `force_download=True`')
+        with tarfile.open(fname, 'r:xz') as tar:
+            tar.extractall(path=extractdir)
+
+        if delete_txz and fname.exists():
+            print(fname)
+            fname.unlink()
+
+        return extractdir
+
+    @staticmethod
+    def _find_match(patterns, base_dir=None):
+        if base_dir is None:
+            glob_match = lambda p: sorted(glob.glob(*p))
+        else:
+            glob_match = lambda p: sorted(glob.glob(osp.join(base_dir,*p)))
+        for p in patterns:
+            f = glob_match(p)
+            if f:
+                break
+
+        return f
 
     def mmax(self, t:Quantity["time"]) -> Quantity["mass"]:
         """
@@ -193,13 +225,11 @@ class MIST(Isochrone):
 
         if self.verbose:
             print('Reading in data...')
-
-        self.ages, self.hdr_list, self.isos = self.read_iso_file()
-        # get the maximum mass still alive for each isochrone
-        ai = np.arange(len(self.ages))
-        self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in ai])
-        self.MMAX = self.mmaxes[0]
-        self.metallicity = self.abun['[Fe/H]']
+        data_read_start = time.time()
+        self.read_data()
+        data_read_end = time.time()
+        if self.verbose:
+            print("Time to read data: ", data_read_end - data_read_start)
 
     def get_data(self):
         """
@@ -253,37 +283,48 @@ class MIST(Isochrone):
 
         if self.force_download:
             url = self.mist_url.format(self.tarfile)
-            message = "Downloading MIST isochrone data"
+            message = "Downloading MIST data"
             # download the tarfile
             self.downloader(self.rootdir / self.tarfile, url, message)
             self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
-    
-    @staticmethod
-    def extract_one(fname, extractdir, delete_txz=False):
-        """
-        Unzips a single ZIP file.
-        """
-        # Ensure output directory exists
-        os.makedirs(extractdir, exist_ok=True)
-        if not tarfile.is_tarfile(fname):
-            raise IOError(f'{fname} is not a valid txz file. '
-                          'Try again with `force_download=True`')
-        with tarfile.open(fname, 'r:xz') as tar:
-            tar.extractall(path=extractdir)
 
-        if delete_txz and fname.exists():
-            print(fname)
-            fname.unlink()
+    def read_data(self):
+        if self.interp_op == "iso":
+            self.ages, self.hdr_list, self.isos = self.read_iso_file()
+            # get the maximum mass still alive for each isochrone
+            na = self.num_ages
+            self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in na])
+            self.MMAX = self.mmaxes[0]
+            self.metallicity = self.abun['[Fe/H]']
+        else:
+            eep_file_pattern = [("?????M.track.eep",),]
+            mass_file_list = self._find_match(eep_file_pattern, self.rootdir / self.modeldir)
+            mass_nums = [int(f.split("/")[-1].split("M")[0]) for f in mass_file_list]
+            self.num_masses = len(mass_nums)
 
-        return extractdir
+            masses = []
+            eeps_list = []
+            mass_set = []
+            min_ages = []
+            max_ages = []
+            for f in mass_file_list:
+                # read in the EEP file
+                minit, eeps, min_age, max_age, data = self.read_eep_file(f)
+                # store the mass and EEP data
+                masses.append(minit)
+                eeps_list.append(eeps)
+                min_ages.append(min_age)
+                max_ages.append(max_age)
+                mass_set.append(data)
+            self.masses = masses
+            self.eeps_list = eeps_list
+            self.min_ages = min_ages
+            self.max_ages = max_ages
+            self.mass_set = mass_set
 
     def read_iso_file(self):
         """
-
         Reads in the isochrone file.
-
-        Args:
-            filename: the name of .iso file.
 
         """
 
@@ -291,9 +332,10 @@ class MIST(Isochrone):
         fname = self.rootdir / self.modeldir / self.isofile
         with open(fname, encoding='utf-8') as f:
             content = [line.split() for line in f]
-        self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
-        self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
-        self.rot = float(content[4][-1])
+        if not hasattr(self, 'version'):
+            self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
+            self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
+            self.rot = float(content[4][-1])
         self.num_ages = int(content[6][-1])
 
         #read one block for each isochrone
@@ -302,20 +344,48 @@ class MIST(Isochrone):
         counter = 0
         data = content[8:]
         for _ in range(self.num_ages):
-            #grab info for each isochrone
+            # grab info for each isochrone
             num_eeps = int(data[counter][-2])
             num_cols = int(data[counter][-1])
             hdr_list = data[counter+2][1:]
             formats = tuple([np.int32]+[np.float64 for i in range(num_cols-1)])
             iso = np.zeros((num_eeps),{'names':tuple(hdr_list),'formats':tuple(formats)})
-            #read through EEPs for each isochrone
+            # read through EEPs for each isochrone
             for eep in range(num_eeps):
                 iso_chunk = data[3+counter+eep]
-                iso[eep]=tuple(iso_chunk)
+                iso[eep] = tuple(iso_chunk)
             iso_set.append(iso)
             ages.append(iso[0][1])
             counter+= 3+num_eeps+2
         return ages, hdr_list, iso_set
+
+    def read_eep_file(self, fname):
+
+        """
+        Reads in an EEP file.
+
+        """
+
+        evol = np.loadtxt(fname, skiprows=11).T
+        with open(fname) as f:
+            content = [line.split() for line in f]
+
+        if not hasattr(self, 'version'):
+            self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
+            self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
+            self.rot = float(content[4][-1])
+            self.hdr_list = content[11][1:]
+        minit = float(content[7][1])
+        hdr_list = content[11][1:]
+        num_eeps = int(content[7][2])
+        eeps = [int(j) for j in content[8][2:]]
+
+
+        data = {hdr_list[i]:evol[i] for i in range(len(hdr_list))}
+        min_age = min(data["star_age"])
+        max_age = max(data["star_age"])
+
+        return minit, eeps, min_age, max_age, data
 
     def _age_index(self, age : Quantity["time"]) -> int:
         """
