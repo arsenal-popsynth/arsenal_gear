@@ -293,7 +293,7 @@ class MIST(Isochrone):
             self.ages, self.hdr_list, self.isos = self.read_iso_file()
             # get the maximum mass still alive for each isochrone
             na = self.num_ages
-            self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in na])
+            self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in range(na)])
             self.MMAX = self.mmaxes[0]
             self.metallicity = self.abun['[Fe/H]']
         else:
@@ -316,11 +316,12 @@ class MIST(Isochrone):
                 min_ages.append(min_age)
                 max_ages.append(max_age)
                 mass_set.append(data)
-            self.masses = masses
+            self.masses = np.array(masses)
             self.eeps_list = eeps_list
-            self.min_ages = min_ages
-            self.max_ages = max_ages
+            self.min_ages = np.array(min_ages)
+            self.max_ages = np.array(max_ages)
             self.mass_set = mass_set
+            self.MMAX = np.max(masses)
 
     def read_iso_file(self):
         """
@@ -521,6 +522,23 @@ class MIST(Isochrone):
 
         return (eepi,qi)
 
+    def _get_mmax_age_interp(self):
+        """
+        Returns the maximum mass as a function of age,
+        properly interpreted from either the isochrone or EEP data.
+        """
+        if self.interp_op == "iso":
+            lages = self.ages
+            mmax = self.mmaxes
+        else:
+            # interpreting from EEPs
+            lages = np.log10(self.max_ages)[::-1]
+            mmax = self.masses[::-1]
+            sel = se_utils._index_monotonic(lages)
+            lages = lages[sel]
+            mmax = mmax[sel]
+        return (lages, mmax)
+
     def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
@@ -530,12 +548,14 @@ class MIST(Isochrone):
         if np.isscalar(t.value):
             t = np.array([t.value])*t.unit
 
-        # cubic spline interpolation in log(age) to get the maximum mass
-        lages = self.ages
-        ai = self._age_index(t)
         lt = np.log10(t.to(u.yr).value)
-        mmax = self.mmaxes
-        return CubicSpline(lages,mmax,bc_type="clamped")(lt)*u.Msun
+
+        (lages, mmax) = self._get_mmax_age_interp()
+        # cubic spline interpolation in log(age)
+        interp = CubicSpline(lages,mmax,bc_type="clamped")(lt)
+        interp[np.where(lt < min(lages))] = self.MMAX
+        interp[np.where(lt > max(lages))] = 0.0
+        return interp*u.Msun
 
     
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
@@ -546,14 +566,14 @@ class MIST(Isochrone):
         if np.isscalar(t.value):
             t = np.array([t.value])*t.unit
 
-        # cubic spline interpolation in log(age) followed by derivative
-        lages = self.ages
-        ai = self._age_index(t)
         lt = np.log10(t.to(u.yr).value)
-        mmax = self.mmaxes
+
+        (lages, mmax) = self._get_mmax_age_interp()
         # return the first derivative of the cubic spline
         unitfac = u.Msun/t.to(u.Myr)/np.log(10)
-        return CubicSpline(lages,mmax,bc_type="clamped")(lt, 1)*unitfac
+        interp = CubicSpline(lages,mmax,bc_type="clamped")(lt, 1)*unitfac
+        interp *= np.logical_and(lt > min(lages), lt < max(lages)) 
+        return interp
 
     def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
         """

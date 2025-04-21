@@ -27,3 +27,21 @@ def _make_monotonic(x: np.float64, y:np.float64) -> np.float64:
             j = k
         else:
             j+=1
+
+def _index_monotonic(y: np.float64) -> np.ndarray:
+    """
+    Return the indices of the array y such that y is monotonic increasing
+    """
+    j = 0
+    out = []
+    while(j < len(y)-1):
+        if y[j] > y[j+1]:
+            k = j+1
+            while(y[j]>y[k]):
+                k += 1
+            out.append(k)
+            j = k+1
+        else:
+            out.append(j)
+            j += 1
+    return np.array(out, dtype=int)
