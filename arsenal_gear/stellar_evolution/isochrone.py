@@ -29,7 +29,7 @@ class Isochrone():
     def __init__(self, **kwargs) -> None:
         # laying out the basic attributed of the isochrone class
         self.filename = ""
-        # the metallicity of the isochrone relative to solar
+        # log10(Z/Zsun)
         self.met = kwargs.get('met', 0.0)
         # determines whether or not thie isochrone instance
         # is being used for testing or not. This changes the 
@@ -139,7 +139,7 @@ class MIST(Isochrone):
 
     """
     # basic options for MIST isochrones
-    mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit{}_basic_isos.txz"
+    mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/{}"
     vcrits   = ["0.0", "0.4"]
     mets     = ["m4.00", "m3.50", "m3.00", "m2.50", "m2.00", "m1.75", "m1.50", "m1.25",\
                 "m1.00", "m0.75", "m0.50", "m0.25", "p0.00", "p0.25", "p0.50"]
@@ -178,6 +178,12 @@ class MIST(Isochrone):
         if self.vvcrit not in ["0.0", "0.4"]:
             raise ValueError("vvcrit must be either 0.0 or 0.4 for MIST isochrones")
 
+        # decide whether to use EEPs or isochrones to interpolate
+        # creating between for new isochrones
+        self.interp_op = kwargs.get("interp_op", "iso")
+        if self.interp_op not in ["iso", "eep"]:
+            raise ValueError("interp_op must be either iso or eep")
+
         # set directories, download data if necessary
         data_acq_start = time.time()
         self.get_data()
@@ -186,7 +192,7 @@ class MIST(Isochrone):
             print("Time to acquire data: ", data_acq_end - data_acq_start)
 
         if self.verbose:
-            print('Reading in: ' + self.isofile)
+            print('Reading in data...')
 
         self.ages, self.hdr_list, self.isos = self.read_iso_file()
         # get the maximum mass still alive for each isochrone
@@ -204,13 +210,18 @@ class MIST(Isochrone):
             None
         """
         # set model directory, tarfile, and filename
-        mod_temp = "MIST_v1.2_vvcrit{}_basic_isos"
-        self.modeldir = mod_temp.format(self.vvcrit)
-        tar_temp = "MIST_v1.2_vvcrit{}_basic_isos.txz"
-        self.tarfile = tar_temp.format(self.vvcrit)
-        iso_fname_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_basic.iso"
-        self.isofile = iso_fname_temp.format(self.metstr, self.vvcrit)
-
+        if self.interp_op == "iso":
+            mod_temp = "MIST_v1.2_vvcrit{}_basic_isos"
+            self.modeldir = mod_temp.format(self.vvcrit)
+            tar_temp = "MIST_v1.2_vvcrit{}_basic_isos.txz"
+            self.tarfile = tar_temp.format(self.vvcrit)
+            iso_fname_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_basic.iso"
+            self.isofile = iso_fname_temp.format(self.metstr, self.vvcrit)
+        elif (self.interp_op == "eep"):
+            mod_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS"
+            self.modeldir = mod_temp.format(self.metstr, self.vvcrit)
+            tar_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS.txz"
+            self.tarfile = tar_temp.format(self.metstr, self.vvcrit)
         # make data storage directory if it doesn't exist
         rootdir = self.rootdir
         if rootdir is None:
@@ -230,7 +241,10 @@ class MIST(Isochrone):
                 elif not self.is_valid_txz(self.rootdir / self.tarfile):
                     # if it's not a valid tar file, download it again
                     force_download = True
-            elif not (self.rootdir / self.modeldir / self.isofile).is_file():
+                else:
+                    # tarfile exists and is valid -> extract it
+                    self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
+            elif (self.interp_op == "iso") and (not (self.rootdir / self.modeldir / self.isofile).is_file()):
                 # model directory exists but isochrone file doesn't -> force download
                 force_download = True
         self.force_download = force_download
@@ -238,11 +252,11 @@ class MIST(Isochrone):
             print("Force download: ", self.force_download)
 
         if self.force_download:
-            url = self.mist_url.format(self.vvcrit)
+            url = self.mist_url.format(self.tarfile)
             message = "Downloading MIST isochrone data"
             # download the tarfile
             self.downloader(self.rootdir / self.tarfile, url, message)
-            self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=False)
+            self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
     
     @staticmethod
     def extract_one(fname, extractdir, delete_txz=False):
