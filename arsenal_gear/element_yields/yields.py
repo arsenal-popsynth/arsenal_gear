@@ -1,14 +1,17 @@
-from scipy.interpolate import RegularGridInterpolator
+import astropy.units as u
+from astropy.units import Quantity
 import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 
 import os
 import warnings
 import re
-
+from typing import Type
+from typing import List
 
 class Source:
 
-    def __init__(self, elements, params, yields):
+    def __init__(self, elements, params, yields) -> None:
 
         self.params = params
         self.yields = {element: RegularGridInterpolator(self.params, yields[i],
@@ -97,9 +100,9 @@ class Source:
 
 
 class Yields:
-    """ Header class for yield tables. """
+    """ Header class for yield tables."""
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         warnings.warn(
             "This is a header class for inheritance and should not be used by itself")
@@ -109,30 +112,34 @@ class Yields:
 
         self.elements, self.atomic_num = None
 
-    def ccsn_yields(self, elements, mass, metal, rot):
+    def ccsn_yields(self, 
+                    elements: List[str], 
+                    mass: Quantity["mass"], 
+                    metal: Quantity["dimensionless"],
+                    interpolate: str="nearest") -> Quantity["mass"]:
+        
+
         raise ValueError("Core-collapse SNe is not part of this yield set.")
 
-    def snia_yields(self, elements, mass, metal, rot):
+    def snia_yields(self,                     
+                    elements: List[str], 
+                    mass: Quantity["mass"], 
+                    metal: Quantity["dimensionless"],
+                    interpolate: str="nearest") -> Quantity["mass"]:
         raise ValueError("Type Ia SNe is not part of this yield set.")
 
-    def wind_yields(self, elements, mass, metal, rot):
+    def wind_yields(self,
+                    elements: List[str], 
+                    mass: Quantity["mass"], 
+                    metal: Quantity["dimensionless"],
+                    interpolate: str="nearest") -> Quantity["mass"]:
         raise ValueError(
             "Stellar winds (main sequence) is not part of this yield set.")
 
-    def agb_yields(self, elements, mass, metal, rot):
+    def agb_yields(self,
+                    elements: List[str], 
+                    mass: Quantity["mass"], 
+                    metal: Quantity["dimensionless"],
+                    interpolate: str="nearest") -> Quantity["mass"]:
         raise ValueError(
             "Stellar wind (asymptotic giant branch) is not part of this yield set.")
-
-    def yields(self, elements, mass, metal, rot, source='all', interpolate='nearest'):
-        """ Header function for returning yields for each element in elements, given
-            stellar parameters."""
-
-        raise ModuleNotFoundError(
-            "This is a header function and is only used for inheritance.")
-
-    def mloss(self, params, source='all', interpolate='nearest'):
-        """ Header function for returning total mass loss by summing all elements, given
-            stellar parameters."""
-        
-        raise ModuleNotFoundError(
-            "This is a header function and is only used for inheritance.")
