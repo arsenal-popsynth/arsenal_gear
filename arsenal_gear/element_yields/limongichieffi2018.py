@@ -4,7 +4,7 @@ import numpy as np
 
 import os
 import re
-from typing import Type
+from typing import List
 
 from .yields import Yields, Source
 
@@ -24,7 +24,31 @@ class LimongiChieffi2018(Yields):
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
     """
 
-    def __init__(self, model: str ='R'):
+    def __init__(self, model: str ='R') -> None:
+        """
+        Args:
+            model: choise of model to load, see Limongi & Chieffi (2018) for details.
+
+        Usage:
+            >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
+            >> mass = np.linspace(8, 120, 1000)*u.M_sun
+            >> plt.plot(mass, yields.ccsn_yields('H', mass=mass, rot=0*u.km/u.s, metal = 1.345e-2*u.dimensionless_unscaled, interpolate='nearest'), '-', color=colors[-1])
+
+        Attributes:
+            model            Available models.
+            mass             Tabulated masses.
+            metal            Tabulated metallicities.
+            feh              Tabulated [Fe/H].
+            rot              Tabulated stellar rotation velocities.
+            ccsn_max         Assumed minimum mass for direct collase to black hole.
+            filedir          Directory of this file (used for relative path).
+            yield_tablefile  Table filename (total yields).
+            wind_tablefile   Table filename (wind yields).
+            elements         Elements available in table.
+            atomic_num       Atomic numbers of available elements.
+            wind             Source object for stellar winds (massive stars)
+            ccsn             Source object for core-collapse SNe
+        """
 
         self.models = ['F', 'I', 'M', 'R']
         self.mass = np.array(
@@ -35,7 +59,7 @@ class LimongiChieffi2018(Yields):
         self.ccsn_mmax = 25
 
         if model not in self.models:
-            raise ValueError("Model does not exist.")
+            raise ValueError(f"Model {model} does not exist.")
 
         self.filedir = os.path.dirname(os.path.realpath(__file__))
         
@@ -55,51 +79,59 @@ class LimongiChieffi2018(Yields):
         self.ccsn = Source(
             self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
-    def ccsn_yields(self, elements, mass, metal, rot, interpolate='nearest', extrapolate=False):
-        """ Returns yields [Msol] for elements from core-collapse supernovae given mass [Msol], 
-            metallicity [mass fraction], and rotation [km/s].
+    def ccsn_yields(self, 
+                    elements: List[str], 
+                    mass: Quantity["mass"], 
+                    metal: Quantity["dimensionless"],
+                    rot: Quantity["velocity"],
+                    interpolate: str="nearest",
+                    extrapolate: bool=False) -> Quantity["mass"]:
+        
+        """ Interpolate yields from core-collapse supernovae for specified elements. 
+            Stellar parameters can be provided as single value, array + single value, or arrays.  
+
+            Args:
+                elements: list of elements, as specified by symbols (e.g., ['H', 'He'] for hydrogen and helium).
+                mass: stellar masses, single or list/array
+                metal: stellar metallicity, single or list/array
+                rot: stellar rotation, single or list/array
+                interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+                extrapolate: if False, then mass, metal, and rot are set to table limits if outside bound. 
+            Returns:
+                List of yields matching provided element list
+
         """
-        return self.ccsn.get_yld(elements, [rot, metal, mass], interpolate=interpolate, extrapolate=extrapolate)
+        args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
+        return self.ccsn.get_yld(elements, args, interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
-    def wind_yields(self, elements, mass, metal, rot, interpolate='nearest', extrapolate=False):
-        """ Returns yields [Msol] for elements from pre-supernovae wind given mass [Msol], 
-            metallicity [mass fraction], and rotation [km/s].
+    def wind_yields(self, 
+                    elements: List[str], 
+                    mass: Quantity["mass"], 
+                    metal: Quantity["dimensionless"],
+                    rot: Quantity["velocity"],
+                    interpolate: str="nearest",
+                    extrapolate: bool=False) -> Quantity["mass"]:
+        
+        """ Interpolate yields from massive stars ejected as winds for specified elements. 
+            Stellar parameters can be provided as single value, array + single value, or arrays.  
+
+            Args:
+                elements: list of elements, as specified by symbols (e.g., ['H', 'He'] for hydrogen and helium).
+                mass: stellar masses, single or list/array
+                metal: stellar metallicity, single or list/array
+                rot: stellar rotation, single or list/array
+                interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+                extrapolate: if False, then mass, metal, and rot are set to table limits if outside bound. 
+            Returns:
+                List of yields matching provided element list
+
         """
-        return self.wind.get_yld(elements, [rot, metal, mass], interpolate=interpolate, extrapolate=extrapolate)
+        args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
+        return self.wind.get_yld(elements, args, interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
-    def yields(self, elements, mass, metal, rot, interpolate='nearest', extrapolate=False):
-        """ Returning yields [Msol] for each element in elements, given
-            stellar parameters mass [Msol], metal [mass fraction], and rot [km/s]."""
-        args = (elements, mass, metal, rot, interpolate, extrapolate)
-        return self.wind_yields(*args) + self.ccsn_yields(*args)
-
-    def ccsn_mloss(self, mass, metal, rot, interpolate='nearest', extrapolate=False):
-        """ Returning mass loss [Msol] as sum of all elements from core-collapse supernovae given mass [Msol], 
-            metallicity [mass fraction], and rotation [km/s].
+    def get_element_list(self) -> None:
+        """ Read element symbols and atomic numbers from tables.
         """
-        return self.ccsn.get_mloss([rot, metal, mass], interpolate=interpolate, extrapolate=extrapolate)
-
-    def wind_mloss(self, mass, metal, rot, interpolate='nearest', extrapolate=False):
-        """ Returning mass loss [Msol] as sum of all elements from pre-supernovae wind given mass [Msol], 
-            metallicity [mass fraction], and rotation [km/s].
-        """
-        return self.wind.get_mloss([rot, metal, mass], interpolate=interpolate, extrapolate=extrapolate)
-
-    def mloss(self, mass, metal, rot, source='all', interpolate='nearest', extrapolate=False):
-        """ Returning mass loss [Msol] as sum of all elements, given
-            stellar parameters mass [Msol], metal [mass fraction], and rot [km/s]."""
-
-        return self.wind_mloss(mass, metal, rot,
-                               source=source,
-                               interpolate=interpolate,
-                               extrapolate=extrapolate) \
-            + self.ccsn_mloss(mass, metal, rot,
-                              source=source,
-                              interpolate=interpolate,
-                              extrapolate=extrapolate)
-
-    def get_element_list(self):
-
         with open(self.wind_tablefile, 'r') as file:
             lines = file.readlines()
 
@@ -113,7 +145,9 @@ class LimongiChieffi2018(Yields):
                 elements.append(element)
                 atomic_num.append(int(line.split()[1]))
 
-    def load_wind_yields(self):
+    def load_wind_yields(self) -> np.ndarray:
+        """ Load tables of yields ejected as winds from massive stars.
+        """
 
         wind_yld = np.zeros([len(self.elements), self.rot.size,
                              self.metal.size, self.mass.size])
@@ -138,7 +172,9 @@ class LimongiChieffi2018(Yields):
 
         return wind_yld
 
-    def load_ccsn_yields(self):
+    def load_ccsn_yields(self) -> np.ndarray:
+        """ Load tables of yields ejected by core-collapse supernovae.
+        """
 
         wind_yld = self.load_wind_yields()
         total_yld = np.zeros([len(self.elements), self.rot.size,
@@ -166,7 +202,9 @@ class LimongiChieffi2018(Yields):
         return ccsn_yld
 
     @staticmethod
-    def get_metal_index_from_model(model):
+    def get_metal_index_from_model(model:str) -> int:
+        """ Convenience function for converting table metal labels into table index.
+        """
         if model == 'a':
             return 3
         elif model == 'b':
@@ -179,7 +217,9 @@ class LimongiChieffi2018(Yields):
             raise ValueError("Model does not exist.")
 
     @staticmethod
-    def get_rot_index_from_model(model):
+    def get_rot_index_from_model(model:str) -> int:
+        """ Convenience function for converting table rotation labels into table index.
+        """
         if model == '000':
             return 0
         elif model == '150':
