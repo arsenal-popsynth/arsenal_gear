@@ -9,6 +9,7 @@ import re
 from typing import Type
 from typing import List
 
+
 class Source:
 
     def __init__(self, elements, params, yields) -> None:
@@ -31,19 +32,21 @@ class Source:
         points = self.convert2array(params)
 
         if extrapolate:
-            warnings.warn("Extrapolating yields might lead to problematic behaviour (e.g., negative yields). Ensure that yields behave as expected.")
+            warnings.warn(
+                "Extrapolating yields might lead to problematic behaviour (e.g., negative yields). Ensure that yields behave as expected.")
         else:
             for ip in range(len(params)):
                 points[:, ip][(points[:, ip] < np.min(self.params[ip]))] = np.min(
                     self.params[ip])
                 points[:, ip][(points[:, ip] > np.max(self.params[ip]))] = np.max(
                     self.params[ip])
-        
+
         if len(elements) == 1:
             try:
                 return self.yields[elements[0]](points, method=interpolate)
             except KeyError:
-                warnings.warn("Element {elements[0]} is not part of yield set.")
+                warnings.warn(
+                    "Element {elements[0]} is not part of yield set.")
                 return np.nan
         else:
             if all(element in list(self.yields.keys()) for element in elements):
@@ -53,9 +56,11 @@ class Source:
                 shape = self.yields['H'](points, method=interpolate).shape
                 for element in elements:
                     try:
-                        yld.append(self.yields[element](points, method=interpolate))
+                        yld.append(self.yields[element](
+                            points, method=interpolate))
                     except KeyError:
-                        warnings.warn("Element {elements[0]} is not part of yield set.")
+                        warnings.warn(
+                            "Element {elements[0]} is not part of yield set.")
                         yld.append(np.ones(shape) * np.nan)
                 return yld
 
@@ -68,7 +73,8 @@ class Source:
         points = self.convert2array(params)
 
         if extrapolate:
-            warnings.warn("Extrapolating yields might lead to problematic behaviour (e.g., negative yields). Ensure that yields behave as expected.")
+            warnings.warn(
+                "Extrapolating yields might lead to problematic behaviour (e.g., negative yields). Ensure that yields behave as expected.")
         else:
             for ip in range(len(params)):
                 points[:, ip][(points[:, ip] < np.min(self.params[ip]))] = np.min(
@@ -112,34 +118,33 @@ class Yields:
 
         self.elements, self.atomic_num = None
 
-    def ccsn_yields(self, 
-                    elements: List[str], 
-                    mass: Quantity["mass"], 
+    def ccsn_yields(self,
+                    elements: List[str],
+                    mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
-                    interpolate: str="nearest") -> Quantity["mass"]:
-        
+                    interpolate: str = "nearest") -> Quantity["mass"]:
 
         raise ValueError("Core-collapse SNe is not part of this yield set.")
 
-    def snia_yields(self,                     
-                    elements: List[str], 
-                    mass: Quantity["mass"], 
+    def snia_yields(self,
+                    elements: List[str],
+                    mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
-                    interpolate: str="nearest") -> Quantity["mass"]:
+                    interpolate: str = "nearest") -> Quantity["mass"]:
         raise ValueError("Type Ia SNe is not part of this yield set.")
 
     def wind_yields(self,
-                    elements: List[str], 
-                    mass: Quantity["mass"], 
+                    elements: List[str],
+                    mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
-                    interpolate: str="nearest") -> Quantity["mass"]:
+                    interpolate: str = "nearest") -> Quantity["mass"]:
         raise ValueError(
             "Stellar winds (main sequence) is not part of this yield set.")
 
     def agb_yields(self,
-                    elements: List[str], 
-                    mass: Quantity["mass"], 
-                    metal: Quantity["dimensionless"],
-                    interpolate: str="nearest") -> Quantity["mass"]:
+                   elements: List[str],
+                   mass: Quantity["mass"],
+                   metal: Quantity["dimensionless"],
+                   interpolate: str = "nearest") -> Quantity["mass"]:
         raise ValueError(
             "Stellar wind (asymptotic giant branch) is not part of this yield set.")
