@@ -5,9 +5,7 @@ population
 This submodule defines the classes for "populations", collections of single or binary stars.
 """
 
-from typing import Type
 
-import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
@@ -23,8 +21,8 @@ class StarPopulation(dict):
     :param tform: Formation time of the stars, defaults to zero
     :type tform: astropy time unit
     """
-    def __init__(self, mass: Quantity["mass"], metals: np.float64,
-                 tform: Quantity["time"]=u.Quantity(0, u.Myr)) -> None:
+    def __init__(self, mass:Quantity["mass"], metals: np.float64,
+                 tform: Quantity["time"]= 0) -> None:
         self['mass'] = mass
         self['metals'] = metals
         self['tform'] = tform

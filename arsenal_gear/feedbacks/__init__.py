@@ -12,24 +12,38 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
+__all__ = ["FBMechanism", "sn"]
 
 class FBMechanism():
+    """
+    This class is inherited by a given feedback mechanism.
+    """
     def __init__(self, start:Quantity["time"], end:Quantity["time"]) -> None:
         self.start = start
         self.end = end
-        pass
 
-    def radiation(self, bands:np.float64) -> np.float64: # What units should we put out here for each band? photons? energy?
-        pass
+    # What units should we put out here for each band? photons? energy?
+    def radiation(self, bands:np.float64) -> np.float64:
+        """
+        Ionizing radiation output of the mechanism.
+        """
 
     def ejecta_mass(self) -> Quantity["mass"]:
-        pass
+        """
+        Mass ejected by the mechanism.
+        """
 
     def ejecta_velocity(self) -> Quantity["velocity"]:
-        pass
+        """
+        Velocity of the ejecta.
+        """
 
     def metal_yields(self) -> Quantity["mass"]:
-        pass
+        """
+        Metal fraction of the ejecta mass.
+        """
 
     def species_yields(self, species:list[str]) -> Quantity["mass"]:
-        pass
+        """
+        Individual species fractions of the ejecta mass.
+        """

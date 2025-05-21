@@ -1,6 +1,6 @@
 """
 stellar_evolution
-==========
+=================
 
 Submodule to handle stellar evolution codes and their isochrones
 """
