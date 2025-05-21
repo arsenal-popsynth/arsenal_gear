@@ -33,7 +33,8 @@ class Source:
 
         if extrapolate:
             warnings.warn(
-                "Extrapolating yields might lead to problematic behaviour (e.g., negative yields). Ensure that yields behave as expected.")
+                """Extrapolating yields might lead to problematic behaviour (e.g., negative yields). 
+                   Ensure that yields behave as expected.""")
         else:
             for ip in range(len(params)):
                 points[:, ip][(points[:, ip] < np.min(self.params[ip]))] = np.min(
@@ -50,7 +51,8 @@ class Source:
                 return np.nan
         else:
             if all(element in list(self.yields.keys()) for element in elements):
-                return np.array([self.yields[element](points, method=interpolate) for element in elements])
+                return np.array([self.yields[element](points, method=interpolate)
+                                 for element in elements])
             else:
                 yld = []
                 shape = self.yields['H'](points, method=interpolate).shape
@@ -74,7 +76,8 @@ class Source:
 
         if extrapolate:
             warnings.warn(
-                "Extrapolating yields might lead to problematic behaviour (e.g., negative yields). Ensure that yields behave as expected.")
+                """Extrapolating yields might lead to problematic behaviour (e.g., negative yields). 
+                   Ensure that yields behave as expected.""")
         else:
             for ip in range(len(params)):
                 points[:, ip][(points[:, ip] < np.min(self.params[ip]))] = np.min(
