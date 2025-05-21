@@ -8,6 +8,7 @@ from typing import List
 
 from .yields import Yields, Source
 
+
 class LimongiChieffi2018(Yields):
     """
     Include yields majority of elements (and isotopes) for massive stars 
@@ -24,7 +25,7 @@ class LimongiChieffi2018(Yields):
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
     """
 
-    def __init__(self, model: str ='R') -> None:
+    def __init__(self, model: str = 'R') -> None:
         """
         Args:
             model: choise of model to load, see Limongi & Chieffi (2018) for details.
@@ -62,10 +63,11 @@ class LimongiChieffi2018(Yields):
             raise ValueError(f"Model {model} does not exist.")
 
         self.filedir = os.path.dirname(os.path.realpath(__file__))
-        
+
         self.yield_tablefile = self.filedir + \
             f'/LimongiChieffi2018/tab_{model}/tab_yieldstot_ele_exp.dec'
-        self.wind_tablefile = self.filedir+f'/LimongiChieffi2018/tab_{model}/tabwind.dec'
+        self.wind_tablefile = self.filedir + \
+            f'/LimongiChieffi2018/tab_{model}/tabwind.dec'
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -79,14 +81,13 @@ class LimongiChieffi2018(Yields):
         self.ccsn = Source(
             self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
-    def ccsn_yields(self, 
-                    elements: List[str], 
-                    mass: Quantity["mass"], 
+    def ccsn_yields(self,
+                    elements: List[str],
+                    mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
                     rot: Quantity["velocity"],
-                    interpolate: str="nearest",
-                    extrapolate: bool=False) -> Quantity["mass"]:
-        
+                    interpolate: str = "nearest",
+                    extrapolate: bool = False) -> Quantity["mass"]:
         """ Interpolate yields from core-collapse supernovae for specified elements. 
             Stellar parameters can be provided as single value, array + single value, or arrays.  
 
@@ -104,14 +105,13 @@ class LimongiChieffi2018(Yields):
         args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
         return self.ccsn.get_yld(elements, args, interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
-    def wind_yields(self, 
-                    elements: List[str], 
-                    mass: Quantity["mass"], 
+    def wind_yields(self,
+                    elements: List[str],
+                    mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
                     rot: Quantity["velocity"],
-                    interpolate: str="nearest",
-                    extrapolate: bool=False) -> Quantity["mass"]:
-        
+                    interpolate: str = "nearest",
+                    extrapolate: bool = False) -> Quantity["mass"]:
         """ Interpolate yields from massive stars ejected as winds for specified elements. 
             Stellar parameters can be provided as single value, array + single value, or arrays.  
 
@@ -202,7 +202,7 @@ class LimongiChieffi2018(Yields):
         return ccsn_yld
 
     @staticmethod
-    def get_metal_index_from_model(model:str) -> int:
+    def get_metal_index_from_model(model: str) -> int:
         """ Convenience function for converting table metal labels into table index.
         """
         if model == 'a':
@@ -217,7 +217,7 @@ class LimongiChieffi2018(Yields):
             raise ValueError("Model does not exist.")
 
     @staticmethod
-    def get_rot_index_from_model(model:str) -> int:
+    def get_rot_index_from_model(model: str) -> int:
         """ Convenience function for converting table rotation labels into table index.
         """
         if model == '000':
