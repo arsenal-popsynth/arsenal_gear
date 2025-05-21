@@ -33,7 +33,11 @@ class LimongiChieffi2018(Yields):
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
             >> mass = np.linspace(8, 120, 1000)*u.M_sun
-            >> plt.plot(mass, yields.ccsn_yields('H', mass=mass, rot=0*u.km/u.s, metal = 1.345e-2*u.dimensionless_unscaled, interpolate='nearest'), '-', color=colors[-1])
+            >> plt.plot(mass, yields.ccsn_yields('H', 
+                                                 mass=mass, rot=0*u.km/u.s, 
+                                                 metal = 1.345e-2*u.dimensionless_unscaled, 
+                                                 interpolate='nearest'), 
+                        '-', color=colors[-1])
 
         Attributes:
             model            Available models.
@@ -92,18 +96,19 @@ class LimongiChieffi2018(Yields):
             Stellar parameters can be provided as single value, array + single value, or arrays.  
 
             Args:
-                elements: list of elements, as specified by symbols (e.g., ['H', 'He'] for hydrogen and helium).
+                elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
                 mass: stellar masses, single or list/array
                 metal: stellar metallicity, single or list/array
                 rot: stellar rotation, single or list/array
                 interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-                extrapolate: if False, then mass, metal, and rot are set to table limits if outside bound. 
+                extrapolate: if False, then mass, metal, and rot are set to limits if outside bound. 
             Returns:
                 List of yields matching provided element list
 
         """
         args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
-        return self.ccsn.get_yld(elements, args, interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
+        return self.ccsn.get_yld(elements, args,
+                                 interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
     def wind_yields(self,
                     elements: List[str],
@@ -116,18 +121,19 @@ class LimongiChieffi2018(Yields):
             Stellar parameters can be provided as single value, array + single value, or arrays.  
 
             Args:
-                elements: list of elements, as specified by symbols (e.g., ['H', 'He'] for hydrogen and helium).
+                elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
                 mass: stellar masses, single or list/array
                 metal: stellar metallicity, single or list/array
                 rot: stellar rotation, single or list/array
                 interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-                extrapolate: if False, then mass, metal, and rot are set to table limits if outside bound. 
+                extrapolate: if False, then mass, metal, and rot are set to table if outside bound. 
             Returns:
                 List of yields matching provided element list
 
         """
         args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
-        return self.wind.get_yld(elements, args, interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
+        return self.wind.get_yld(elements, args,
+                                 interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
     def get_element_list(self) -> None:
         """ Read element symbols and atomic numbers from tables.
@@ -189,11 +195,12 @@ class LimongiChieffi2018(Yields):
                 ind_metal = self.get_metal_index_from_model(model[3])
                 ind_rot = self.get_rot_index_from_model(model[4:])
 
-                total_yld[:, ind_rot, ind_metal, :] = np.genfromtxt(self.yield_tablefile,
-                                                                    usecols=[
-                                                                        4, 5, 6, 7, 8, 9, 10, 11, 12],
-                                                                    skip_header=index+1,
-                                                                    max_rows=53)
+                total_yld[:, ind_rot, ind_metal, :] = np.genfromtxt(
+                    self.yield_tablefile,
+                    usecols=[
+                        4, 5, 6, 7, 8, 9, 10, 11, 12],
+                    skip_header=index+1,
+                    max_rows=53)
 
         ccsn_yld = total_yld - wind_yld
         ccsn_yld[ccsn_yld < 0.0] = 0.0
