@@ -1,20 +1,17 @@
-==============================
-Arsenal Gear Code Architecture
-==============================
+# Arsenal Gear Code Architecture
 
+## Top-Level Population Class
 
-Top-Level Population Class
-**************************
+The main way that users should interact with the code in python scripts
+is through the top level `StellarPopulation` class. It has member
+classes for both single and binary stellar sub-populations:
 
-The main way that users should interact with the code in python scripts is through the
-top level ``StellarPopulation`` class. It has member classes for both single and binary
-stellar sub-populations::
-    StellarPopulation
+    StellarPopulation 
     params
-        samp_mode              (stochastic, integrative)
-        mstar                  (total stellar mass)
-        metallicity            (stellar metallicity)
-        fbin                   (total binary fraction)
+        samp_mode       (stochastic, integrative)
+        mstar           (total stellar mass)
+        metallicity     (stellar metallicity)
+        fbin            (total binary fraction)
     member classes
         SingleStarPop
         BinaryPop
@@ -31,11 +28,11 @@ stellar sub-populations::
         yields(times)
         save_outputs(times)
 
-Abstract Stellar Population Classes
-***********************************
+## Abstract Stellar Population Classes
 
-These classes contain information on the initial population of single stars and binaries
-as well as methods for evolving them, which are stellar evolution instances::
+These classes contain information on the initial population of single
+stars and binaries as well as methods for evolving them, which are
+stellar evolution instances:
 
     SingleStarPop
     params
@@ -51,17 +48,16 @@ as well as methods for evolving them, which are stellar evolution instances::
         P_dist            (period distribution)
         e_dist            (eccentricity distribution)
 
-Abstract Stellar Evolution Classes
-**********************************
+## Abstract Stellar Evolution Classes
 
-These classes contain interfaces to stellar evolution codes::
+These classes contain interfaces to stellar evolution codes:
 
     SingleStellarEvolution
     params
         SingleStarPop
     methods
         props(times)          (get stellar properties)
-    
+
     BinaryStellarEvolution
     params
         BinaryPop
@@ -70,14 +66,15 @@ These classes contain interfaces to stellar evolution codes::
         e(times)              (eccentricity evolution)
         P(times)              (Period evolution)
 
-The  ``props`` methods will return ``StellarProperties`` structures which are containers
-for all of the properies of a star that are important for its radiation and feedback.
+The `props` methods will return `StellarProperties` structures which are
+containers for all of the properies of a star that are important for its
+radiation and feedback.
 
-Abstract Atmosphere Classes
-***************************
+## Abstract Atmosphere Classes
 
-This provides the radiative output of a star based on its properties such as bolometric
-luminosity, mass, radius, effective temperature, metallicity::
+This provides the radiative output of a star based on its properties
+such as bolometric luminosity, mass, radius, effective temperature,
+metallicity:
 
     Atmosphere
     params
@@ -86,10 +83,9 @@ luminosity, mass, radius, effective temperature, metallicity::
         get_band(times, band_data)
         get_spec(times)
 
-Abstract Mechanical Feedback Classes
-************************************
+## Abstract Mechanical Feedback Classes
 
-Classes related to the return of mass, energy, and elements to the ISM::
+Classes related to the return of mass, energy, and elements to the ISM:
 
     MechanicalFeedback
     params
@@ -105,7 +101,7 @@ Classes related to the return of mass, energy, and elements to the ISM::
     methods
         mdotw(times)        (wind mass loss rates)
         vwind(times)        (wind velocities)
-    
+
     Supernovae
     params
         StellarEvolution    (not necessary depending on choices)

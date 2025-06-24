@@ -1,7 +1,6 @@
-================
-Arsenal Gear API
-================
+# Arsenal Gear API
 
+```{eval-rst}
 .. currentmodule:: arsenal_gear
 
 .. autosummary::
@@ -12,3 +11,4 @@ Arsenal Gear API
    feedbacks
    population
    stellar_evolution
+```
