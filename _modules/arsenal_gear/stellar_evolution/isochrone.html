@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.stellar_evolution.isochrone &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.isochrone</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.stellar_evolution.isochrone</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">isochrone</span>
+<span class="sd">==========</span>
+
+<span class="sd">This submodule defines the interface to various stellar evolution codes</span>
+<span class="sd">through interpreting and processing their isochrones</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">u</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">astropy.units</span> <span class="kn">import</span> <span class="n">Quantity</span>
+
+
+<div class="viewcode-block" id="Isochrone">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.Isochrone.html#arsenal_gear.stellar_evolution.isochrone.Isochrone">[docs]</a>
+<span class="k">class</span> <span class="nc">Isochrone</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is used to load and interpret isochrones from various sources</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># laying out the basic attributed of the isochrone class</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="c1"># the metallicity of the isochrone relative to solar</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metallicity</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+
+<div class="viewcode-block" id="Isochrone.get_Mmax">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.Isochrone.html#arsenal_gear.stellar_evolution.isochrone.Isochrone.get_Mmax">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_Mmax</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">age</span><span class="p">:</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the maximum mass of the stellar population that hasn&#39;t</span>
+<span class="sd">        died yet (in e.g. a SN) as a function of age</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+</div>
+
+
+<div class="viewcode-block" id="MIST">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.MIST.html#arsenal_gear.stellar_evolution.isochrone.MIST">[docs]</a>
+<span class="k">class</span> <span class="nc">MIST</span><span class="p">(</span><span class="n">Isochrone</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    Reads in MIST isochrone files.</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span> <span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            filename: the name of .iso file.</span>
+
+<span class="sd">        Usage:</span>
+<span class="sd">            &gt;&gt; iso = read_mist_models.ISO(&#39;MIST_v1.0_feh_p0.00_afe_p0.0_vvcrit0.4.iso&#39;)</span>
+<span class="sd">            &gt;&gt; age_ind = iso.age_index(8.0)</span>
+<span class="sd">            &gt;&gt; logTeff = iso.isos[age_ind][&#39;log_Teff&#39;]</span>
+<span class="sd">            &gt;&gt; logL = iso.isos[age_ind][&#39;log_L&#39;]</span>
+<span class="sd">            &gt;&gt; plt.plot(logTeff, logL) #plot the HR diagram for logage = 8.0</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            version     Dictionary containing the MIST and MESA version numbers.</span>
+<span class="sd">            abun        Dictionary containing Yinit, Zinit, [Fe/H], and [a/Fe] values.</span>
+<span class="sd">            rot         Rotation in units of surface v/v_crit.</span>
+<span class="sd">            ages        List of ages.</span>
+<span class="sd">            num_ages    Number of isochrones.</span>
+<span class="sd">            hdr_list    List of column headers.</span>
+<span class="sd">            isos        Data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Reading in: &#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">isos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_iso_file</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metallicity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">abun</span><span class="p">[</span><span class="s1">&#39;[Fe/H]&#39;</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+<div class="viewcode-block" id="MIST.read_iso_file">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.MIST.html#arsenal_gear.stellar_evolution.isochrone.MIST.read_iso_file">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_iso_file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        Reads in the isochrone file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename: the name of .iso file.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+
+        <span class="c1">#open file and read it in</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;MIST&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;MESA&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">abun</span> <span class="o">=</span> <span class="p">{</span><span class="n">content</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">i</span><span class="p">]:</span><span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">5</span><span class="p">)}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rot</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_ages</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">6</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="c1">#read one block for each isochrone</span>
+        <span class="n">iso_set</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">content</span><span class="p">[</span><span class="mi">8</span><span class="p">:]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_ages</span><span class="p">):</span>
+            <span class="c1">#grab info for each isochrone</span>
+            <span class="n">num_eeps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">counter</span><span class="p">][</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">num_cols</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">counter</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">hdr_list</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">counter</span><span class="o">+</span><span class="mi">2</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">formats</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span><span class="o">+</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cols</span><span class="o">-</span><span class="mi">1</span><span class="p">)])</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_eeps</span><span class="p">),{</span><span class="s1">&#39;names&#39;</span><span class="p">:</span><span class="nb">tuple</span><span class="p">(</span><span class="n">hdr_list</span><span class="p">),</span><span class="s1">&#39;formats&#39;</span><span class="p">:</span><span class="nb">tuple</span><span class="p">(</span><span class="n">formats</span><span class="p">)})</span>
+            <span class="c1">#read through EEPs for each isochrone</span>
+            <span class="k">for</span> <span class="n">eep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_eeps</span><span class="p">):</span>
+                <span class="n">iso_chunk</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">3</span><span class="o">+</span><span class="n">counter</span><span class="o">+</span><span class="n">eep</span><span class="p">]</span>
+                <span class="n">iso</span><span class="p">[</span><span class="n">eep</span><span class="p">]</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">iso_chunk</span><span class="p">)</span>
+            <span class="n">iso_set</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iso</span><span class="p">)</span>
+            <span class="n">ages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iso</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">counter</span><span class="o">+=</span> <span class="mi">3</span><span class="o">+</span><span class="n">num_eeps</span><span class="o">+</span><span class="mi">2</span>
+        <span class="k">return</span> <span class="n">ages</span><span class="p">,</span> <span class="n">hdr_list</span><span class="p">,</span> <span class="n">iso_set</span></div>
+
+
+<div class="viewcode-block" id="MIST.age_index">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.MIST.html#arsenal_gear.stellar_evolution.isochrone.MIST.age_index">[docs]</a>
+    <span class="k">def</span> <span class="nf">age_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">age</span> <span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        Returns the index of the isochrone closest to the requested age</span>
+<span class="sd">        that is also younger than the requested age.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            age: the age of the isochrone.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">age</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">ais</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">)</span> <span class="o">-</span> <span class="n">la</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">la</span> <span class="ow">in</span> <span class="n">lage</span><span class="p">]</span>
+        <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ais</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">lage</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">))</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">lage</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">)):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The requested age is outside the range. Try between &#39;</span>
+                  <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39; and &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="n">ais</span></div>
+
+
+<div class="viewcode-block" id="MIST.get_Mmax">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.MIST.html#arsenal_gear.stellar_evolution.isochrone.MIST.get_Mmax">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_Mmax</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">age</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the maximum mass of the stellar population that hasn&#39;t</span>
+<span class="sd">        died yet (in e.g. a SN) as a funciton of age</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">age</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">age</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">age</span><span class="o">.</span><span class="n">value</span><span class="p">])</span><span class="o">*</span><span class="n">age</span><span class="o">.</span><span class="n">unit</span>
+
+        <span class="n">ai</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">age_index</span><span class="p">(</span><span class="n">age</span><span class="p">)</span>
+        <span class="n">lage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">age</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">a_lo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ai</span><span class="p">])</span>
+        <span class="n">a_hi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">ages</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ai</span><span class="p">])</span>
+        <span class="n">mmax_lo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;initial_mass&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ai</span><span class="p">])</span>
+        <span class="n">mmax_hi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;initial_mass&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ai</span><span class="p">])</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="p">(</span><span class="n">mmax_hi</span> <span class="o">-</span> <span class="n">mmax_lo</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">a_hi</span> <span class="o">-</span> <span class="n">a_lo</span><span class="p">)</span>
+        <span class="n">o_s</span> <span class="o">=</span> <span class="n">mmax_lo</span> <span class="o">-</span> <span class="n">s</span><span class="o">*</span><span class="n">a_lo</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">age</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">s</span><span class="o">*</span><span class="n">lage</span> <span class="o">+</span> <span class="n">o_s</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">s</span><span class="o">*</span><span class="n">lage</span> <span class="o">+</span> <span class="n">o_s</span><span class="p">)</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tests.html">Automated Tests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.isochrone</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

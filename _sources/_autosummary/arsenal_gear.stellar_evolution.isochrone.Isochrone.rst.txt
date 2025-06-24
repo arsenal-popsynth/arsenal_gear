@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.isochrone.Isochrone
+====================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.isochrone
+
+.. autoclass:: Isochrone
+   :members:
+   :show-inheritance:
