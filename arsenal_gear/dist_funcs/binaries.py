@@ -13,7 +13,7 @@ from scipy.stats import rv_continuous, loguniform, uniform
 
 from arsenal_gear.population import StarPopulation, BinaryPopulation
 
-class BinaryDistributions:
+class BinaryDistribution():
     """
     This class is the superclass of all distributions of binary properties
     in which the binary fraction and distributions of orbtial periods and 
@@ -39,12 +39,9 @@ class BinaryDistributions:
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
         if m_inner < (9 * u.Msun):
-            raise Warning(f"There are inner companions with log(P/days) \ 
-            > 3.8 for masses below 9 Msun. You are overestimating the \
-            number of close companions for low- and intermediate-mass \
-            stars compared to observations.")
+            raise Warning(f"There are inner companions with log(P/days) > 3.8 for masses below 9 Msun. Please select a value >= 9 Msun.")
         self.model:    str   = model
-        self.m_inner:  float = min_mass.to(u.Msun).value
+        self.m_inner:  float = m_inner.to(u.Msun).value
         self.dir:      str   = bpass_dir + '/'
         
         
@@ -65,7 +62,7 @@ class BinaryDistributions:
         q_values    = np.arange(0, 1, 0.1) # q = 0 for single
         logp_values = np.arange(0, 4.4, 0.2) # 4.2 w/ q = 0 for single
         
-        file_path = self.dir + 'bpass_v2.2.1_imf' + self.model + '/input_bpass_z014_bin_' + self.model
+        file_path = self.dir + 'bpass_v2.2.1_imf' + self.model + '/input_bpass_z014_bin_imf' + self.model
         
         with open(file_path, 'r') as f:
             prob = np.zeros((len(m1_values), len(q_values), len(logp_values)))
@@ -102,7 +99,7 @@ class BinaryDistributions:
                         prob[save_which[0], save_which[1], save_which[2]] = ln[0]
             
             
-        if self.m_inner < int(model[-3:]):
+        if self.m_inner < int(self.model[-3:]):
             # If mass limit for inner companion
             # Zero out probability above 3.8 if M > m_inner
             _mask_m = np.where(m1_values >= self.m_inner)[0]
@@ -120,7 +117,7 @@ class BinaryDistributions:
             np.save(self.dir + 'prob_bin_imf' + self.model + '.npy', prob)
                 
             
-    def discrete_sampling(self, mtot: Quantity["mass"]) -> Tuple[Quantity["mass"], 
+    def discrete_sampling(self, mtot: Quantity["mass"]) -> tuple[Quantity["mass"], 
                                                                  Quantity["mass"], 
                                                                  Quantity["mass"], 
                                                                  Quantity["time"]]:
@@ -139,6 +136,18 @@ class BinaryDistributions:
         
         """
         prob = np.load(self.dir + 'prob_bin_imf' + self.model + '.npy')
+        prob = prob/prob.sum()
+        
+        m1_values = np.concatenate((np.arange(0.1, 0.7, 0.1), 
+                                    np.arange(0.8, 2.2, 0.1),
+                                    np.array([2.3, 2.5, 2.7, 3, 3.2, 3.5, 3.7]), 
+                                    np.arange(4, 10, 0.5), 
+                                    np.arange(10, 26, 1), 
+                                    np.array([30, 35, 40, 50, 60, 70, 80, 100, 
+                                              120, 150, 200, 300])))
+        
+        q_values    = np.arange(0, 1, 0.1) # q = 0 for single
+        logp_values = np.arange(0, 4.4, 0.2) # 4.2 w/ q = 0 for single
         
         # Sample by flattening the array
         # Assume that the average system mass is below 1.5 MSun
