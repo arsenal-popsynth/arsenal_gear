@@ -4,6 +4,26 @@ from numpy.testing import assert_allclose
 
 import arsenal_gear
 
+class TestLogUniformPeriod:
+    N = int(1e6)
+    min_p = 1*u.d
+    max_p = 1e4*u.au
+    period = arsenal_gear.dist_funcs.binaries.LogUniformPeriod(min_p, max_p)
+    
+    def test_limits(self):
+        p = self.period.sample(self.N)
+        assert p.max() <= self.max_p
+        assert p.min() >= self.min_p
+
+    def test_count(self):
+        p = self.period.sample(self.N)
+        assert len(p) == self.N
+
+    def test_mean(self):
+        p = self.period.sample(self.N)
+        assert_allclose(np.mean(p), u.d*self.period.mean(), 
+                        rtol=0, atol=5*self.period.var())
+
 class TestLogUniformSemimajor:
     N = int(1e6)
     min_a = 0.1*u.au
@@ -43,23 +63,3 @@ class TestUniformMassRatio:
         q = self.mratio.sample(self.N)
         assert_allclose(np.mean(q), self.mratio.mean(), 
                         rtol=0, atol=5*self.mratio.var())
-
-class TestUniformEccentricity:
-    N = int(1e6)
-    min_e = 0
-    max_e = 0.9
-    ecc = arsenal_gear.dist_funcs.binaries.UniformEccentricity(min_e, max_e)
-    
-    def test_limits(self):
-        e = self.ecc.sample(self.N)
-        assert e.max() <= self.max_e
-        assert e.min() >= self.min_e
-
-    def test_count(self):
-        e = self.ecc.sample(self.N)
-        assert len(e) == self.N
-
-    def test_mean(self):
-        e = self.ecc.sample(self.N)
-        assert_allclose(np.mean(e), self.ecc.mean(), 
-                        rtol=0, atol=5*self.ecc.var())

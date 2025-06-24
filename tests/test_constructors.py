@@ -37,5 +37,5 @@ def test_binary():
     assert_array_equal(binary.secondary["tform"], star2["tform"])
 
     # Check binary properties
-    assert_array_equal(binary["semimajor"], semimajor)
+    assert_array_equal(binary["period"], period)
     assert_array_equal(binary["eccentricity"], eccentricity)
