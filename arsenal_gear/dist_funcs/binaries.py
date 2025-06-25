@@ -39,7 +39,7 @@ class BinaryDistribution():
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
         if m_inner < (9 * u.Msun):
-            raise Warning(f"There are inner companions with log(P/days) > 3.8 for masses below 9 Msun. Please select a value >= 9 Msun.")
+            raise Warning("Please select a value >= 9 Msun.")
         self.model:    str   = model
         self.m_inner:  float = m_inner.to(u.Msun).value
         self.dir:      str   = bpass_dir + '/'
@@ -51,70 +51,87 @@ class BinaryDistribution():
         BPASS input file.
 
         """
-        m1_values = np.concatenate((np.arange(0.1, 0.7, 0.1), 
-                                    np.arange(0.8, 2.2, 0.1),
-                                    np.array([2.3, 2.5, 2.7, 3, 3.2, 3.5, 3.7]), 
-                                    np.arange(4, 10, 0.5), 
-                                    np.arange(10, 26, 1), 
-                                    np.array([30, 35, 40, 50, 60, 70, 80, 100, 
-                                              120, 150, 200, 300])))
         
-        q_values    = np.arange(0, 1, 0.1) # q = 0 for single
-        logp_values = np.arange(0, 4.4, 0.2) # 4.2 w/ q = 0 for single
-        
-        file_path = self.dir + 'bpass_v2.2.1_imf' + self.model + '/input_bpass_z014_bin_imf' + self.model
-        
-        with open(file_path, 'r') as f:
-            prob = np.zeros((len(m1_values), len(q_values), len(logp_values)))
-            save_next = False
-            save_which = None
-            for line in f:
-                ln = line.strip()
-                if 'NEWSINMODS' in ln:
-                    # e.g. NEWSINMODS/z014/sneplot-z014-300
-                    # Read only mass
-                    save_next = True
-                    mass = float(ln[ln.rfind('-') + 1:])
-                    save_which = np.array([np.argmin(np.abs(m1_values - mass)), 0, -1])
-                elif 'NEWBINMODS/NEWBINMODS' in ln:
-                    # e.g. NEWBINMODS/NEWBINMODS/z014/sneplot-z014-300-0.1-0
-                    # Read period, mass ratio, and mass
-                    save_next = True
-                    ind_p = ln.rfind('-')
-                    ind_q = ln[:ind_p].rfind('-')
-                    ind_m = ln[:ind_q].rfind('-')
-                    logp = float(ln[ind_p + 1:])
-                    qrat = float(ln[ind_q + 1:ind_p])
-                    mass = float(ln[ind_m + 1:ind_q])
-                    save_which = np.array([np.argmin(np.abs(m1_values - mass)), 
-                                           np.argmin(np.abs(q_values - qrat)), 
-                                           np.argmin(np.abs(logp_values - logp))])
-                elif save_next:
-                    save_next = False
-                    ln = np.array(ln.split())
-                    if prob[save_which[0], save_which[1], save_which[2]] > 0:
-                        prob[save_which[0], save_which[1], save_which[2]] += float(ln[0])
-                        #print('Overwritting value at', m1_values[save_which[0]], 'MSun, q=', q_values[save_which[1]], ', log(P/days)', logp_values[save_which[2]])
-                    else:
-                        prob[save_which[0], save_which[1], save_which[2]] = ln[0]
+        def get_probability_matrix(file_path, m1_vals, q_vals, logp_vals):
             
+            with open(file_path, 'r') as f:
+                prob = np.zeros((len(m1_vals), len(q_vals), len(logp_vals)))
+                save_n = False
+                save_w = np.zeros(3)
+                for line in f:
+                    ln = line.strip()
+                    if 'NEWSINMODS' in ln:
+                        # e.g. NEWSINMODS/z014/sneplot-z014-300
+                        # Read only mass
+                        save_n = True
+                        m1 = float(ln[ln.rfind('-') + 1:])
+                        save_w = np.array([np.argmin(np.abs(m1_vals - mass)), 0, -1])
+                    elif 'NEWBINMODS/NEWBINMODS' in ln:
+                        # e.g. NEWBINMODS/NEWBINMODS/z014/sneplot-z014-300-0.1-0
+                        # Read period, mass ratio, and mass
+                        save_n = True
+                        ind_p = ln.rfind('-')
+                        ind_q = ln[:ind_p].rfind('-')
+                        ind_m = ln[:ind_q].rfind('-')
+                        logp = float(ln[ind_p + 1:])
+                        q    = float(ln[ind_q + 1:ind_p])
+                        m1   = float(ln[ind_m + 1:ind_q])
+                        save_w = np.array([np.argmin(np.abs(m1_vals - m1)), 
+                                           np.argmin(np.abs(q_vals - q)), 
+                                           np.argmin(np.abs(logp_vals - logp))])
+                    elif save_n:
+                        save_n = False
+                        ln = np.array(ln.split())
+                        if prob[save_w[0], save_w[1], save_w[2]] > 0:
+                            prob[save_w[0], save_w[1], save_w[2]] += float(ln[0])
+                        else:
+                            prob[save_w[0], save_w[1], save_w[2]] = ln[0]
+                        
+            return prob
+        
+        def edit_probability_matrix(prob, m_inner, m1_vals, q_vals, logp_vals):
             
-        if self.m_inner < int(self.model[-3:]):
             # If mass limit for inner companion
             # Zero out probability above 3.8 if M > m_inner
-            _mask_m = np.where(m1_values >= self.m_inner)[0]
-            _mask_q = np.where((q_values > 0))[0]
-            _mask_p = np.where((logp_values > 3.8))[0]
-            _mask_i = np.where((logp_values <= 3.8))[0]
+            _mask_m = np.where(m1_vals >= m_inner)[0]
+            _mask_q = np.where((q_vals > 0))[0]
+            _mask_p = np.where((logp_vals > 3.8))[0]
+            _mask_i = np.where((logp_vals <= 3.8))[0]
             _norm_inner = (prob[_mask_m[0]:, _mask_q[0]:, :_mask_i[-1]]).sum()
             _norm_outer = (prob[_mask_m[0]:, _mask_q[0]:, _mask_p[0]:]).sum()
-            prob[_mask_m[0]:, _mask_q[0]:, _mask_p[0]:] = np.zeros((len(_mask_m), len(_mask_q), len(_mask_p)))
-            prob[_mask_m[0]:, _mask_q[0]:, :_mask_i[-1]] *= (_norm_inner + _norm_outer)/_norm_inner
+            prob[_mask_m[0]:, _mask_q[0]:, _mask_p[0]:] = np.zeros((len(_mask_m), 
+                                                                    len(_mask_q), 
+                                                                    len(_mask_p)))
+            prob[_mask_m[0]:, _mask_q[0]:, :_mask_i[-1]] *= (_norm_inner + \
+                                                             _norm_outer)/_norm_inner
             
+            return prob
+            
+            
+        m1_vals = np.concatenate((np.arange(0.1, 0.7, 0.1), 
+                                  np.arange(0.8, 2.2, 0.1),
+                                  np.array([2.3, 2.5, 2.7, 3, 3.2, 3.5, 3.7]), 
+                                  np.arange(4, 10, 0.5), 
+                                  np.arange(10, 26, 1), 
+                                  np.array([30, 35, 40, 50, 60, 70, 80, 100, 
+                                            120, 150, 200, 300])))
+        
+        q_vals    = np.arange(0, 1, 0.1) # q = 0 for single
+        logp_vals = np.arange(0, 4.4, 0.2) # 4.2 w/ q = 0 for single
+        
+        file_path = self.dir + 'bpass_v2.2.1_imf' + self.model + \
+                    '/input_bpass_z014_bin_imf' + self.model
+        
+        prob = get_probability_matrix(file_path, m1_vals, q_vals, logp_vals)
+                
+        if self.m_inner < int(self.model[-3:]):
+            
+            prob = edit_probability_matrix(prob, self.m_inner, m1_vals, q_vals, logp_vals)
             np.save(self.dir + 'prob_bin_imf' + self.model + '.npy', prob)
         
         else:
             np.save(self.dir + 'prob_bin_imf' + self.model + '.npy', prob)
+             
                 
             
     def discrete_sampling(self, mtot: Quantity["mass"]) -> tuple[Quantity["mass"], 
@@ -135,40 +152,59 @@ class BinaryDistribution():
         :rtype:      Quantity["time"]
         
         """
+        
+        def sample_distribution(prob, mtot, m, q, logp):
+            
+            # Sample by flattening the array
+            # Assume that the average system mass is below 1.5 MSun
+            num_samples = int(1.5 * mtot.to(u.Msun).value)
+            prob_flat = prob.ravel()
+            samp_inds = np.random.choice(a=np.prod(prob.shape), size=num_samples, p=prob_flat)
+            # Convert flattened indices back to 3D coordinates
+            ind_m, ind_q, ind_p = np.unravel_index(samp_inds, prob.shape)
+            samp_m = m[ind_m]
+            samp_q = q[ind_q]
+            samp_p = logp[ind_p]
+            
+            return samp_m, samp_q, samp_p
+        
+        def truncate_at_target_mass(mtot, samp_m, samp_q, samp_p):
+            
+            _target_mass = np.argmin(np.abs(mtot.to(u.Msun).value - (samp_m * (1 + samp_q)).cumsum()))
+            _primary_masses   = samp_m[:_target_mass] * u.Msun
+            _companion_masses = samp_q[:_target_mass] * samp_m[:_target_mass] * u.Msun
+            _orbital_periods  = 10**samp_p[:_target_mass] * u.d
+        
+            _mask_s = np.where(_companion_masses == 0)[0]
+            _mask_b = np.where(_companion_masses > 0)[0]
+        
+            s_masses = _primary_masses[_mask_s]
+            p_masses = _primary_masses[_mask_b]
+            c_masses = _companion_masses[_mask_b]
+            periods  = _orbital_periods[_mask_b]
+            
+            return s_masses, p_masses, c_masses, periods
+            
+        
         prob = np.load(self.dir + 'prob_bin_imf' + self.model + '.npy')
         prob = prob/prob.sum()
         
-        m1_values = np.concatenate((np.arange(0.1, 0.7, 0.1), 
-                                    np.arange(0.8, 2.2, 0.1),
-                                    np.array([2.3, 2.5, 2.7, 3, 3.2, 3.5, 3.7]), 
-                                    np.arange(4, 10, 0.5), 
-                                    np.arange(10, 26, 1), 
-                                    np.array([30, 35, 40, 50, 60, 70, 80, 100, 
-                                              120, 150, 200, 300])))
+        m1 = np.concatenate((np.arange(0.1, 0.7, 0.1), 
+                             np.arange(0.8, 2.2, 0.1),
+                             np.array([2.3, 2.5, 2.7, 3, 3.2, 3.5, 3.7]), 
+                             np.arange(4, 10, 0.5), 
+                             np.arange(10, 26, 1), 
+                             np.array([30, 35, 40, 50, 60, 70, 80, 100, 
+                                       120, 150, 200, 300])))
         
-        q_values    = np.arange(0, 1, 0.1) # q = 0 for single
-        logp_values = np.arange(0, 4.4, 0.2) # 4.2 w/ q = 0 for single
+        q    = np.arange(0, 1, 0.1) # q = 0 for single
+        logp = np.arange(0, 4.4, 0.2) # 4.2 w/ q = 0 for single
         
-        # Sample by flattening the array
-        # Assume that the average system mass is below 1.5 MSun
-        num_samples = int(1.5 * mtot.to(u.Msun).value)
-        prob_flat = prob.ravel()
-        samp_inds = np.random.choice(a=np.prod(prob.shape), size=num_samples, p=prob_flat)
-        # Convert flattened indices back to 3D coordinates
-        ind_m, ind_q, ind_p = np.unravel_index(samp_inds, prob.shape)
-        samp_m = m1_values[ind_m]
-        samp_q = q_values[ind_q]
-        samp_p = logp_values[ind_p]
         
-        _target_mass = np.argmin(np.abs(mtot.to(u.Msun).value - (samp_m * (1 + samp_q)).cumsum()))
-        primary_masses   = samp_m[:_target_mass] * u.Msun
-        companion_masses = samp_q[:_target_mass] * samp_m[:_target_mass] * u.Msun
-        orbital_periods  = 10**samp_p[:_target_mass] * u.d
+        samp_m, samp_q, samp_p = sample_distribution(prob, mtot, m1, q, logp)
+        s_masses, p_masses, c_masses, periods = truncate_at_target_mass(mtot, samp_m, samp_q, samp_p)
         
-        _mask_s = np.where(companion_masses == 0)[0]
-        _mask_b = np.where(companion_masses > 0)[0]
-        
-        return primary_masses[_mask_s], primary_masses[_mask_b], companion_masses[_mask_b], orbital_periods[_mask_b] 
+        return s_masses, p_masses, c_masses, periods
         
         
 
@@ -194,6 +230,7 @@ class Fraction:
         assert np.min(self.fraction) >= 0
         assert np.max(self.fraction) <= 1
         assert np.min(self.mass_bins) >= 0 
+        super().__init__(a=self.fraction, b=self.mass_bins, c=self.stars, name=name)
 
     
 class StepFraction(Fraction):
@@ -274,8 +311,8 @@ class UniformMassRatio(MassRatio):
     with lower and upper bounds
     """
     
-    def __init__(self, min_q: float, max_q: float):
-        self.name = "uniform"
+    def __init__(self, min_q: float, max_q: float, name="uniform"):
+        self.name = name
         super().__init__(min_q, max_q, name=self.name)
 
     def _pdf(self, x: np.float64) -> np.float64:
@@ -283,9 +320,9 @@ class UniformMassRatio(MassRatio):
         # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
         return rv.pdf(x)
    
-    def _ppf(self, x: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64) -> np.float64:
         rv = uniform(self.min_q, self.max_q - self.min_q)
-        return rv.ppf(x)
+        return rv.ppf(q)
     
 
 class Period(rv_continuous):
@@ -301,8 +338,7 @@ class Period(rv_continuous):
     :type name: str
     """
 
-    def __init__(self, min_p: Quantity["time"], 
-                 max_p: Quantity["time"], name=""):
+    def __init__(self, min_p: Quantity["time"], max_p: Quantity["time"], name=""):
         self.min_p: float = min_p.to(u.d).value
         self.max_p: float = max_p.to(u.d).value
         assert self.min_p > 0
@@ -330,17 +366,17 @@ class LogUniformPeriod(Period):
     A simple loguniform distribution of semi-major axes
     """
     
-    def __init__(self, min_p: Quantity["time"], max_p: Quantity["time"]):
-        self.name = "loguniform"
+    def __init__(self, min_p: Quantity["time"], max_p: Quantity["time"], name="loguniform"):
+        self.name = name
         super().__init__(min_p, max_p, name=self.name)
         
     def _pdf(self, x: np.float64) -> np.float64:
         rv = loguniform(self.min_p, self.max_p)
         return rv.pdf(x)
    
-    def _ppf(self, x: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64) -> np.float64:
         rv = loguniform(self.min_p, self.max_p)
-        return rv.ppf(x)
+        return rv.ppf(q)
     
     
 class Semimajor(rv_continuous):
@@ -356,8 +392,7 @@ class Semimajor(rv_continuous):
     :type name: str
     """
 
-    def __init__(self, min_a: Quantity["length"], 
-                 max_a: Quantity["length"], name=""):
+    def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"], name=""):
         self.min_a: float = min_a.to(u.au).value
         self.max_a: float = max_a.to(u.au).value
         assert self.min_a > 0
@@ -385,14 +420,15 @@ class LogUniformSemimajor(Semimajor):
     A simple loguniform distribution of semi-major axes
     """
     
-    def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"]):
-        self.name = "loguniform"
+    def __init__(self, min_a: Quantity["length"], max_a: Quantity["length"], name="loguniform"):
+        self.name = name
         super().__init__(min_a, max_a, name=self.name)
         
     def _pdf(self, x: np.float64) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
         return rv.pdf(x)
    
-    def _ppf(self, x: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
-        return rv.ppf(x)
+        return rv.ppf(q)
+    
