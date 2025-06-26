@@ -65,7 +65,7 @@ class BinaryDistribution():
                         # Read only mass
                         save_n = True
                         m1 = float(ln[ln.rfind('-') + 1:])
-                        save_w = np.array([np.argmin(np.abs(m1_vals - mass)), 0, -1])
+                        save_w = np.array([np.argmin(np.abs(m1_vals - m1)), 0, -1])
                     elif 'NEWBINMODS/NEWBINMODS' in ln:
                         # e.g. NEWBINMODS/NEWBINMODS/z014/sneplot-z014-300-0.1-0
                         # Read period, mass ratio, and mass
