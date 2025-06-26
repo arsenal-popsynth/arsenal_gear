@@ -7,16 +7,17 @@ synthesis codes through interpreting and processing their outputs
 """
 
 import os
-
-import astropy.units as u
-import numpy as np
-from astropy.units import Quantity
-from arsenal_gear.population import StarPopulation, BinaryPopulation
-
-import requests, tarfile
-from tqdm import tqdm
+import tarfile
 from zipfile import ZipFile
 
+import numpy as np
+import requests
+from tqdm import tqdm
+
+import astropy.units as u
+from astropy.units import Quantity
+
+from arsenal_gear.population import StarPopulation, BinaryPopulation
     
 class BPASS_stellar_models():
     """
@@ -113,7 +114,10 @@ class BPASS_stellar_models():
                     print(name)
             else:
                 if target_file in file_names:
+                    
                     zip_archive.extract(target_file, path = self.dir)
+                elif target_file is None:
+                    zip_archive.extractall(path = self.dir)
 
         if delete_zip and fname.exists():
             print("Deleting", fname)
@@ -133,7 +137,8 @@ class BPASS_stellar_models():
             raise IOError(f'{fname} is not a valid tar.gz file. '
                           'Try again with `force_download=True`')
         with tarfile.open(fname, 'r:gz') as tar:
-            tar.extractall(path=extractdir)
+            print(f'Extracting {fname}...')
+            tar.extractall(path = self.dir)
 
         if delete_tar and fname.exists():
             print("Deleting", fname)
