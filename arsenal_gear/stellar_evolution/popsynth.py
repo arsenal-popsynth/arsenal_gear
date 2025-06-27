@@ -28,16 +28,16 @@ class BPASS_stellar_models():
     # Change dl=0 to dl=1 to force download
     bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
     
-    def __init__(self, binaries: BinaryPopulation, metal: str,
-                 time: Quantity["time"],
+    def __init__(self, singles: StarPopulation, binaries: BinaryPopulation, 
+                 metal: str, time: Quantity["time"],
                  bpass_dir: str, force_download: bool = False) -> None:
         """
         Args:
+            stars:     the StarPopulation instance for which we want information
             binaries:  the BinaryPopulation instance for which we want information
             metal:     the metallicity of the stellar population
             TO DO -CCC, 26/06/2025: Read metallicity from binaries
             time:      current simulation time
-            #prev_time: previous simulation time, necessary for binary mass loss
             bpass_dir: the directory for the BPASS models
 
         """
@@ -56,9 +56,10 @@ class BPASS_stellar_models():
             self.dir:    str = bpass_dir + '/'
             
         self.time:    Quantity["time"] = time
-            
-        self.mass:    list = binaries.primary["mass"].to(u.Msun).value
-        self.mrat:    list = binaries.secondary["mass"] / binaries.primary["mass"]
+        
+        self.s_mass:  list = singles["mass"].to(u.Msun).value
+        self.b_mass:  list = binaries.primary["mass"].to(u.Msun).value
+        self.mratio:  list = binaries.secondary["mass"] / binaries.primary["mass"]
         self.logp:    list = np.log10(binaries["period"].to(u.d).value)
         super().__init__()
                 
@@ -202,24 +203,35 @@ class BPASS_stellar_models():
         Read BPASS data from a stellar model file.
         """
         # General file name, to append
-        gen_fname = self.dir + 'NEWBINMODS/NEWBINMODS/' + self.metal + \
-                    '/sneplot-' + self.metal
-        # Get frequency for each unique binary
-        props = np.vstack((self.mass, self.mrat, self.logp))
-        vals, _, counts = np.unique(props, return_index = True, 
-                                    return_counts = True, axis=1)
-        feedback = np.empty((10, len(counts)))
-        feedback[0, :] = counts
+        b_fname = self.dir + 'NEWBINMODS/NEWBINMODS/' + self.metal + \
+                  '/sneplot-' + self.metal
+        s_fname = self.dir + 'NEWSINMODS/' + self.metal + \
+                  '/sneplot-' + self.metal
+        # Get frequency for each unique binary and single
+        b_props = np.vstack((self.b_mass, self.mratio, self.logp))
+        b_vals, _, b_counts = np.unique(b_props, return_index = True, 
+                                        return_counts = True, axis=1)
+        s_vals, _, s_counts = np.unique(self.s_mass, return_index = True, return_counts = True)
+        len_b = len(b_counts)
+        len_s = len(s_counts)
+        feedback = np.empty((10, len_b + len_s))
+        feedback[0, :] = np.concatenate((b_counts, s_counts))
         # Get the properties for each unique binary
-        for i in range(len(counts)):
-            _mass, _mrat, _logp = np.round(vals[:, i], decimals=1)
-            # Matching file names from BPASS
-            if str(_mass)[-2:] == '.0':
-                _mass = int(_mass)
-            if str(_logp)[-2:] == '.0':
-                _logp = int(_logp)
-            fname = gen_fname + '-' + str(_mass) + '-' + str(_mrat) + \
-                    '-' + str(_logp)
+        for i in range(len_b + len_s):
+            if i in range(len_b):
+                _mass, _mrat, _logp = np.round(b_vals[:, i], decimals=1)
+                # Matching file names from BPASS
+                if str(_mass)[-2:] == '.0':
+                    _mass = int(_mass)
+                if str(_logp)[-2:] == '.0':
+                    _logp = int(_logp)
+                fname = b_fname + '-' + str(_mass) + '-' + str(_mrat) + '-' + str(_logp)
+            else:
+                _mass = np.round(s_vals[i - len_b], decimals=1)
+                # Matching file names from BPASS
+                if str(_mass)[-2:] == '.0':
+                    _mass = int(_mass)
+                fname = s_fname + '-' + str(_mass)
 
             data = self.data_from_model(np.genfromtxt(fname), self.time)
             feedback[1, i] = data[0].to_value(u.Msun)
