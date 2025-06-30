@@ -307,6 +307,7 @@ class MIST(Isochrone):
             mass_set = []
             min_ages = []
             max_ages = []
+            (min_eep, max_eep) = (np.inf, -1)
             for f in mass_file_list:
                 # read in the EEP file
                 minit, eeps, min_age, max_age, data = self.read_eep_file(f)
@@ -316,12 +317,16 @@ class MIST(Isochrone):
                 min_ages.append(min_age)
                 max_ages.append(max_age)
                 mass_set.append(data)
+
+                min_eep = np.min([min_eep, np.min(eeps)])
+                max_eep = np.max([max_eep, np.max(eeps)])
             self.masses = np.array(masses)
             self.eeps_list = eeps_list
             self.min_ages = np.array(min_ages)
             self.max_ages = np.array(max_ages)
             self.mass_set = mass_set
             self.MMAX = np.max(masses)
+            (self.min_eep, self.max_eep) = (int(min_eep),int(max_eep))
 
     def read_iso_file(self):
         """
