@@ -460,7 +460,7 @@ class MIST(Isochrone):
     def _fixed_eep_q(j:int, eeps:list, qs:list):
         """
         Returns the value of a isochrone quantity at a fixed EEP
-        across severl isochrones at different times.
+        across several isochrones at different times.
         Args:
             j: the index of the EEP to get values for
             eeps: the list of EEPs for each isochrone.
@@ -470,7 +470,7 @@ class MIST(Isochrone):
         """
         return [q[np.where(eep == j)[0][0]] for (q,eep) in zip(qs,eeps)]
 
-    def _interp_iso_quantity(self, t:Quantity["time"], label:str,
+    def _interp_iso_quantity_eep(self, t:Quantity["time"], label:str,
                              method:str="pchip", make_monotonic:bool=False) -> (np.float64, np.float64):
         """
         Interpolates between isochrones using the EEP values to create an
@@ -520,12 +520,43 @@ class MIST(Isochrone):
         if make_monotonic:
             start = time.time()
             if np.any(np.diff(qi) < 0):
-                se_utils._make_monotonic(eepi,qi)
+                qi = se_utils._make_monotonic_increasing(eepi,qi)
             end = time.time()
             if self.profile:
                 print("\t\tMonotonic interpolation took: ", end-start)
 
         return (eepi,qi)
+
+    def _interp_iso_quantity_mass(self, mini:Quantity["mass"], t:Quantity["time"],
+                                  label:str, method:str="pchip") -> np.float64:
+        """
+        Uses _interp_iso_quantity_eep to interpolate a provided quantity in both
+        that quantity and in initial mass as a funciton of EEP and then returns the
+        value of the quantity at the requested initial mass
+        Args:
+            mini: the initial mass of the star.
+            t: the age of the isochrone.
+            label: the label of the quantity to be interpolated.
+            method: the interpolation method to use, either pchip or linear
+        Returns:
+            qi: the specified quantity at the requested initial mass.
+        """
+        # construct isochrone for mass/luminosity relationship
+        start = time.time()
+        (eepi, qi) = self._interp_iso_quantity_eep(t, label,method=method)
+        end = time.time()
+        if self.profile:
+            print("\tTime to interpolate %s: "%(label), end-start)
+        start = time.time()
+        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass', method=method, make_monotonic=True)
+        end = time.time()
+        if self.profile:
+            print("\tTime to interpolate mass: ", end-start)
+
+        q_res = pchip_interpolate(massi, qi, mini.value)
+        # make sure values are zero outside the range of masses used
+        q_res *= np.logical_and(mini.value > min(massi), mini.value < max(massi))
+        return q_res
 
     def _get_mmax_age_interp(self):
         """
@@ -536,7 +567,7 @@ class MIST(Isochrone):
             lages = self.ages
             mmax = self.mmaxes
         else:
-            # interpreting from EEPs
+            # interpolating from EEPs
             lages = np.log10(self.max_ages)[::-1]
             mmax = self.masses[::-1]
             sel = se_utils._index_monotonic(lages)
@@ -562,7 +593,6 @@ class MIST(Isochrone):
         interp[np.where(lt > max(lages))] = 0.0
         return interp*u.Msun
 
-    
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the rate of change of the maximum mass of the stellar population
@@ -592,22 +622,9 @@ class MIST(Isochrone):
 
         if np.isscalar(mini.value):
             mini = np.array([mini.value])*mini.unit
-        
-        # construct isochrone for mass/luminosity relationship
-        start = time.time()
-        (eepi,logLi) = self._interp_iso_quantity(t, 'log_L')
-        end = time.time()
-        if self.profile:
-            print("\tTime to interpolate Lbol: ", end-start)
-        start = time.time()
-        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass', make_monotonic=True)
-        end = time.time()
-        if self.profile:
-            print("\tTime to interpolate mass: ", end-start)
 
-        logLbol_res = pchip_interpolate(massi, logLi, mini.value)
+        logLbol_res = self._interp_iso_quantity_mass(mini, t, 'log_L')
         Lbol_res = np.power(10, logLbol_res)*u.Lsun
-        Lbol_res *= np.logical_and(mini.value > min(massi), mini.value < max(massi))
         return Lbol_res
 
     def teff(self, mini:Quantity["mass"], t: Quantity["time"],method:str="pchip") -> Quantity["temperature"]:
@@ -624,33 +641,18 @@ class MIST(Isochrone):
         if np.isscalar(mini.value):
             mini = np.array([mini.value])*mini.unit
 
-        # construct isochrone for mass/temperature relationship
-        start = time.time()
-        (eepi,logTi) = self._interp_iso_quantity(t, 'log_Teff',method=method)
-        end = time.time()
-        if self.profile:
-            print("\tTime to interpolate Teff: ", end-start)
-        start = time.time()
-        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass',make_monotonic=True)
-        end = time.time()
-        if self.profile:
-            print("\tTime to interpolate mass: ", end-start)
-
-        logTeff_res = pchip_interpolate(massi, logTi, mini.value)
+        logTeff_res = self._interp_iso_quantity_mass(mini, t, 'log_Teff')
         Teff_res = np.power(10, logTeff_res)*u.K
-        Teff_res *= np.logical_and(mini.value > min(massi), mini.value < max(massi))
         return Teff_res
 
     def mini(self, t: Quantity["time"],method:str="pchip") -> Quantity["temperature"]:
         """
-        get the atmospheric effective temperature of a star of initial mass mini
-        at age t
+        at a given age t, return the realationship between initial mass and EEP
         Args:
-            mini: the initial mass of the star. Can be an array
             t: the age of the isochrone. Should be a single time (for now...)
         Returns:
-            Quantity["power"]: the bolometric luminosity of the star.
+            Quantity["mass"]: the ZAMS mass of the star.
         """
 
-        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass')
+        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',make_monotonic=True)
         return (eepi,massi)
