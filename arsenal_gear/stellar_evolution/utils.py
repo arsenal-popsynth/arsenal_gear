@@ -18,11 +18,14 @@ def _make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
         y (np.float64): dependent variable to be made monotonic
     """
     j = 0
-    while(j < len(y)-1):
+    n = len(y)
+    while(j < n-1):
         if y[j] > y[j+1]:
             k = j+1
-            while(y[j]>y[k]):
+            while((k< n) and (y[j]>y[k])):
                 k+=1
+            if k == n:
+                k = n-1
             y[j+1:k] = np.interp(x[j+1:k],[x[j],x[k]],[y[j],y[k]])
             j = k
         else:
@@ -39,11 +42,14 @@ def _make_monotonic_decreasing(x: np.float64, y:np.float64) -> np.float64:
         y (np.float64): dependent variable to be made monotonic
     """
     j = 0
-    while(j < len(y)-1):
+    n = len(y)
+    while(j < n-1):
         if y[j] < y[j+1]:
             k = j+1
-            while(y[j] < y[k]):
+            while((k < n) and (y[j] < y[k])):
                 k+=1
+            if k == n:
+                k = n-1
             y[j+1:k] = np.interp(x[j+1:k],[x[j],x[k]],[y[j],y[k]])
             j = k
         else:
