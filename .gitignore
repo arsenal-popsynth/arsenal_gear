@@ -18,3 +18,6 @@ _autosummary
 
 # Isochrone data
 arsenal_gear/stellar_evolution/data/
+
+# plotting outputs
+plots/
