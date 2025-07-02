@@ -1,0 +1,6 @@
+arsenal\_gear.feedbacks.sn.lifetimes\_Raiteri
+=============================================
+
+.. currentmodule:: arsenal_gear.feedbacks.sn
+
+.. autofunction:: lifetimes_Raiteri

@@ -1,0 +1,8 @@
+arsenal\_gear.population.StarPopulation
+=======================================
+
+.. currentmodule:: arsenal_gear.population
+
+.. autoclass:: StarPopulation
+   :members:
+   :show-inheritance:
