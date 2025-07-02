@@ -1,4 +1,5 @@
 .envrc
+.venv
 *.swp
 
 figures/
