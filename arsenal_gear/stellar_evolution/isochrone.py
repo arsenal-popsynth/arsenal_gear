@@ -18,6 +18,7 @@ import requests
 from tqdm import tqdm
 
 import astropy.units as u
+from astropy.utils.masked import Masked
 import numpy as np
 from scipy.interpolate import CubicSpline, pchip_interpolate
 from astropy.units import Quantity
@@ -231,6 +232,7 @@ class MIST(Isochrone):
         if self.verbose:
             print("Time to read data: ", data_read_end - data_read_start)
 
+    ######## DATA ACQUISITION AND READING ########
     def get_data(self):
         """
         Retrieves the MIST isochrone data from a local directory or downloads it if
@@ -304,7 +306,7 @@ class MIST(Isochrone):
 
             masses = []
             eeps_list = []
-            mass_set = []
+            tracks = []
             min_ages = []
             max_ages = []
             (min_eep, max_eep) = (np.inf, -1)
@@ -316,7 +318,7 @@ class MIST(Isochrone):
                 eeps_list.append(eeps)
                 min_ages.append(min_age)
                 max_ages.append(max_age)
-                mass_set.append(data)
+                tracks.append(data)
 
                 min_eep = np.min([min_eep, np.min(eeps)])
                 max_eep = np.max([max_eep, np.max(eeps)])
@@ -324,7 +326,7 @@ class MIST(Isochrone):
             self.eeps_list = eeps_list
             self.min_ages = np.array(min_ages)
             self.max_ages = np.array(max_ages)
-            self.mass_set = mass_set
+            self.tracks = tracks
             self.MMAX = np.max(masses)
             (self.min_eep, self.max_eep) = (int(min_eep),int(max_eep))
 
@@ -393,6 +395,7 @@ class MIST(Isochrone):
 
         return minit, eeps, min_age, max_age, data
 
+    ######## ISOCHRONE INTERPOLATION FUNCTIONS ########
     def _age_index(self, age : Quantity["time"]) -> int:
         """
 
@@ -468,7 +471,7 @@ class MIST(Isochrone):
         Returns:
             qj: the quantity at the fixed EEP.
         """
-        return [q[np.where(eep == j)[0][0]] for (q,eep) in zip(qs,eeps)]
+        return [q[np.where(eep == j)[0]][0] for (q,eep) in zip(qs,eeps)]
 
     def _interp_iso_quantity_eep(self, t:Quantity["time"], label:str,
                              method:str="pchip", make_monotonic:bool=False) -> (np.float64, np.float64):
@@ -482,17 +485,11 @@ class MIST(Isochrone):
             qi: The specified quantity at the requested age. This is a function of
                 initial mass which can also be generated in this way.
             eepi: The EEP values corresponding to the interpolated isochrone.
-        """
-        if not(np.isscalar(t.value)):
-            # throw error
-            raise ValueError("t must be a scalar")
-        else:
-            t = np.array([t.value])*t.unit
-    
+        """    
         start = time.time()
         ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
-        lages = [self.ages[i] for i in ais]
+        lages = np.array([self.ages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
         qs = [self.isos[i][label] for i in ais]
         eeps = [self.isos[i]['EEP'] for i in ais]
@@ -539,7 +536,7 @@ class MIST(Isochrone):
             label: the label of the quantity to be interpolated.
             method: the interpolation method to use, either pchip or linear
         Returns:
-            qi: the specified quantity at the requested initial mass.
+            q_res: the specified quantity at the requested initial mass.
         """
         # construct isochrone for mass/luminosity relationship
         start = time.time()
@@ -553,11 +550,73 @@ class MIST(Isochrone):
         if self.profile:
             print("\tTime to interpolate mass: ", end-start)
 
-        q_res = pchip_interpolate(massi, qi, mini.value)
+        mini = mini.to(u.Msun).value
+        q_res = pchip_interpolate(massi, qi, mini)
         # make sure values are zero outside the range of masses used
-        q_res *= np.logical_and(mini.value > min(massi), mini.value < max(massi))
+        mask = np.logical_or(mini < min(massi), mini > max(massi))
+        q_res = np.ma.masked_array(q_res, mask=mask)
         return q_res
 
+    ######## EEP INTERPOLATION FUNCTIONS ########
+    def _interp_eep_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
+                             label:str, method:str="pchip") -> np.float64:
+        """
+        Follows the instructions of the MIST0 and MIST1 papers by looping over
+        all EEPs and
+            1. Looping over all Mass tracks and getting the age at the given EEP
+               This then constitutes an age vs. mass realtionship which is eforced to be
+               montonic (decreasing as a function of mas)
+            2. We interpolate this relationship to find M(t) for the given EEP
+            3. We then interpolate the requested quantity, given by "label" in mass for
+               the given EEP.
+        Args:
+            mini: the initial mass of the star.
+            t: the age of the isochrone.
+            label: the label of the quantity to be interpolated.
+            method: the interpolation method to use, either pchip or linear
+        Returns:
+            qi: the specified quantity at the requested age (t) and range of initial
+                masses (mini)
+        """
+
+        age = t.to(u.yr).value
+        (eeps_,ms_,qs_) = ([],[],[])
+        for eep in range(1, self.max_eep+1):
+            (age_set, mass_set, q_set) = ([], [], [])
+            for (j,track) in enumerate(self.tracks):
+                ages = track["star_age"]
+                if eep <= len(ages):
+                    # get the age at the given EEP
+                    age_set.append(ages[eep-1])
+                    mass_set.append(self.masses[j])
+                    q_set.append(track[label][eep-1])        
+            age_set = np.array(age_set)
+            mass_set = np.array(mass_set)
+            q_set = np.array(q_set)
+            age_test = (max(age_set)>age) and (min(age_set)<age)
+            if ((len(age_set) > 0) and age_test):
+                eeps_.append(eep)
+                age_set = se_utils._make_monotonic_decreasing(mass_set, age_set)
+                m = pchip_interpolate(age_set[::-1], mass_set[::-1], age)[0]
+                q = pchip_interpolate(mass_set, q_set, m)
+                ms_.append(m)
+                qs_.append(q)
+        # this is the constructed isochrone for property q given by "label"
+        eeps_ = np.array(eeps_)
+        ms_ = np.array(ms_)
+        qs_ = np.array(qs_)
+        # make sure masses are monotonically increasing (not guaranteed by above interp)
+        ms_ = se_utils._make_monotonic_increasing(eeps_, ms_)
+        # finally we interpolate the requested quantity to the requested masses
+        mini = mini.to(u.Msun).value
+        qi = pchip_interpolate(ms_, qs_, mini)
+        # make sure values are zero outside the range of masses used
+        mask = np.logical_or(mini < min(ms_), mini > max(ms_))
+        qi = np.ma.masked_array(qi, mask=mask)
+        return qi
+
+
+    ######## OTHER HELPER FUNCTIONS ########
     def _get_mmax_age_interp(self):
         """
         Returns the maximum mass as a function of age,
@@ -575,6 +634,42 @@ class MIST(Isochrone):
             mmax = mmax[sel]
         return (lages, mmax)
 
+    def _interp_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
+                         label:str) -> np.float64:
+        """
+        Helper function to decide between which inerpolation method to use
+        and properly format the arguments
+        Args:
+            mini: the initial mass of the star.
+            t: the age of the isochrone. Should be a single time (for now...)
+            label: the label of the quantity to be interpolated.
+        Returns:
+            q_res: the specified quantity at the requested initial mass.
+                   This is masked based on the range of initial masses
+                   available at the specified age.
+        """
+
+        if np.isscalar(mini.value):
+            mini = np.array([mini.value])*mini.unit
+
+        if not(np.isscalar(t.value)):
+            if len(t.value) != 1:
+                # if t is an array, we can only interpolate at a single age
+                # throw error
+                raise ValueError("t must be a scalar, or length 1 array")
+        else:
+            t = np.array([t.value])*t.unit
+
+        if self.interp_op == "iso":
+            # interpolate from isochrones
+            q_res = self._interp_iso_quantity_mass(mini, t, label)
+        else:
+            # interpolate from EEPs
+            q_res = self._interp_eep_quantity(mini, t, label)
+
+        return q_res
+
+    ######## MAIN PUBLIC OUTPUT FUNCTIONS ########
     def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
@@ -619,11 +714,7 @@ class MIST(Isochrone):
         Returns:
             Quantity["power"]: the bolometric luminosity of the star.
         """
-
-        if np.isscalar(mini.value):
-            mini = np.array([mini.value])*mini.unit
-
-        logLbol_res = self._interp_iso_quantity_mass(mini, t, 'log_L')
+        logLbol_res = Masked(self._interp_quantity(mini, t, 'log_L'))
         Lbol_res = np.power(10, logLbol_res)*u.Lsun
         return Lbol_res
 
@@ -635,13 +726,10 @@ class MIST(Isochrone):
             mini: the initial mass of the star. Can be an array
             t: the age of the isochrone. Should be a single time (for now...)
         Returns:
-            Quantity["power"]: the bolometric luminosity of the star.
+            Quantity["temperature"]: the effective surface temperature of the star.
         """
-
-        if np.isscalar(mini.value):
-            mini = np.array([mini.value])*mini.unit
-
-        logTeff_res = self._interp_iso_quantity_mass(mini, t, 'log_Teff')
+        # interpolating from EEPs
+        logTeff_res = Masked(self._interp_quantity(mini, t, 'log_Teff'))
         Teff_res = np.power(10, logTeff_res)*u.K
         return Teff_res
 
