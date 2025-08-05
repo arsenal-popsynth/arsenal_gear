@@ -75,7 +75,7 @@ class LimongiChieffi2018(Yields):
 
         super().__init__()
         self.filedir = os.path.dirname(os.path.realpath(__file__))
-        
+
         self.yield_tablefile = self.filedir + \
             f'/LimongiChieffi2018/tab_{model}/tab_yieldstot_ele_exp.dec'
         self.wind_tablefile = self.filedir + \
@@ -225,14 +225,14 @@ class LimongiChieffi2018(Yields):
         """
         if model == 'a':
             return 3
-        elif model == 'b':
+        if model == 'b':
             return 2
-        elif model == 'c':
+        if model == 'c':
             return 1
-        elif model == 'd':
+        if model == 'd':
             return 0
-        else:
-            raise ValueError("Model does not exist.")
+        
+        raise ValueError("Model does not exist.")
 
     @staticmethod
     def _get_rot_index_from_model(model: str) -> int:
@@ -240,9 +240,9 @@ class LimongiChieffi2018(Yields):
         """
         if model == '000':
             return 0
-        elif model == '150':
+        if model == '150':
             return 1
-        elif model == '300':
+        if model == '300':
             return 2
-        else:
-            raise ValueError("Model does not exist.")
+        
+        raise ValueError("Model does not exist.")
