@@ -145,7 +145,7 @@ class LimongiChieffi2018(Yields):
     def get_element_list(self) -> None:
         """ Read element symbols and atomic numbers from tables.
         """
-        with open(self.wind_tablefile, 'r') as file:
+        with open(self.wind_tablefile, 'r', encoding="utf-8") as file:
             lines = file.readlines()
 
         elements = []
@@ -157,6 +157,9 @@ class LimongiChieffi2018(Yields):
             if element not in elements:
                 elements.append(element)
                 atomic_num.append(int(line.split()[1]))
+        
+        raise ValueError(
+            f"Could not determine list of elements in file {self.wind_tablefile}.")
 
     def load_wind_yields(self) -> np.ndarray:
         """ Load tables of yields ejected as winds from massive stars.
@@ -165,21 +168,21 @@ class LimongiChieffi2018(Yields):
         wind_yld = np.zeros([len(self.elements), self.rot.size,
                              self.metal.size, self.mass.size])
 
-        with open(self.wind_tablefile, 'r') as file:
+        with open(self.wind_tablefile, 'r', encoding="utf-8") as file:
             lines = file.readlines()
 
         for index, line in enumerate(lines):
             if line.split()[0] == 'ele':
                 model = line.split()[4]
-                ind_metal = self.get_metal_index_from_model(model[3])
-                ind_rot = self.get_rot_index_from_model(model[4:])
+                ind_metal = self._get_metal_index_from_model(model[3])
+                ind_rot = self._get_rot_index_from_model(model[4:])
 
                 data = np.genfromtxt(self.wind_tablefile,
                                      usecols=[1, 4, 5, 6, 7, 8, 9, 10, 11, 12],
                                      skip_header=index+1,
                                      max_rows=142).T
-                for i, (atom_nr, element) in enumerate(zip(self.atomic_num, self.elements)):
-                    mask = (data[0] == atom_nr)
+                for i, atom_nr in enumerate(self.atomic_num):
+                    mask = data[0] == atom_nr
                     wind_yld[i, ind_rot, ind_metal] = np.sum(
                         data[1:, mask], axis=1)
 
@@ -193,14 +196,14 @@ class LimongiChieffi2018(Yields):
         total_yld = np.zeros([len(self.elements), self.rot.size,
                               self.metal.size, self.mass.size])
 
-        with open(self.yield_tablefile, 'r') as file:
+        with open(self.yield_tablefile, 'r', encoding="utf-8") as file:
             lines = file.readlines()
 
         for index, line in enumerate(lines):
             if line.split()[0] == 'ele':
                 model = line.split()[4]
-                ind_metal = self.get_metal_index_from_model(model[3])
-                ind_rot = self.get_rot_index_from_model(model[4:])
+                ind_metal = self._get_metal_index_from_model(model[3])
+                ind_rot = self._get_rot_index_from_model(model[4:])
 
                 total_yld[:, ind_rot, ind_metal, :] = np.genfromtxt(
                     self.yield_tablefile,
@@ -216,7 +219,7 @@ class LimongiChieffi2018(Yields):
         return ccsn_yld
 
     @staticmethod
-    def get_metal_index_from_model(model: str) -> int:
+    def _get_metal_index_from_model(model: str) -> int:
         """ Convenience function for converting table metal labels into table index.
         """
         if model == 'a':
@@ -231,7 +234,7 @@ class LimongiChieffi2018(Yields):
             raise ValueError("Model does not exist.")
 
     @staticmethod
-    def get_rot_index_from_model(model: str) -> int:
+    def _get_rot_index_from_model(model: str) -> int:
         """ Convenience function for converting table rotation labels into table index.
         """
         if model == '000':

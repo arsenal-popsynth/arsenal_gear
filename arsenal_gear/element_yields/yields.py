@@ -77,18 +77,18 @@ class Source:
             if all(element in list(self.yields.keys()) for element in elements):
                 return np.array([self.yields[element](points, method=interpolate)
                                  for element in elements])
-            else:
-                yld = []
-                shape = self.yields['H'](points, method=interpolate).shape
-                for element in elements:
-                    try:
-                        yld.append(self.yields[element](
-                            points, method=interpolate))
-                    except KeyError:
-                        warnings.warn(
-                            "Element {elements[0]} is not part of yield set.")
-                        yld.append(np.ones(shape) * np.nan)
-                return yld
+
+            yld = []
+            shape = self.yields['H'](points, method=interpolate).shape
+            for element in elements:
+                try:
+                    yld.append(self.yields[element](
+                        points, method=interpolate))
+                except KeyError:
+                    warnings.warn(
+                        "Element {elements[0]} is not part of yield set.")
+                    yld.append(np.ones(shape) * np.nan)
+            return yld
 
     def get_mloss(self, params, interpolate='nearest', extrapolate=False):
         """ Interpolate sum of all yields (total mass) from class.   
@@ -131,8 +131,8 @@ class Source:
                 Interpolation points for RegularGridInterpolator
 
         """
-        max_length = max([len(param) if isinstance(
-            param, (list, np.ndarray)) else 1 for param in params])
+        max_length = max(len(param) if isinstance(
+            param, (list, np.ndarray)) else 1 for param in params)
 
         # Ensure all arguments are lists or arrays of the same length
         args = []
