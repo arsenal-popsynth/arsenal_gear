@@ -155,8 +155,9 @@ class Yields:
 
     def __init__(self) -> None:
 
-        warnings.warn(
-            "This is a header class for inheritance and should not be used by itself")
+        if self.__class__ is Yields:
+            raise NotImplementedError(
+                "This is a header class for inheritance and should not be used by itself")
 
         self.filedir = os.path.dirname(os.path.realpath(__file__))
         self.yield_tablefile = self.filedir + '<yield file name>'
@@ -168,7 +169,9 @@ class Yields:
                     elements: List[str],
                     mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
-                    interpolate: str = "nearest") -> Quantity["mass"]:
+                    rot: Quantity["velocity"],
+                    interpolate: str = "nearest",
+                    extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for core-collapse SNe.
 
             Use: Rewrite for a given yields
@@ -180,7 +183,9 @@ class Yields:
                     elements: List[str],
                     mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
-                    interpolate: str = "nearest") -> Quantity["mass"]:
+                    rot: Quantity["velocity"],
+                    interpolate: str = "nearest",
+                    extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for SNe type Ia.
 
             Use: Rewrite for a given yields
@@ -191,7 +196,9 @@ class Yields:
                     elements: List[str],
                     mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
-                    interpolate: str = "nearest") -> Quantity["mass"]:
+                    rot: Quantity["velocity"],
+                    interpolate: str = "nearest",
+                    extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for stellar winds.
 
             Use: Rewrite for a given yields
@@ -203,7 +210,9 @@ class Yields:
                    elements: List[str],
                    mass: Quantity["mass"],
                    metal: Quantity["dimensionless"],
-                   interpolate: str = "nearest") -> Quantity["mass"]:
+                   rot: Quantity["velocity"],
+                   interpolate: str = "nearest",
+                   extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for AGB mass loss.
 
             Use: Rewrite for a given yields

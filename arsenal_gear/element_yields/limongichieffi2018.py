@@ -73,8 +73,9 @@ class LimongiChieffi2018(Yields):
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
+        super().__init__()
         self.filedir = os.path.dirname(os.path.realpath(__file__))
-
+        
         self.yield_tablefile = self.filedir + \
             f'/LimongiChieffi2018/tab_{model}/tab_yieldstot_ele_exp.dec'
         self.wind_tablefile = self.filedir + \
