@@ -1,10 +1,17 @@
-import astropy.units as u
-from astropy.units import Quantity
-import numpy as np
+"""
+limongichieffi2018
+==========
 
+This submodule contains all the code required to load yields from
+Limongi & Chieffi (2018).
+"""
 import os
 import re
 from typing import List
+
+import astropy.units as u
+from astropy.units import Quantity
+import numpy as np
 
 from .yields import Yields, Source
 

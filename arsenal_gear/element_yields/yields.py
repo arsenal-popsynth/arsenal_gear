@@ -1,16 +1,30 @@
-import astropy.units as u
+"""
+yields
+==========
+
+This module contains the header classes used for different
+yield tables available in the litterature.
+"""
+import os
+import warnings
+from typing import List
+
 from astropy.units import Quantity
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-import os
-import warnings
-import re
-from typing import Type
-from typing import List
-
 
 class Source:
+    """
+    Class used to store interpolators of yields from a given
+    source (e.g., winds or core-collapse SNe). Makes use of
+    scipy.interpolate.RegularGridInterpolator for flexibility
+    and efficiency.
+
+    Includes functions: 
+    get_yield - returns yields of given elements
+    get_mloss - return sum of all yields in table.
+    """
 
     def __init__(self, elements, params, yields) -> None:
 
@@ -22,14 +36,24 @@ class Source:
                                              fill_value=None, bounds_error=False)
 
     def get_yld(self, elements, params, interpolate='nearest', extrapolate=False):
+        """ Interpolate yields from class.   
 
+            Args:
+                elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+                params: list of parameters of the table (e.g., mass, metallicity, rotation)
+                interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+                extrapolate: if False, then params are set to limits if outside bound. 
+            Returns:
+                List of yields matching provided element list
+
+        """
         elements = np.atleast_1d(elements)
 
         if len(params) != len(self.params):
             raise ValueError(
                 "Supplied parameters do not match yield set parameters.")
 
-        points = self.convert2array(params)
+        points = self._convert2array(params)
 
         if extrapolate:
             warnings.warn(
@@ -67,12 +91,21 @@ class Source:
                 return yld
 
     def get_mloss(self, params, interpolate='nearest', extrapolate=False):
+        """ Interpolate sum of all yields (total mass) from class.   
 
+            Args:
+                params: list of parameters of the table (e.g., mass, metallicity, rotation)
+                interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+                extrapolate: if False, then params are set to limits if outside bound. 
+            Returns:
+                Total mass ejected by source (i.e., sum of all elements)
+
+        """
         if len(params) != len(self.params):
             raise ValueError(
                 "Supplied parameters do not match yield set parameters.")
 
-        points = self.convert2array(params)
+        points = self._convert2array(params)
 
         if extrapolate:
             warnings.warn(
@@ -88,7 +121,16 @@ class Source:
         return self.mloss(points, method=interpolate)
 
     @staticmethod
-    def convert2array(params):
+    def _convert2array(params):
+        """ Internal function to convert list of parameters to a format
+            that RegularGridInterpolator can handle.   
+
+            Args:
+                params: list of parameters of the table (e.g., mass, metallicity, rotation)
+            Returns:
+                Interpolation points for RegularGridInterpolator
+
+        """
         max_length = max([len(param) if isinstance(
             param, (list, np.ndarray)) else 1 for param in params])
 
@@ -119,13 +161,18 @@ class Yields:
         self.filedir = os.path.dirname(os.path.realpath(__file__))
         self.yield_tablefile = self.filedir + '<yield file name>'
 
-        self.elements, self.atomic_num = None
+        self.elements = None
+        self.atomic_num = None
 
     def ccsn_yields(self,
                     elements: List[str],
                     mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
                     interpolate: str = "nearest") -> Quantity["mass"]:
+        """ Header function for core-collapse SNe.
+
+            Use: Rewrite for a given yields
+        """
 
         raise ValueError("Core-collapse SNe is not part of this yield set.")
 
@@ -134,6 +181,10 @@ class Yields:
                     mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
                     interpolate: str = "nearest") -> Quantity["mass"]:
+        """ Header function for SNe type Ia.
+
+            Use: Rewrite for a given yields
+        """
         raise ValueError("Type Ia SNe is not part of this yield set.")
 
     def wind_yields(self,
@@ -141,6 +192,10 @@ class Yields:
                     mass: Quantity["mass"],
                     metal: Quantity["dimensionless"],
                     interpolate: str = "nearest") -> Quantity["mass"]:
+        """ Header function for stellar winds.
+
+            Use: Rewrite for a given yields
+        """
         raise ValueError(
             "Stellar winds (main sequence) is not part of this yield set.")
 
@@ -149,5 +204,9 @@ class Yields:
                    mass: Quantity["mass"],
                    metal: Quantity["dimensionless"],
                    interpolate: str = "nearest") -> Quantity["mass"]:
+        """ Header function for AGB mass loss.
+
+            Use: Rewrite for a given yields
+        """
         raise ValueError(
             "Stellar wind (asymptotic giant branch) is not part of this yield set.")
