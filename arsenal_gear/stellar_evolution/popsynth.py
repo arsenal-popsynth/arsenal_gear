@@ -24,9 +24,11 @@ class BPASS_stellar_models():
     Reads in BPASS stellar model files for use with a discrete stellar population.
     """
     # basic options for BPASS stellar models
-    #bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=0&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
+    #bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=0" + \
+    #            "&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
     # Change dl=0 to dl=1 to force download
-    bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
+    bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1" + \
+                "&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
     
     def __init__(self, singles: StarPopulation, binaries: BinaryPopulation, 
                  metal: str, time: Quantity["time"],
@@ -176,14 +178,17 @@ class BPASS_stellar_models():
         Returns:
             Feedback properties
         """
-        # Replace NaNs by 0s
+        # Replace NaNs by 0s --> What about files without a companion?
         data = np.nan_to_num(data)
         # We want to extract the following values
         time = data[:, 1] * u.yr
-        ind_now = np.where((time_now - time) > 0 * u.yr)[-1][0]
+        ind_now = np.where((time_now - time) > 0 * u.yr)[-1][-1]
+        
+        # Model time
+        t_max = time[-1]
 
         # Need to use column 36 for 50-0.9-1
-        M1 = data[ind_now, 36] * u.Msun # 5 recommended in manual
+        M1 = data[ind_now, 36] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
         L1 = 10**data[ind_now, 4] * u.Lsun
         T1 = 10**data[ind_now, 3] * u.K
         R1 = 10**data[ind_now, 2] * u.Rsun
@@ -192,11 +197,46 @@ class BPASS_stellar_models():
         L2 = 10**data[ind_now, 48] * u.Lsun
         T2 = 10**data[ind_now, 47] * u.K
         R2 = 10**data[ind_now, 46] * u.Rsun
+        
+        M2_init = data[0, 37] * u.Msun # Initial companion mass
+        P = data[ind_now, 34] * u.yr   # Final orbital period
 
         dM  = (data[ind_now, 39] + data[ind_now, 40] - data[ind_now, 41] - data[ind_now, 42] + \
                data[ind_now, 43] + data[ind_now, 44]) * u.Msun / (1.989 * u.s)
         
-        return M1, M2, R1, R2, T1, T2, L1, L2, dM
+        return M1, M2, M2_init, P, R1, R2, T1, T2, L1, L2, dM, t_max
+    
+    def data_from_single_model(self, data: tuple, 
+                               time_now: Quantity["time"]) -> tuple:
+        """
+        Extract the stellar properties necessary for feedback
+        from a BPASS stellar model file, for a single star.
+        
+        Args:
+            data                (tuple): Matrix loaded from the stellar model file
+            time_now (Quantity["time"]): Current simulation time
+            
+        Returns:
+            Feedback properties
+        """
+        # Replace NaNs by 0s --> What about files without a companion?
+        data = np.nan_to_num(data)
+        # We want to extract the following values
+        time = data[:, 1] * u.yr
+        ind_now = np.where((time_now - time) > 0 * u.yr)[-1][-1]
+        
+        # Model time
+        t_max = time[-1]
+
+        # Need to use column 36 for 50-0.9-1
+        M1 = data[ind_now, 36] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
+        L1 = 10**data[ind_now, 4] * u.Lsun
+        T1 = 10**data[ind_now, 3] * u.K
+        R1 = 10**data[ind_now, 2] * u.Rsun
+
+        dM  = data[ind_now, 39] * u.Msun / (1.989 * u.s)
+        
+        return M1, R1, T1, L1, dM, t_max
     
     def read_bpass_data(self) -> tuple:
         """
@@ -218,6 +258,7 @@ class BPASS_stellar_models():
         feedback[0, :] = np.concatenate((b_counts, s_counts))
         # Get the properties for each unique binary
         for i in range(len_b + len_s):
+
             if i in range(len_b):
                 _mass, _mrat, _logp = np.round(b_vals[:, i], decimals=1)
                 # Matching file names from BPASS
@@ -226,24 +267,51 @@ class BPASS_stellar_models():
                 if str(_logp)[-2:] == '.0':
                     _logp = int(_logp)
                 fname = b_fname + '-' + str(_mass) + '-' + str(_mrat) + '-' + str(_logp)
+                
+                data = self.data_from_model(np.genfromtxt(fname), self.time)
+                feedback[1, i] = data[0].to_value(u.Msun)
+                feedback[2, i] = data[1].to_value(u.Msun)
+                feedback[3, i] = data[4].to_value(u.Rsun)
+                feedback[4, i] = data[5].to_value(u.Rsun)
+                feedback[5, i] = data[6].to_value(u.K)
+                feedback[6, i] = data[7].to_value(u.K)
+                feedback[7, i] = data[8].to_value(u.Lsun)
+                feedback[8, i] = data[9].to_value(u.Lsun)
+                feedback[9, i] = data[10].to_value(u.Msun/u.yr)
+                
+                # Set primary properties to 0 if remnant
+                if (data[-1] > 0 * u.yr) and (data[-1] < self.time):
+                    # Setting properties to 0 for now
+                    feedback[7, i] = 0
+                    feedback[9, i] = 0
+            
             else:
                 _mass = np.round(s_vals[i - len_b], decimals=1)
                 # Matching file names from BPASS
                 if str(_mass)[-2:] == '.0':
                     _mass = int(_mass)
+                if _mass == 120:
+                    _mass = 125 # Correct manually; not same mass as the binary models
+                in_binary = False
                 fname = s_fname + '-' + str(_mass)
-
-            data = self.data_from_model(np.genfromtxt(fname), self.time)
-            feedback[1, i] = data[0].to_value(u.Msun)
-            feedback[2, i] = data[1].to_value(u.Msun)
-            feedback[3, i] = data[2].to_value(u.Rsun)
-            feedback[4, i] = data[3].to_value(u.Rsun)
-            feedback[5, i] = data[4].to_value(u.K)
-            feedback[6, i] = data[5].to_value(u.K)
-            feedback[7, i] = data[6].to_value(u.Lsun)
-            feedback[8, i] = data[7].to_value(u.Lsun)
-            feedback[9, i] = data[8].to_value(u.Msun/u.yr)
-             
+                
+                data = self.data_from_single_model(np.genfromtxt(fname), self.time)
+                feedback[1, i] = data[0].to_value(u.Msun)
+                feedback[3, i] = data[1].to_value(u.Rsun)
+                feedback[5, i] = data[2].to_value(u.K)
+                feedback[7, i] = data[3].to_value(u.Lsun)
+                feedback[9, i] = data[4].to_value(u.Msun/u.yr)
+                feedback[2, i] = 0 # Set companion properties to 0
+                feedback[4, i] = 0
+                feedback[6, i] = 0
+                feedback[8, i] = 0
+                
+                # Also set primary properties to 0 if remnant
+                if (data[-1] > 0 * u.yr) and (data[-1] < self.time):
+                    # Setting properties to 0 for now
+                    feedback[7, i] = 0
+                    feedback[9, i] = 0
+                
         return feedback
             
             
