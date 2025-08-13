@@ -8,7 +8,7 @@ module.
 
 import numpy as np
 
-def _make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
+def make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
     """
     Make an array montonically increasing by replacing decreasing values with
     interpolated values based on the nearest by points j and k such that 
@@ -19,7 +19,7 @@ def _make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
     """
     j = 0
     n = len(y)
-    while(j < n-1):
+    while j < n-1:
         if y[j] > y[j+1]:
             k = j+1
             while((k < n) and (y[j]>y[k])):
@@ -38,7 +38,7 @@ def _make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
             j+=1
     return y
 
-def _make_monotonic_decreasing(x: np.float64, y:np.float64) -> np.float64:
+def make_monotonic_decreasing(x: np.float64, y:np.float64) -> np.float64:
     """
     Make an array montonically decreasing by replacing increasing values with
     interpolated values based on the nearest by points j and k such that 
@@ -49,7 +49,7 @@ def _make_monotonic_decreasing(x: np.float64, y:np.float64) -> np.float64:
     """
     j = 0
     n = len(y)
-    while(j < n-1):
+    while j < n-1:
         if y[j] < y[j+1]:
             k = j+1
             while((k < n) and (y[j] < y[k])):
@@ -68,17 +68,17 @@ def _make_monotonic_decreasing(x: np.float64, y:np.float64) -> np.float64:
             j+=1
     return y
 
-def _index_monotonic(y: np.float64) -> np.ndarray:
+def index_monotonic(y: np.float64) -> np.ndarray:
     """
     Return the indices of the array y such that y is monotonic increasing
     """
     j = 0
     out = []
-    while(j < len(y)-1):
+    while j < len(y)-1:
         out.append(j)
         if y[j] > y[j+1]:
             k = j+1
-            while(y[j]>y[k]):
+            while y[j]>y[k]:
                 k += 1
             # this should technically be k not k+1, but that 
             # leads to weird behavior, possibly due to very small

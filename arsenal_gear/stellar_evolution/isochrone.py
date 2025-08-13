@@ -18,10 +18,11 @@ import requests
 from tqdm import tqdm
 
 import astropy.units as u
+from astropy.units import Quantity
 from astropy.utils.masked import Masked
 import numpy as np
-from scipy.interpolate import CubicSpline, pchip_interpolate
-from astropy.units import Quantity
+# TODO(ltlancas: add CubicSpline interpolation as an option)
+from scipy.interpolate import pchip_interpolate
 
 from . import utils as se_utils
 
@@ -63,16 +64,20 @@ class Isochrone():
 
         try:
             response = requests.get(url, stream=True, timeout=10)
-        except requests.exceptions.Timeout:
-            raise Exception('Request timed out. Check your internet connection.')
+        except requests.exceptions.Timeout as e:
+            raise Exception('Request timed out. Check your internet connection.') from e
+        except requests.exceptions.ConnectionError as e:
+            raise Exception('Connection error occurred. Check your internet connection.') from e
+        except requests.exceptions.HTTPError as e:
+            raise Exception(f'HTTP error occurred: {e}') from e
         except requests.exceptions.RequestException as e:
-            raise Exception(f'Request failed: {e}')
+            raise Exception(f'Request failed: {e}') from e
 
         # Get file size
         total_size = int(response.headers.get('content-length', 0))
         # create a progress bar
-        tqdm_args = dict(desc='Downloading', total=total_size, unit='B',
-                        unit_scale=True, unit_divisor=1024)
+        tqdm_args = {"desc": "Downloading", "total": total_size, "unit": 'B',
+                     "unit_scale": True, "unit_divisor": 1024}
         # write the file
         with open(fname, 'wb') as f, tqdm(**tqdm_args) as prog_bar:
             for chunk in response.iter_content(chunk_size=1024):
@@ -249,7 +254,7 @@ class MIST(Isochrone):
             self.tarfile = tar_temp.format(self.vvcrit)
             iso_fname_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_basic.iso"
             self.isofile = iso_fname_temp.format(self.metstr, self.vvcrit)
-        elif (self.interp_op == "eep"):
+        elif self.interp_op == "eep":
             mod_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS"
             self.modeldir = mod_temp.format(self.metstr, self.vvcrit)
             tar_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS.txz"
@@ -265,18 +270,20 @@ class MIST(Isochrone):
         # check if the file exists and download otherwise
         force_download = self.force_download
         if not force_download:
-            if not (self.rootdir / self.modeldir).is_dir():
+            modeldir_path = self.rootdir / self.modeldir
+            tarfile_path = self.rootdir / self.tarfile
+            if not modeldir_path.is_dir():
                 # model directory doesn't exist -> check for tarfile
-                if not (self.rootdir / self.tarfile).is_file():
+                if not tarfile_path.is_file():
                     # if it doesn't exist, download it
                     force_download = True                
-                elif not self.is_valid_txz(self.rootdir / self.tarfile):
+                elif not self.is_valid_txz(tarfile_path):
                     # if it's not a valid tar file, download it again
                     force_download = True
                 else:
                     # tarfile exists and is valid -> extract it
-                    self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
-            elif (self.interp_op == "iso") and (not (self.rootdir / self.modeldir / self.isofile).is_file()):
+                    self.extract_one(tarfile_path, self.rootdir, delete_txz=True)
+            elif (self.interp_op == "iso") and (not (modeldir_path / self.isofile).is_file()):
                 # model directory exists but isochrone file doesn't -> force download
                 force_download = True
         self.force_download = force_download
@@ -291,6 +298,13 @@ class MIST(Isochrone):
             self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
 
     def read_data(self):
+        """
+        Once the necessary isochrone data has been retrieved from the web, this method
+        loads the appropriate data into the class instance.
+
+        Returns:
+            None
+        """
         if self.interp_op == "iso":
             self.ages, self.hdr_list, self.isos = self.read_iso_file()
             # get the maximum mass still alive for each isochrone
@@ -309,26 +323,24 @@ class MIST(Isochrone):
             tracks = []
             min_ages = []
             max_ages = []
-            (min_eep, max_eep) = (np.inf, -1)
             for f in mass_file_list:
                 # read in the EEP file
-                minit, eeps, min_age, max_age, data = self.read_eep_file(f)
+                #minit, eeps, min_age, max_age, data = self.read_eep_file(f)
+                eep_file = self.read_eep_file(f)
                 # store the mass and EEP data
-                masses.append(minit)
-                eeps_list.append(eeps)
-                min_ages.append(min_age)
-                max_ages.append(max_age)
-                tracks.append(data)
-
-                min_eep = np.min([min_eep, np.min(eeps)])
-                max_eep = np.max([max_eep, np.max(eeps)])
+                masses.append(eep_file[0])
+                eeps_list.append(eep_file[1])
+                min_ages.append(eep_file[2])
+                max_ages.append(eep_file[3])
+                tracks.append(eep_file[4])
             self.masses = np.array(masses)
             self.eeps_list = eeps_list
             self.min_ages = np.array(min_ages)
             self.max_ages = np.array(max_ages)
             self.tracks = tracks
             self.MMAX = np.max(masses)
-            (self.min_eep, self.max_eep) = (int(min_eep),int(max_eep))
+            self.min_eep = int(np.min([np.min(tracki) for tracki in self.eeps_list]))
+            self.max_eep = int(np.max([np.max(tracki) for tracki in self.eeps_list]))
 
     def read_iso_file(self):
         """
@@ -375,7 +387,7 @@ class MIST(Isochrone):
         """
 
         evol = np.loadtxt(fname, skiprows=11).T
-        with open(fname) as f:
+        with open(fname, encoding='utf-8') as f:
             content = [line.split() for line in f]
 
         if not hasattr(self, 'version'):
@@ -385,7 +397,6 @@ class MIST(Isochrone):
             self.hdr_list = content[11][1:]
         minit = float(content[7][1])
         hdr_list = content[11][1:]
-        num_eeps = int(content[7][2])
         eeps = [int(j) for j in content[8][2:]]
 
 
@@ -430,18 +441,18 @@ class MIST(Isochrone):
         """
         nages = len(self.ages)
 
-        if (self.test and ((ai==0) or (ai == nages-1))):
+        if (self.test and (ai in (0, nages-1))):
             raise ValueError("Test Isochrone must be in middle of isochrone range")
-        if (n<=1):
+        if n<=1:
             raise ValueError("Must Request more than one point for interpolation")
     
         # decide on right range of isochrone indices
-        if (ai-n//2 <= 0):
+        if ai-n//2 <= 0:
             if self.test:
                 ais = np.concatenate((np.arange(0, ai), np.arange(ai+1, n+1)))
             else:
                 ais = np.arange(0, n)
-        elif (ai+n//2+1 >= nages):
+        elif ai+n//2+1 >= nages:
             if self.test:
                 ais = np.concatenate((np.arange(nages-n-1, ai), np.arange(ai+1, nages)))
             else:
@@ -473,8 +484,8 @@ class MIST(Isochrone):
         """
         return [q[np.where(eep == j)[0]][0] for (q,eep) in zip(qs,eeps)]
 
-    def _interp_iso_quantity_eep(self, t:Quantity["time"], label:str,
-                             method:str="pchip", make_monotonic:bool=False) -> (np.float64, np.float64):
+    def _interp_iso_quantity_eep(self, t:Quantity["time"], label:str, method:str="pchip",
+                                 make_monotonic:bool=False) -> (np.float64, np.float64):
         """
         Interpolates between isochrones using the EEP values to create an
         intermediate age isochrone
@@ -496,9 +507,9 @@ class MIST(Isochrone):
 
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
-        if (method == "pchip"):
+        if method == "pchip":
             f = lambda x,x0,y0: pchip_interpolate(x0,y0,x)[0]
-        elif (method == "linear"):
+        elif method == "linear":
             f = lambda x,x0,y0: np.interp(x,x0,y0)[0]
         else:
             raise ValueError("method must be either pchip or linear")
@@ -517,7 +528,7 @@ class MIST(Isochrone):
         if make_monotonic:
             start = time.time()
             if np.any(np.diff(qi) < 0):
-                qi = se_utils._make_monotonic_increasing(eepi,qi)
+                qi = se_utils.make_monotonic_increasing(eepi,qi)
             end = time.time()
             if self.profile:
                 print("\t\tMonotonic interpolation took: ", end-start)
@@ -543,9 +554,11 @@ class MIST(Isochrone):
         (eepi, qi) = self._interp_iso_quantity_eep(t, label,method=method)
         end = time.time()
         if self.profile:
-            print("\tTime to interpolate %s: "%(label), end-start)
+            print(f"\tTime to interpolate {label}: ", end-start)
         start = time.time()
-        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass', method=method, make_monotonic=True)
+        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',
+                                                     method=method,
+                                                     make_monotonic=True)
         end = time.time()
         if self.profile:
             print("\tTime to interpolate mass: ", end-start)
@@ -578,6 +591,12 @@ class MIST(Isochrone):
             qi: the specified quantity at the requested age (t) and range of initial
                 masses (mini)
         """
+        if method == "pchip":
+            interp = lambda x,x0,y0: pchip_interpolate(x0,y0,x)
+        elif method == "linear":
+            interp = lambda x,x0,y0: np.interp(x,x0,y0)
+        else:
+            raise ValueError("method must be either pchip or linear")
 
         age = t.to(u.yr).value
         (eeps_,ms_,qs_) = ([],[],[])
@@ -596,9 +615,9 @@ class MIST(Isochrone):
             age_test = (max(age_set)>age) and (min(age_set)<age)
             if ((len(age_set) > 0) and age_test):
                 eeps_.append(eep)
-                age_set = se_utils._make_monotonic_decreasing(mass_set, age_set)
-                m = pchip_interpolate(age_set[::-1], mass_set[::-1], age)[0]
-                q = pchip_interpolate(mass_set, q_set, m)
+                age_set = se_utils.make_monotonic_decreasing(mass_set, age_set)
+                m = interp(age, age_set[::-1], mass_set[::-1])[0]
+                q = interp(m, mass_set, q_set)
                 ms_.append(m)
                 qs_.append(q)
         # this is the constructed isochrone for property q given by "label"
@@ -606,10 +625,10 @@ class MIST(Isochrone):
         ms_ = np.array(ms_)
         qs_ = np.array(qs_)
         # make sure masses are monotonically increasing (not guaranteed by above interp)
-        ms_ = se_utils._make_monotonic_increasing(eeps_, ms_)
+        ms_ = se_utils.make_monotonic_increasing(eeps_, ms_)
         # finally we interpolate the requested quantity to the requested masses
         mini = mini.to(u.Msun).value
-        qi = pchip_interpolate(ms_, qs_, mini)
+        qi = interp(mini, ms_, qs_)
         # make sure values are zero outside the range of masses used
         mask = np.logical_or(mini < min(ms_), mini > max(ms_))
         qi = np.ma.masked_array(qi, mask=mask)
@@ -629,13 +648,13 @@ class MIST(Isochrone):
             # interpolating from EEPs
             lages = np.log10(self.max_ages)[::-1]
             mmax = self.masses[::-1]
-            sel = se_utils._index_monotonic(lages)
+            sel = se_utils.index_monotonic(lages)
             lages = lages[sel]
             mmax = mmax[sel]
         return (lages, mmax)
 
     def _interp_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
-                         label:str) -> np.float64:
+                         label:str, method:str="pchip") -> np.float64:
         """
         Helper function to decide between which inerpolation method to use
         and properly format the arguments
@@ -652,7 +671,7 @@ class MIST(Isochrone):
         if np.isscalar(mini.value):
             mini = np.array([mini.value])*mini.unit
 
-        if not(np.isscalar(t.value)):
+        if not np.isscalar(t.value):
             if len(t.value) != 1:
                 # if t is an array, we can only interpolate at a single age
                 # throw error
@@ -662,10 +681,10 @@ class MIST(Isochrone):
 
         if self.interp_op == "iso":
             # interpolate from isochrones
-            q_res = self._interp_iso_quantity_mass(mini, t, label)
+            q_res = self._interp_iso_quantity_mass(mini, t, label, method=method)
         else:
             # interpolate from EEPs
-            q_res = self._interp_eep_quantity(mini, t, label)
+            q_res = self._interp_eep_quantity(mini, t, label, method=method)
 
         return q_res
 
@@ -705,7 +724,8 @@ class MIST(Isochrone):
         interp *= np.logical_and(lt > min(lages), lt < max(lages)) 
         return interp
 
-    def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+    def lbol(self, mini:Quantity["mass"], t: Quantity["time"],
+             method:str="pchip") -> Quantity["power"]:
         """
         get the bolometric luminosity of a star of initial mass mini at age t
         Args:
@@ -714,11 +734,12 @@ class MIST(Isochrone):
         Returns:
             Quantity["power"]: the bolometric luminosity of the star.
         """
-        logLbol_res = Masked(self._interp_quantity(mini, t, 'log_L'))
+        logLbol_res = Masked(self._interp_quantity(mini, t, 'log_L', method=method))
         Lbol_res = np.power(10, logLbol_res)*u.Lsun
         return Lbol_res
 
-    def teff(self, mini:Quantity["mass"], t: Quantity["time"],method:str="pchip") -> Quantity["temperature"]:
+    def teff(self, mini:Quantity["mass"], t: Quantity["time"], 
+             method:str="pchip") -> Quantity["temperature"]:
         """
         get the atmospheric effective temperature of a star of initial mass mini
         at age t
@@ -729,7 +750,7 @@ class MIST(Isochrone):
             Quantity["temperature"]: the effective surface temperature of the star.
         """
         # interpolating from EEPs
-        logTeff_res = Masked(self._interp_quantity(mini, t, 'log_Teff'))
+        logTeff_res = Masked(self._interp_quantity(mini, t, 'log_Teff', method=method))
         Teff_res = np.power(10, logTeff_res)*u.K
         return Teff_res
 
@@ -742,5 +763,6 @@ class MIST(Isochrone):
             Quantity["mass"]: the ZAMS mass of the star.
         """
 
-        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',make_monotonic=True)
+        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',make_monotonic=True,
+                                                     method=method)
         return (eepi,massi)
