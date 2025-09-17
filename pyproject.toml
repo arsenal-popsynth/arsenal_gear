@@ -21,6 +21,7 @@ dependencies = [
     "scipy>=1.10",
     "astropy",
     "pyyaml",
+    "tqdm",
     "myst-parser",
     ]
 dynamic = ["version"]
