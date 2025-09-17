@@ -11,7 +11,7 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from . import dist_funcs, feedbacks, population, stellar_evolution
+from . import dist_funcs, feedbacks, population, stellar_evolution, element_yields
 
 __version__ = '0.0.1'
 __all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution']
