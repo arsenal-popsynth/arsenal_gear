@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.imf.Salpeter
+======================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.imf
+
+.. autoclass:: Salpeter
+   :members:
+   :show-inheritance:

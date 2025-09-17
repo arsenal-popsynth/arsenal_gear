@@ -1,0 +1,6 @@
+arsenal\_gear.stellar\_evolution.utils.index\_monotonic
+=======================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.utils
+
+.. autofunction:: index_monotonic
