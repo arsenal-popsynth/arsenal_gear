@@ -14,7 +14,7 @@ from astropy.units import Quantity
 import numpy as np
 
 from .yields import Yields, Source
-
+from ..population import StarPopulation
 
 class LimongiChieffi2018(Yields):
     """
@@ -95,9 +95,7 @@ class LimongiChieffi2018(Yields):
 
     def ccsn_yields(self,
                     elements: List[str],
-                    mass: Quantity["mass"],
-                    metal: Quantity["dimensionless"],
-                    rot: Quantity["velocity"],
+                    starPop: StarPopulation,
                     interpolate: str = "nearest",
                     extrapolate: bool = False) -> Quantity["mass"]:
         """ Interpolate yields from core-collapse supernovae for specified elements. 
@@ -114,15 +112,13 @@ class LimongiChieffi2018(Yields):
                 List of yields matching provided element list
 
         """
-        args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
+        args = [starPop["rot"].to(u.km/u.s).value, starPop["metals"].value, starPop["mass"].to(u.M_sun).value]
         return self.ccsn.get_yld(elements, args,
                                  interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
     def wind_yields(self,
                     elements: List[str],
-                    mass: Quantity["mass"],
-                    metal: Quantity["dimensionless"],
-                    rot: Quantity["velocity"],
+                    starPop: StarPopulation,
                     interpolate: str = "nearest",
                     extrapolate: bool = False) -> Quantity["mass"]:
         """ Interpolate yields from massive stars ejected as winds for specified elements. 
@@ -139,7 +135,7 @@ class LimongiChieffi2018(Yields):
                 List of yields matching provided element list
 
         """
-        args = [rot.to(u.km/u.s).value, metal.value, mass.to(u.M_sun).value]
+        args = [starPop["rot"].to(u.km/u.s).value, starPop["metals"].value, starPop["mass"].to(u.M_sun).value]
         return self.wind.get_yld(elements, args,
                                  interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
