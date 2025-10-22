@@ -112,7 +112,9 @@ class LimongiChieffi2018(Yields):
                 List of yields matching provided element list
 
         """
-        args = [starPop["rot"].to(u.km/u.s).value, starPop["metals"].value, starPop["mass"].to(u.M_sun).value]
+        args = [starPop["rot"].to(u.km/u.s).value, 
+                starPop["metals"].value, 
+                starPop["mass"].to(u.M_sun).value]
         return self.ccsn.get_yld(elements, args,
                                  interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
@@ -135,7 +137,9 @@ class LimongiChieffi2018(Yields):
                 List of yields matching provided element list
 
         """
-        args = [starPop["rot"].to(u.km/u.s).value, starPop["metals"].value, starPop["mass"].to(u.M_sun).value]
+        args = [starPop["rot"].to(u.km/u.s).value, 
+                starPop["metals"].value, 
+                starPop["mass"].to(u.M_sun).value]
         return self.wind.get_yld(elements, args,
                                  interpolate=interpolate, extrapolate=extrapolate)*u.M_sun
 
