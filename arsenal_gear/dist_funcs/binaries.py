@@ -170,7 +170,8 @@ class BinaryDistribution():
         
         def truncate_at_target_mass(mtot, samp_m, samp_q, samp_p):
             
-            _target_mass = np.argmin(np.abs(mtot.to(u.Msun).value - (samp_m * (1 + samp_q)).cumsum()))
+            _target_mass = np.argmin(np.abs(mtot.to(u.Msun).value - \
+                                     (samp_m * (1 + samp_q)).cumsum()))
             _primary_masses   = samp_m[:_target_mass] * u.Msun
             _companion_masses = samp_q[:_target_mass] * samp_m[:_target_mass] * u.Msun
             _orbital_periods  = 10**samp_p[:_target_mass] * u.d
@@ -202,7 +203,8 @@ class BinaryDistribution():
         
         
         samp_m, samp_q, samp_p = sample_distribution(prob, mtot, m1, q, logp)
-        s_masses, p_masses, c_masses, periods = truncate_at_target_mass(mtot, samp_m, samp_q, samp_p)
+        s_masses, p_masses, c_masses, periods = \
+            truncate_at_target_mass(mtot, samp_m, samp_q, samp_p)
         
         return s_masses, p_masses, c_masses, periods
         

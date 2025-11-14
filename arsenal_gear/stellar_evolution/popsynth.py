@@ -236,7 +236,89 @@ class BPASS_stellar_models():
 
         dM  = data[ind_now, 39] * u.Msun / (1.989 * u.s)
         
-        return M1, R1, T1, L1, dM, t_max
+        return M1, R1, T1, L1, dM, t_max    
+    
+    def data_from_companion_model(self, data: tuple, 
+                                  time_now: Quantity["time"]) -> tuple:
+        """
+        Extract the stellar properties necessary for feedback
+        from a BPASS stellar model file. 
+        
+        Args:
+            data                (tuple): Matrix loaded from the stellar model file
+            time_now (Quantity["time"]): Current simulation time
+            
+        Returns:
+            Feedback properties
+        """
+        # Replace NaNs by 0s --> What about files without a companion?
+        data = np.nan_to_num(data)
+        # We want to extract the following values
+        time = data[:, 1] * u.yr
+        ind_now = np.where((time_now - time) > 0 * u.yr)[-1][-1]
+        
+        # Model time
+        t_max = time[-1]
+
+        # Need to use column 36 for 50-0.9-1
+        MR = data[ind_now, 29] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
+
+        M2 = data[ind_now, 37] * u.Msun
+        
+        M2_init = data[0, 37] * u.Msun # Initial companion mass
+        P = data[ind_now, 34] * u.yr   # Final orbital period
+        
+        M2_vals = np.concatenate((np.arange(0.1, 0.7, 0.1), 
+                                  np.arange(0.8, 2.2, 0.1),
+                                  np.array([2.3, 2.5, 2.7, 3, 3.2, 3.5, 3.7]), 
+                                  np.arange(4, 10, 0.5), 
+                                  np.arange(10, 26, 1), 
+                                  np.array([30, 35, 40, 50, 60, 70, 80, 100, 
+                                            120, 150, 200, 300])))
+        MR_vals = np.array([0.1, 0.158489, 0.199526, 0.251189, 0.316228, 0.398107, 
+                            0.501187, 0.630957, 0.794328, 1.29593, 1.4, 1.99526, 2.51189,
+                            3.16228, 3.98107, 5.01187, 6.30957, 7.94328, 10.0000, 12.5893])
+        
+        P_vals = np.arange(-0.4, 4.2, 0.2)
+        
+        M2_file = M2_vals[np.argmin(np.abs(M2_vals - M2_init.to_value(u.Msun)))]
+        MR_file = MR_vals[np.argmin(np.abs(MR_vals - MR.to_value(u.Msun)))]
+        P_file  = P_vals[np.argmin(np.abs(P_vals - np.log10(P.to_value(u.day))))]
+        
+        c_fname = self.dir + 'NEWBINMODS/NEWSECMODS/' + self.metal + '_2' + \
+                  '/sneplot_2-' + self.metal + '-' + str(M2_file) + '-' + str(MR_file) + \
+                  '-' + str(P_file)
+        
+        
+        if c_fname in os.listdir(self.dir):
+            c_data = np.genfromtxt(c_fname)
+        
+        elif (c_fname + '0000') in os.listdir(self.dir):
+            print('Adding 0\'s...')
+            c_data = np.genfromtxt(c_fname + '0000')
+            
+        else:
+            print("Incorrect file!", c_fname)
+               
+        # Replace NaNs by 0s --> What about files without a companion?
+        c_data = np.nan_to_num(c_data)
+        # We want to extract the following values
+        time = c_data[:, 1] * u.yr
+        ind_now = np.where((time_now - time) > 0 * u.yr)[-1][-1]
+            
+        # Model time
+        t_max = time[-1]
+
+        # Need to use column 36 for 50-0.9-1
+        M1 = c_data[ind_now, 36] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
+        L1 = 10**c_data[ind_now, 4] * u.Lsun
+        T1 = 10**c_data[ind_now, 3] * u.K
+        R1 = 10**c_data[ind_now, 2] * u.Rsun
+
+        dM  = c_data[ind_now, 39] * u.Msun / (1.989 * u.s)
+        
+        return M1, L1, T1, L1, dM, t_max
+    
     
     def read_bpass_data(self) -> tuple:
         """
@@ -256,6 +338,7 @@ class BPASS_stellar_models():
         len_s = len(s_counts)
         feedback = np.empty((10, len_b + len_s))
         feedback[0, :] = np.concatenate((b_counts, s_counts))
+
         # Get the properties for each unique binary
         for i in range(len_b + len_s):
 
@@ -281,9 +364,16 @@ class BPASS_stellar_models():
                 
                 # Set primary properties to 0 if remnant
                 if (data[-1] > 0 * u.yr) and (data[-1] < self.time):
-                    # Setting properties to 0 for now
+                    
+                    print("Setting from companion...")
                     feedback[7, i] = 0
-                    feedback[9, i] = 0
+                    
+                    data_rem = self.data_from_companion_model(np.genfromtxt(fname), self.time)
+                    feedback[2, i] = data_rem[0].to_value(u.Msun)
+                    feedback[4, i] = data_rem[1].to_value(u.Rsun)
+                    feedback[6, i] = data_rem[2].to_value(u.K)
+                    feedback[8, i] = data_rem[3].to_value(u.Lsun)
+                    feedback[9, i] = data_rem[4].to_value(u.Msun/u.yr)
             
             else:
                 _mass = np.round(s_vals[i - len_b], decimals=1)
