@@ -229,7 +229,7 @@ class BPASS_stellar_models():
         t_max = time[-1]
 
         # Need to use column 36 for 50-0.9-1
-        M1 = data[ind_now, 36] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
+        M1 = data[ind_now, 5] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
         L1 = 10**data[ind_now, 4] * u.Lsun
         T1 = 10**data[ind_now, 3] * u.K
         R1 = 10**data[ind_now, 2] * u.Rsun
@@ -260,6 +260,9 @@ class BPASS_stellar_models():
         # Model time
         t_max = time[-1]
 
+        # Directory
+        c_dir = self.dir + 'NEWBINMODS/NEWSECMODS/' + self.metal + '_2/'
+
         # Need to use column 36 for 50-0.9-1
         MR = data[ind_now, 29] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
 
@@ -282,23 +285,62 @@ class BPASS_stellar_models():
         P_vals = np.arange(-0.4, 4.2, 0.2)
         
         M2_file = M2_vals[np.argmin(np.abs(M2_vals - M2_init.to_value(u.Msun)))]
-        MR_file = MR_vals[np.argmin(np.abs(MR_vals - MR.to_value(u.Msun)))]
-        P_file  = P_vals[np.argmin(np.abs(P_vals - np.log10(P.to_value(u.day))))]
-        
-        c_fname = self.dir + 'NEWBINMODS/NEWSECMODS/' + self.metal + '_2' + \
-                  '/sneplot_2-' + self.metal + '-' + str(M2_file) + '-' + str(MR_file) + \
-                  '-' + str(P_file)
-        
-        
-        if c_fname in os.listdir(self.dir):
-            c_data = np.genfromtxt(c_fname)
-        
-        elif (c_fname + '0000') in os.listdir(self.dir):
-            print('Adding 0\'s...')
-            c_data = np.genfromtxt(c_fname + '0000')
-            
+        if M2_file == int(M2_file):
+            M2_str = str(int(M2_file))
         else:
-            print("Incorrect file!", c_fname)
+            M2_str = str(M2_file)
+        MR_file = MR_vals[np.argmin(np.abs(MR_vals - MR.to_value(u.Msun)))]
+        if MR_file == 10:
+            MR_str = '10.0000' # set manually
+        else:
+            MR_str  = str(MR_file)
+        P_file  = P_vals[np.argmin(np.abs(P_vals - np.log10(P.to_value(u.day))))]
+        P_str   = str(P_file)
+        if (P_str[-1] != 0) and (len(P_str) > 3):
+            P_str = P_str[:3]
+        
+        c_fname = 'sneplot_2-' + self.metal + '-' + M2_str + '-' + \
+                    MR_str + '-' + P_str
+        
+        if c_fname in os.listdir(c_dir):
+            c_data = np.genfromtxt(c_dir + c_fname)
+
+        else:
+            num0 = 0
+            print('Adding 0\'s...')
+            while num0 < 10:
+                c_fname = c_fname + '0'
+                if (c_fname) in os.listdir(c_dir):
+                    c_data = np.genfromtxt(c_dir + c_fname)
+                    num0 += 10 # force exit the loop if ok
+                else:
+                    num0 += 1
+                
+                
+            if (c_fname) not in os.listdir(c_dir):
+                print("Incorrect file!", c_fname)
+                c_fname = c_fname[:-10]
+                try_num = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5]
+                for n in try_num:
+                    new_num = str(float(c_fname[-3:]) + 0.2*n)
+                    if (len(new_num) > 3):
+                        new_num = new_num[:3]
+                    n_fname = c_fname[:-3] + new_num
+
+                    if n_fname in os.listdir(c_dir):
+                        c_data = np.genfromtxt(c_dir + n_fname)
+
+                    else:
+                        num0 = 0
+                        print('Adding 0\'s...')
+                        while num0 < 10:
+                            n_fname = n_fname + '0'
+                            if (n_fname) in os.listdir(c_dir):
+                                c_data = np.genfromtxt(c_dir + n_fname)
+                                num0 += 10 # force exit the loop if ok
+                            else:
+                                num0 += 1
+                    
                
         # Replace NaNs by 0s --> What about files without a companion?
         c_data = np.nan_to_num(c_data)
@@ -310,14 +352,14 @@ class BPASS_stellar_models():
         t_max = time[-1]
 
         # Need to use column 36 for 50-0.9-1
-        M1 = c_data[ind_now, 36] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
-        L1 = 10**c_data[ind_now, 4] * u.Lsun
-        T1 = 10**c_data[ind_now, 3] * u.K
-        R1 = 10**c_data[ind_now, 2] * u.Rsun
+        M2 = c_data[ind_now, 5] * u.Msun # 5 recommended in manual but doesn't conserve mass, 36 works
+        L2 = 10**c_data[ind_now, 4] * u.Lsun
+        T2 = 10**c_data[ind_now, 3] * u.K
+        R2 = 10**c_data[ind_now, 2] * u.Rsun
 
         dM  = c_data[ind_now, 39] * u.Msun / (1.989 * u.s)
         
-        return M1, L1, T1, L1, dM, t_max
+        return M2, R2, T2, L2, dM, t_max
     
     
     def read_bpass_data(self) -> tuple:
@@ -365,7 +407,7 @@ class BPASS_stellar_models():
                 # Set primary properties to 0 if remnant
                 if (data[-1] > 0 * u.yr) and (data[-1] < self.time):
                     
-                    print("Setting from companion...")
+                    print("Getting data from companion... assuming no kick!")
                     feedback[7, i] = 0
                     
                     data_rem = self.data_from_companion_model(np.genfromtxt(fname), self.time)
