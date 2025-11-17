@@ -11,7 +11,7 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.stats import rv_continuous, loguniform, uniform
 
-from arsenal_gear.population import StarPopulation, BinaryPopulation
+from arsenal_gear.population import StarPopulation
 
 class BinaryDistribution():
     """
@@ -53,8 +53,25 @@ class BinaryDistribution():
         """
         
         def get_probability_matrix(file_path, m1_vals, q_vals, logp_vals):
+
+            def get_prob_single(ln):
+                m1 = float(ln[ln.rfind('-') + 1:])
+                save_w = np.array([np.argmin(np.abs(m1_vals - m1)), 0, -1])
+                return save_w
+
+            def get_prob_binary(ln):
+                ind_p = ln.rfind('-')
+                ind_q = ln[:ind_p].rfind('-')
+                ind_m = ln[:ind_q].rfind('-')
+                logp = float(ln[ind_p + 1:])
+                q    = float(ln[ind_q + 1:ind_p])
+                m1   = float(ln[ind_m + 1:ind_q])
+                save_w = np.array([np.argmin(np.abs(m1_vals - m1)), 
+                                    np.argmin(np.abs(q_vals - q)), 
+                                   np.argmin(np.abs(logp_vals - logp))])
+                return save_w
             
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 prob = np.zeros((len(m1_vals), len(q_vals), len(logp_vals)))
                 save_n = False
                 save_w = np.zeros(3)
@@ -64,21 +81,14 @@ class BinaryDistribution():
                         # e.g. NEWSINMODS/z014/sneplot-z014-300
                         # Read only mass
                         save_n = True
-                        m1 = float(ln[ln.rfind('-') + 1:])
-                        save_w = np.array([np.argmin(np.abs(m1_vals - m1)), 0, -1])
+                        save_w = get_prob_single(ln)
+                        
                     elif 'NEWBINMODS/NEWBINMODS' in ln:
                         # e.g. NEWBINMODS/NEWBINMODS/z014/sneplot-z014-300-0.1-0
                         # Read period, mass ratio, and mass
                         save_n = True
-                        ind_p = ln.rfind('-')
-                        ind_q = ln[:ind_p].rfind('-')
-                        ind_m = ln[:ind_q].rfind('-')
-                        logp = float(ln[ind_p + 1:])
-                        q    = float(ln[ind_q + 1:ind_p])
-                        m1   = float(ln[ind_m + 1:ind_q])
-                        save_w = np.array([np.argmin(np.abs(m1_vals - m1)), 
-                                           np.argmin(np.abs(q_vals - q)), 
-                                           np.argmin(np.abs(logp_vals - logp))])
+                        save_w = get_prob_binary(ln)
+                        
                     elif save_n:
                         save_n = False
                         ln = np.array(ln.split())
@@ -161,10 +171,10 @@ class BinaryDistribution():
             prob_flat = prob.ravel()
             samp_inds = np.random.choice(a=np.prod(prob.shape), size=num_samples, p=prob_flat)
             # Convert flattened indices back to 3D coordinates
-            ind_m, ind_q, ind_p = np.unravel_index(samp_inds, prob.shape)
-            samp_m = m[ind_m]
-            samp_q = q[ind_q]
-            samp_p = logp[ind_p]
+            indices = np.unravel_index(samp_inds, prob.shape)
+            samp_m = m[indices[0]]
+            samp_q = q[indices[1]]
+            samp_p = logp[indices[2]]
             
             return samp_m, samp_q, samp_p
         
@@ -317,12 +327,12 @@ class UniformMassRatio(MassRatio):
         self.name = name
         super().__init__(min_q, max_q, name=self.name)
 
-    def _pdf(self, x: np.float64) -> np.float64:
+    def _pdf(self, x: np.float64, *args) -> np.float64:
         rv = uniform(self.min_q, self.max_q - self.min_q)
         # 2nd argument of scipy.stats.uniform is RANGE, not upper bound
         return rv.pdf(x)
    
-    def _ppf(self, q: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64, *args) -> np.float64:
         rv = uniform(self.min_q, self.max_q - self.min_q)
         return rv.ppf(q)
     
@@ -372,11 +382,11 @@ class LogUniformPeriod(Period):
         self.name = name
         super().__init__(min_p, max_p, name=self.name)
         
-    def _pdf(self, x: np.float64) -> np.float64:
+    def _pdf(self, x: np.float64, *args) -> np.float64:
         rv = loguniform(self.min_p, self.max_p)
         return rv.pdf(x)
    
-    def _ppf(self, q: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64, *args) -> np.float64:
         rv = loguniform(self.min_p, self.max_p)
         return rv.ppf(q)
     
@@ -426,11 +436,10 @@ class LogUniformSemimajor(Semimajor):
         self.name = name
         super().__init__(min_a, max_a, name=self.name)
         
-    def _pdf(self, x: np.float64) -> np.float64:
+    def _pdf(self, x: np.float64, *args) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
         return rv.pdf(x)
    
-    def _ppf(self, q: np.float64) -> np.float64:
+    def _ppf(self, q: np.float64, *args) -> np.float64:
         rv = loguniform(self.min_a, self.max_a)
         return rv.ppf(q)
-    
