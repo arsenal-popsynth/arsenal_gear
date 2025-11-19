@@ -13,6 +13,7 @@ from astropy.units import Quantity
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
+from ..population import StarPopulation
 
 class Source:
     """
@@ -167,9 +168,7 @@ class Yields:
 
     def ccsn_yields(self,
                     elements: List[str],
-                    mass: Quantity["mass"],
-                    metal: Quantity["dimensionless"],
-                    rot: Quantity["velocity"],
+                    starPop: StarPopulation,
                     interpolate: str = "nearest",
                     extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for core-collapse SNe.
@@ -181,9 +180,7 @@ class Yields:
 
     def snia_yields(self,
                     elements: List[str],
-                    mass: Quantity["mass"],
-                    metal: Quantity["dimensionless"],
-                    rot: Quantity["velocity"],
+                    starPop: StarPopulation,
                     interpolate: str = "nearest",
                     extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for SNe type Ia.
@@ -194,9 +191,7 @@ class Yields:
 
     def wind_yields(self,
                     elements: List[str],
-                    mass: Quantity["mass"],
-                    metal: Quantity["dimensionless"],
-                    rot: Quantity["velocity"],
+                    starPop: StarPopulation,
                     interpolate: str = "nearest",
                     extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for stellar winds.
@@ -208,9 +203,7 @@ class Yields:
 
     def agb_yields(self,
                    elements: List[str],
-                   mass: Quantity["mass"],
-                   metal: Quantity["dimensionless"],
-                   rot: Quantity["velocity"],
+                    starPop: StarPopulation,
                    interpolate: str = "nearest",
                    extrapolate: bool = False) -> Quantity["mass"]:
         """ Header function for AGB mass loss.

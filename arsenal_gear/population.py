@@ -18,13 +18,19 @@ class StarPopulation(dict):
     :type mass: astropy mass unit
     :param metals: Metallicity (mass fraction) of the stars
     :type metals: float
+    :param rot: Stellar rotation
+    :type rot: astropy velocity unit
     :param tform: Formation time of the stars, defaults to zero
     :type tform: astropy time unit
     """
-    def __init__(self, mass:Quantity["mass"], metals: np.float64,
+    def __init__(self, 
+                 mass:Quantity["mass"], 
+                 metals: np.float64,
+                 rot: Quantity["velocity"],
                  tform: Quantity["time"]= 0) -> None:
         self['mass'] = mass
         self['metals'] = metals
+        self['rot'] = rot
         self['tform'] = tform
 
 class BinaryPopulation(dict):
