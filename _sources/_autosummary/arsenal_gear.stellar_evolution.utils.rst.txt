@@ -1,0 +1,32 @@
+arsenal\_gear.stellar\_evolution.utils
+======================================
+
+.. automodule:: arsenal_gear.stellar_evolution.utils
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      index_monotonic
+      make_monotonic_decreasing
+      make_monotonic_increasing
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

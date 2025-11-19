@@ -1,0 +1,38 @@
+arsenal\_gear.dist\_funcs.binaries
+==================================
+
+.. automodule:: arsenal_gear.dist_funcs.binaries
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      BinaryDistribution
+      Fraction
+      LogUniformPeriod
+      LogUniformSemimajor
+      MassRatio
+      Period
+      Semimajor
+      StepFraction
+      UniformMassRatio
+   
+   
+
+   
+   
+   
+
+
+
