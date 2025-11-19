@@ -32,10 +32,10 @@ def test_binary():
     rot = u.km/u.s*np.zeros(100)
     star1 = arsenal_gear.population.StarPopulation(mass=mass,metals=metals,tform=tform,rot=rot)
     star2 = arsenal_gear.population.StarPopulation(mass=2*mass,metals=metals,tform=tform,rot=rot)
-    semimajor = u.kpc*np.ones(100)
+    period = u.d*np.ones(100)
     eccentricity = 0.5*np.ones(100)
     binary = arsenal_gear.population.BinaryPopulation(primary=star1, secondary=star2,
-                                                    semimajor=semimajor, eccentricity=eccentricity)
+                                                      period=period, eccentricity=eccentricity)
     # Check the first star
     assert_array_equal(binary.primary["mass"], star1["mass"])
     assert_array_equal(binary.primary["metals"], star1["metals"])
@@ -48,5 +48,5 @@ def test_binary():
     assert_array_equal(binary.secondary["tform"], star2["tform"])
     assert_array_equal(binary.secondary["rot"], star2["rot"])
     # Check binary properties
-    assert_array_equal(binary["semimajor"], semimajor)
+    assert_array_equal(binary["period"], period)
     assert_array_equal(binary["eccentricity"], eccentricity)

@@ -23,8 +23,8 @@ class StarPopulation(dict):
     :param tform: Formation time of the stars, defaults to zero
     :type tform: astropy time unit
     """
-    def __init__(self, 
-                 mass:Quantity["mass"], 
+    def __init__(self,
+                 mass:Quantity["mass"],
                  metals: np.float64,
                  rot: Quantity["velocity"],
                  tform: Quantity["time"]= 0) -> None:
@@ -42,14 +42,14 @@ class BinaryPopulation(dict):
     :type primary: class:arsenal_gear.population.StarPopulation
     :param secondary: the secondary stars in the binary pairs
     :type secondary: class:arsenal_gear.population.StarPopulation
-    :param semimajor: the semimajor axis of the binary orbits
-    :type semimajor: astropy length unit
+    :param period: the orbital period of the binary orbits
+    :type period: astropy length time
     :param eccentricity: the eccentricity of the binary orbits
     :type eccentricity: float
     """
-    def __init__(self, primary: StarPopulation, secondary: StarPopulation, semimajor:
-                 Quantity["length"], eccentricity: np.float64) -> None:
+    def __init__(self, primary: StarPopulation, secondary: StarPopulation, period:
+                 Quantity["time"], eccentricity: np.float64) -> None:
         self.primary = primary
         self.secondary = secondary
-        self['semimajor'] = semimajor
+        self['period'] = period
         self['eccentricity'] = eccentricity
