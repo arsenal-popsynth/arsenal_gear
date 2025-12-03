@@ -1,6 +1,6 @@
-name: documentation
+name: Documentation Build
 
-on: 
+on:
   push:
     branches: [ "main" ]
 
