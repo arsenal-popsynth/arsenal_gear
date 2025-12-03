@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>arsenal_gear.stellar_evolution.isochrone.Isochrone &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="arsenal_gear.stellar_evolution.isochrone.MIST" href="arsenal_gear.stellar_evolution.isochrone.MIST.html" />
+    <link rel="prev" title="arsenal_gear.stellar_evolution.isochrone" href="arsenal_gear.stellar_evolution.isochrone.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.isochrone.MIST.html" title="arsenal_gear.stellar_evolution.isochrone.MIST"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.isochrone.html" title="arsenal_gear.stellar_evolution.isochrone"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../api.html" >Arsenal Gear API</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="arsenal_gear.stellar_evolution.html" >arsenal_gear.stellar_evolution</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="arsenal_gear.stellar_evolution.isochrone.html" accesskey="U">arsenal_gear.stellar_evolution.isochrone</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.isochrone.Isochrone</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="arsenal-gear-stellar-evolution-isochrone-isochrone">
+<h1>arsenal_gear.stellar_evolution.isochrone.Isochrone<a class="headerlink" href="#arsenal-gear-stellar-evolution-isochrone-isochrone" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">arsenal_gear.stellar_evolution.isochrone.</span></span><span class="sig-name descname"><span class="pre">Isochrone</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>This class is used to load and interpret isochrones from various sources</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone.downloader">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">downloader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">url</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone.downloader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone.downloader" title="Link to this definition">¶</a></dt>
+<dd><p>Method for downloading isochrone data from the web where available.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>fname (str or Path): The file name or path to save the downloaded file.
+url (str): The URL of the file to download.
+message (str): Optional message to display before downloading.</p>
+</dd>
+<dt>Raises:</dt><dd><p>Exception: If the download fails.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone.extract_one">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extract_one</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extractdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delete_txz</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone.extract_one"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone.extract_one" title="Link to this definition">¶</a></dt>
+<dd><p>Unzips a single ZIP file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone.is_valid_txz">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_valid_txz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone.is_valid_txz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone.is_valid_txz" title="Link to this definition">¶</a></dt>
+<dd><p>Check if a .txz file is valid.</p>
+<p>Parameters:
+- fname (str): The path to the .txz file.</p>
+<p>Returns:
+- bool: True if the .txz file is valid, False otherwise.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone.lbol">
+<span class="sig-name descname"><span class="pre">lbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mini</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">Quantity</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PhysicalType</span><span class="p"><span class="pre">(</span></span><span class="s"><span class="pre">'mass'</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">Quantity</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PhysicalType</span><span class="p"><span class="pre">(</span></span><span class="s"><span class="pre">'time'</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Quantity,</span> <span class="pre">PhysicalType({'power',</span> <span class="pre">'radiant</span> <span class="pre">flux'})]</span></span></span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone.lbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone.lbol" title="Link to this definition">¶</a></dt>
+<dd><p>get the bolometric luminosity of a star of initial mass mini at age age</p>
+<p>Default function in base class</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>mini: the initial mass of the star.
+t: the age of the isochrone.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Quantity[“power”]: the bolometric luminosity of the star.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone.mmax">
+<span class="sig-name descname"><span class="pre">mmax</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">Quantity</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PhysicalType</span><span class="p"><span class="pre">(</span></span><span class="s"><span class="pre">'time'</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">Quantity</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PhysicalType</span><span class="p"><span class="pre">(</span></span><span class="s"><span class="pre">'mass'</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone.mmax"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone.mmax" title="Link to this definition">¶</a></dt>
+<dd><p>get the maximum mass of the stellar population that hasn’t
+died yet (in e.g. a SN) as a function of age, t</p>
+<p>default function in base class</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.isochrone.Isochrone.mmaxdot">
+<span class="sig-name descname"><span class="pre">mmaxdot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">Quantity</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PhysicalType</span><span class="p"><span class="pre">(</span></span><span class="s"><span class="pre">'time'</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">Quantity</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PhysicalType</span><span class="p"><span class="pre">(</span></span><span class="s"><span class="pre">'mass'</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/isochrone.html#Isochrone.mmaxdot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.isochrone.Isochrone.mmaxdot" title="Link to this definition">¶</a></dt>
+<dd><p>get the rate of change of the maximum mass of the stellar population
+with respect to time.</p>
+<p>Default function in base class
+Args:</p>
+<blockquote>
+<div><p>t: the age of the isochrone.</p>
+</div></blockquote>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tests.html">Automated Tests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">Arsenal Gear API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="arsenal_gear.dist_funcs.html">arsenal_gear.dist_funcs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arsenal_gear.feedbacks.html">arsenal_gear.feedbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arsenal_gear.population.html">arsenal_gear.population</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="arsenal_gear.stellar_evolution.html">arsenal_gear.stellar_evolution</a></li>
+</ul>
+</li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="arsenal_gear.stellar_evolution.isochrone.html"
+                          title="previous chapter">arsenal_gear.stellar_evolution.isochrone</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="arsenal_gear.stellar_evolution.isochrone.MIST.html"
+                          title="next chapter">arsenal_gear.stellar_evolution.isochrone.MIST</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/_autosummary/arsenal_gear.stellar_evolution.isochrone.Isochrone.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.isochrone.MIST.html" title="arsenal_gear.stellar_evolution.isochrone.MIST"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.isochrone.html" title="arsenal_gear.stellar_evolution.isochrone"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../api.html" >Arsenal Gear API</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="arsenal_gear.stellar_evolution.html" >arsenal_gear.stellar_evolution</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="arsenal_gear.stellar_evolution.isochrone.html" >arsenal_gear.stellar_evolution.isochrone</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.isochrone.Isochrone</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

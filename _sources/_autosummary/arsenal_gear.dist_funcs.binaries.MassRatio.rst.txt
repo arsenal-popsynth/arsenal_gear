@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.MassRatio
+============================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: MassRatio
+   :members:
+   :show-inheritance:
