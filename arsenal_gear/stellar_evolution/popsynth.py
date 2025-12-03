@@ -90,10 +90,10 @@ class BPASS_stellar_models():
             
         try:
             response = requests.get(download_url, stream=True, timeout=10)
-        except requests.exceptions.Timeout:
-            raise Exception('Request timed out. Check your internet connection.')
+        except requests.exceptions.Timeout as e:
+            raise requests.exceptions.Timeout(f'Request timed out. Check your internet connection. {e}') 
         except requests.exceptions.RequestException as e:
-            raise Exception(f'Request failed: {e}')
+            raise requests.exceptions.RequestException(f'Request failed: {e}')
 
         # Get file size
         total_size = int(response.headers.get('content-length', 0))
@@ -424,7 +424,6 @@ class BPASS_stellar_models():
                     _mass = int(_mass)
                 if _mass == 120:
                     _mass = 125 # Correct manually; not same mass as the binary models
-                in_binary = False
                 fname = s_fname + '-' + str(_mass)
                 
                 data = self.data_from_single_model(np.genfromtxt(fname), self.time)

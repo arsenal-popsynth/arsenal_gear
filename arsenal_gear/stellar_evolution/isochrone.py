@@ -44,6 +44,16 @@ class Isochrone():
         self.profile = kwargs.get('profile', False)
         # decides whether or not to force a download of the isochrone data
         self.force_download = kwargs.get('force_download', False)
+        # Dictionary containing the MIST and MESA version numbers. None until data loaded.
+        self.version = None
+        # Dictionary containing Yinit, Zinit, [Fe/H], and [a/Fe] values. None until data loaded.
+        self.abun = None
+        # Rotation in units of surface v/v_crit. None until data loaded.
+        self.rot = None
+        # Number of isochrones. None until data loaded.
+        self.num_ages = None
+        # List of column headers. None until data loaded.
+        self.hdr_list = None
 
     @staticmethod
     def downloader(fname, url, message):
@@ -65,13 +75,13 @@ class Isochrone():
         try:
             response = requests.get(url, stream=True, timeout=10)
         except requests.exceptions.Timeout as e:
-            raise Exception('Request timed out. Check your internet connection.') from e
+            raise requests.exceptions.Timeout('Request timed out. Check your internet connection.') from e
         except requests.exceptions.ConnectionError as e:
-            raise Exception('Connection error occurred. Check your internet connection.') from e
+            raise requests.exceptions.ConnectionError('Connection error occurred. Check your internet connection.') from e
         except requests.exceptions.HTTPError as e:
-            raise Exception(f'HTTP error occurred: {e}') from e
+            raise requests.exceptions.HTTPError(f'HTTP error occurred: {e}') from e
         except requests.exceptions.RequestException as e:
-            raise Exception(f'Request failed: {e}') from e
+            raise requests.exceptions.RequestException(f'Request failed: {e}') from e
 
         # Get file size
         total_size = int(response.headers.get('content-length', 0))
@@ -142,6 +152,8 @@ class Isochrone():
 
         default function in base class
         """
+        if t < 0:
+            raise ValueError("Age must be non-negative")
         return 0.0*u.Msun
 
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
@@ -153,6 +165,8 @@ class Isochrone():
         Args:
             t: the age of the isochrone.
         """
+        if t < 0:
+            raise ValueError("Age must be non-negative")
         return 0.0*u.Msun/u.Myr
 
     def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
@@ -167,6 +181,10 @@ class Isochrone():
         Returns:
             Quantity["power"]: the bolometric luminosity of the star.
         """
+        if t < 0:
+            raise ValueError("Age must be non-negative")
+        if mini < 0:
+            raise ValueError("Initial mass must be non-negative")
         return 0.0*u.erg/u.s
 
 class MIST(Isochrone):
@@ -352,7 +370,7 @@ class MIST(Isochrone):
         fname = self.rootdir / self.modeldir / self.isofile
         with open(fname, encoding='utf-8') as f:
             content = [line.split() for line in f]
-        if not hasattr(self, 'version'):
+        if self.version is None:
             self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
             self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
             self.rot = float(content[4][-1])
@@ -390,7 +408,7 @@ class MIST(Isochrone):
         with open(fname, encoding='utf-8') as f:
             content = [line.split() for line in f]
 
-        if not hasattr(self, 'version'):
+        if self.version is None:
             self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
             self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
             self.rot = float(content[4][-1])
@@ -551,14 +569,14 @@ class MIST(Isochrone):
         """
         # construct isochrone for mass/luminosity relationship
         start = time.time()
-        (eepi, qi) = self._interp_iso_quantity_eep(t, label,method=method)
+        qi = self._interp_iso_quantity_eep(t, label,method=method)[1]
         end = time.time()
         if self.profile:
             print(f"\tTime to interpolate {label}: ", end-start)
         start = time.time()
-        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',
+        massi = self._interp_iso_quantity_eep(t, 'initial_mass',
                                                      method=method,
-                                                     make_monotonic=True)
+                                                     make_monotonic=True)[1]
         end = time.time()
         if self.profile:
             print("\tTime to interpolate mass: ", end-start)
@@ -594,7 +612,7 @@ class MIST(Isochrone):
         if method == "pchip":
             interp = lambda x,x0,y0: pchip_interpolate(x0,y0,x)
         elif method == "linear":
-            interp = lambda x,x0,y0: np.interp(x,x0,y0)
+            interp = np.interp
         else:
             raise ValueError("method must be either pchip or linear")
 
