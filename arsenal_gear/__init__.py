@@ -5,6 +5,7 @@ arsenal-gear
 A lightweight population synthesis code with an emphasis on the quantities
 relevant for stellar feedback from massive stars.
 """
+import argparse
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
@@ -14,44 +15,28 @@ from . import dist_funcs, feedbacks, population, stellar_evolution
 __version__ = '0.0.1'
 __all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution']
 
-class StarMaker():
-    """
-    This class will act as the primary API for aresenal
-    Ideally it will take an input yaml file or accept default values for
-    certain parameters and return a population of stars with
-    pre-calculated parameters for the feedback and radiaiton.
-    """
+def check_arguments(args):
+    if args.continuous and args.stochastic:
+        raise ValueError("Cannot use both continuous and stochastic sampling simultaneously.")
+    if not args.continuous and not args.stochastic:
+        raise ValueError("Must specify either continuous or stochastic sampling.")
+    if args.binary_fraction > 0:
+        raise NotImplementedError("Binary systems are not yet implemented.")
+    if args.continuous:
+        raise NotImplementedError("Continuous sampling is not yet implemented.")
+    return args
 
-    def __init__(self, discrete:bool=True) -> None:
-        self.Mtot = 1e6*u.Msun
-        self.imf = dist_funcs.imf.Salpeter(0.08*u.Msun, 100*u.Msun, alpha=2.3)
-        self.discrete = discrete
-        # relative to solar
-        self.metallicity = 1.0
-        # generate masses
-        if self.discrete:
-            self.masses = self.imf.sample_mass(self.Mtot)
-        self.tmin = 0.0*u.Myr
-        self.tmax = 40.0*u.Myr
+def main():
+    parser = argparse.ArgumentParser(description="Arsenal Gear: A lightweight population synthesis code.")
+    parser.add_argument("-s", "--stochastic", action="store_true", default=False, help="Use stochastic sampling of the IMF")
+    parser.add_argument("-c", "--continuous", action="store_true", default=False, help="Use continuous sampling of the IMF")
+    parser.add_argument("-v", "--version", action="version", version=__version__)
+    parser.add_argument("-m", "--mass", type=float, default=1e6, help="Total mass of the stellar population in solar masses")
+    parser.add_argument("-Z", "--metallicity", type=float, default=1, help="Metallicity of the stellar population in solar metallicity")
+    parser.add_argument("-b", "--binary-fraction", type=float, default=0, help="Fraction of stars in binary systems")
+    args = check_arguments(parser.parse_args())
 
-        mbase = "<path-to-mist>"
-        isofname = mbase + "MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.0_full.iso"
-        self.iso = stellar_evolution.isochrone.MIST(isofname)
-
-    def get_NSN(self, t:Quantity["time"]) -> int:
-        """
-        Return the number of supernovae that have gone off by time t
-        """
-        Mmax = self.iso.get_Mmax(t)
-        if self.discrete:
-            return self.masses[self.masses >= max(8*u.Msun, Mmax)].size
-        # fraction of stars that have exploded
-        fexp_8 = 1 - self.imf.cdf(8*u.Msun)
-        fexp = 1 - self.imf.cdf(Mmax)
-        fexp = fexp*(fexp < fexp_8) + fexp_8*(fexp >= fexp_8)
-        return (fexp*self.Mtot/self.imf.mean()).value
-
-    def __call__(self, N:int) -> population.StarPopulation:
-        """
-        Return a
-        """
+    if args.stochastic:
+        imf = dist_funcs.imf.Salpeter(min_mass=0.1*u.Msun, max_mass=100*u.Msun)
+        masses = imf.sample_mass(args.mass * u.Msun)
+        print(masses.max())
