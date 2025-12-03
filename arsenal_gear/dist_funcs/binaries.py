@@ -9,9 +9,10 @@ binary fraction and distributions of orbital parameters.
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
-from scipy.stats import rv_continuous, loguniform, uniform
+from scipy.stats import loguniform, rv_continuous, uniform
 
 from arsenal_gear.population import StarPopulation
+
 
 class BinaryDistribution():
     """

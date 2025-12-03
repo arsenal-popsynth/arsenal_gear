@@ -10,15 +10,15 @@ import os
 import tarfile
 from zipfile import ZipFile
 
+import astropy.units as u
 import numpy as np
 import requests
+from astropy.units import Quantity
 from tqdm import tqdm
 
-import astropy.units as u
-from astropy.units import Quantity
+from arsenal_gear.population import BinaryPopulation, StarPopulation
 
-from arsenal_gear.population import StarPopulation, BinaryPopulation
-    
+
 class BPASS_stellar_models():
     """
     Reads in BPASS stellar model files for use with a discrete stellar population.

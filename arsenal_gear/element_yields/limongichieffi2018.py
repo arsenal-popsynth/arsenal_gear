@@ -10,11 +10,12 @@ import re
 from typing import List
 
 import astropy.units as u
-from astropy.units import Quantity
 import numpy as np
+from astropy.units import Quantity
 
-from .yields import Yields, Source
 from ..population import StarPopulation
+from .yields import Source, Yields
+
 
 class LimongiChieffi2018(Yields):
     """

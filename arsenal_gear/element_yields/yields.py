@@ -9,11 +9,12 @@ import os
 import warnings
 from typing import List
 
-from astropy.units import Quantity
 import numpy as np
+from astropy.units import Quantity
 from scipy.interpolate import RegularGridInterpolator
 
 from ..population import StarPopulation
+
 
 class Source:
     """

@@ -6,25 +6,25 @@ This submodule defines the interface to various stellar evolution codes
 through interpreting and processing their isochrones
 """
 
-from functools import reduce
 import glob
 import os
 import os.path as osp
-from pathlib import Path
 import tarfile
 import time
-
-import requests
-from tqdm import tqdm
+from functools import reduce
+from pathlib import Path
 
 import astropy.units as u
+import numpy as np
+import requests
 from astropy.units import Quantity
 from astropy.utils.masked import Masked
-import numpy as np
 # TODO(ltlancas: add CubicSpline interpolation as an option)
 from scipy.interpolate import pchip_interpolate
+from tqdm import tqdm
 
 from . import utils as se_utils
+
 
 class Isochrone():
     """

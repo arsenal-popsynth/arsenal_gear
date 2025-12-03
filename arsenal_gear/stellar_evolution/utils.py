@@ -8,6 +8,7 @@ module.
 
 import numpy as np
 
+
 def make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
     """
     Make an array montonically increasing by replacing decreasing values with
