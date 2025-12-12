@@ -1,0 +1,31 @@
+arsenal\_gear.stellar\_evolution.isochrone
+==========================================
+
+.. automodule:: arsenal_gear.stellar_evolution.isochrone
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Isochrone
+      MIST
+   
+   
+
+   
+   
+   
+
+
+
