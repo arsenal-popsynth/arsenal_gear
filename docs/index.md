@@ -35,7 +35,7 @@ models.md
 code-models.md
 architecture.md
 troubleshooting.md
-tests.md
+developers.md
 docs.md
 api.md
 ```
