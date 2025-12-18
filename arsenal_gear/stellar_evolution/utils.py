@@ -20,14 +20,14 @@ def make_monotonic_increasing(x: np.float64, y:np.float64) -> np.float64:
     j = 0
     n = len(y)
     while j < n-1:
-        if y[j] > y[j+1]:
+        if y[j] >= y[j+1]:
             k = j+1
-            while((k < n) and (y[j]>y[k])):
+            while((k < n) and (y[j]>=y[k])):
                 k+=1
             if k == n:
                 k = n-1
                 if y[j] > y[k]:
-                    last = y[j]*1.1
+                    last = y[j]*1.0001
                 else:
                     last = y[k]
                 y[j+1:] = np.interp(x[j+1:],[x[j],x[k]],[y[j],last])
