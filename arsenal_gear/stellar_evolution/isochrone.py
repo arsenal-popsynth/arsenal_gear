@@ -13,6 +13,7 @@ import os.path as osp
 from pathlib import Path
 import tarfile
 import time
+from abc import ABC, abstractmethod
 
 import requests
 from tqdm import tqdm
@@ -26,7 +27,7 @@ from scipy.interpolate import pchip_interpolate
 
 from . import utils as se_utils
 
-class Isochrone():
+class Isochrone(ABC):
     """
     This class is used to load and interpret isochrones from various sources
     """
@@ -65,11 +66,13 @@ class Isochrone():
         try:
             response = requests.get(url, stream=True, timeout=10)
         except requests.exceptions.Timeout as e:
-            raise Exception('Request timed out. Check your internet connection.') from e
+            raise TimeoutError('Request timed out. Check internet connection.') from e
         except requests.exceptions.ConnectionError as e:
-            raise Exception('Connection error occurred. Check your internet connection.') from e
+            raise ConnectionError('Connection error. Check internet connection.') from e
         except requests.exceptions.HTTPError as e:
-            raise Exception(f'HTTP error occurred: {e}') from e
+            raise RuntimeError(f'HTTP error occurred: {e}') from e
+        except requests.exceptions.TooManyRedirects as e:
+            raise RuntimeError('Too many redirects. Check the URL.') from e
         except requests.exceptions.RequestException as e:
             raise Exception(f'Request failed: {e}') from e
 
@@ -135,6 +138,7 @@ class Isochrone():
 
         return f
 
+    @abstractmethod
     def mmax(self, t:Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
@@ -142,8 +146,9 @@ class Isochrone():
 
         default function in base class
         """
-        return 0.0*u.Msun
+        pass
 
+    @abstractmethod
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the rate of change of the maximum mass of the stellar population
@@ -153,8 +158,9 @@ class Isochrone():
         Args:
             t: the age of the isochrone.
         """
-        return 0.0*u.Msun/u.Myr
+        pass
 
+    @abstractmethod
     def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
         """
         get the bolometric luminosity of a star of initial mass mini at age age
@@ -167,7 +173,23 @@ class Isochrone():
         Returns:
             Quantity["power"]: the bolometric luminosity of the star.
         """
-        return 0.0*u.erg/u.s
+        pass
+
+    @abstractmethod
+    def teff(self, mini:Quantity["mass"],
+             t: Quantity["time"]) -> Quantity["temperature"]:
+        """
+        get the bolometric luminosity of a star of initial mass mini at age age
+
+        Default function in base class
+        
+        Args:
+            mini: the initial mass of the star.
+            t: the age of the isochrone.
+        Returns:
+            Quantity["temperature"]: the effective temperature of the star.
+        """
+        pass
 
 class MIST(Isochrone):
     """
@@ -283,7 +305,8 @@ class MIST(Isochrone):
                 else:
                     # tarfile exists and is valid -> extract it
                     self.extract_one(tarfile_path, self.rootdir, delete_txz=True)
-            elif (self.interp_op == "iso") and (not (modeldir_path / self.isofile).is_file()):
+            elif ((self.interp_op == "iso") and
+                  (not (modeldir_path / self.isofile).is_file())):
                 # model directory exists but isochrone file doesn't -> force download
                 force_download = True
         self.force_download = force_download
@@ -612,7 +635,7 @@ class MIST(Isochrone):
             age_set = np.array(age_set)
             mass_set = np.array(mass_set)
             q_set = np.array(q_set)
-            age_test = (max(age_set)>age) and (min(age_set)<age)
+            age_test = min(age_set) < age < max(age_set)
             if ((len(age_set) > 0) and age_test):
                 eeps_.append(eep)
                 age_set = se_utils.make_monotonic_decreasing(mass_set, age_set)
@@ -754,7 +777,7 @@ class MIST(Isochrone):
         Teff_res = np.power(10, logTeff_res)*u.K
         return Teff_res
 
-    def mini(self, t: Quantity["time"],method:str="pchip") -> Quantity["temperature"]:
+    def mini(self, t: Quantity["time"], method:str="pchip") -> (int, Quantity["mass"]):
         """
         at a given age t, return the realationship between initial mass and EEP
         Args:
