@@ -135,8 +135,60 @@ class Isochrone(ABC):
             f = glob_match(p)
             if f:
                 break
-
         return f
+
+    @staticmethod
+    def _get_interpolator(method:str):
+        """
+        Returns the appropriate interpolation function based on the method string
+        Args:
+            method: the interpolation method to use, either pchip or linear
+        Returns:
+            interp: the interpolation function
+        """
+        if method == "pchip":
+            def interp(x,x0,y0):
+                return pchip_interpolate(x0,y0,x)
+        elif method == "linear":
+            def interp(x,x0,y0):
+                return np.interp(x,x0,y0)
+        else:
+            raise ValueError("method must be either pchip or linear")
+        return interp
+
+    @staticmethod
+    def _masked_power(base, exponent):
+        """
+        Computes base raised to the exponent, handling masked values appropriately.
+        Args:
+            base: The base value (can be masked).
+            exponent: The exponent value (can be masked).
+        Returns:
+            The result of base ** exponent, with masked values preserved as masked.
+        """
+        if np.isscalar(base) and not(np.isscalar(exponent)):
+            mask = Masked(exponent).mask
+            nmask = np.logical_not(mask)
+            res = np.zeros_like(exponent)
+            res[nmask] = np.power(base, exponent[nmask])
+            res = Masked(res,mask=mask)
+        elif not(np.isscalar(base)) and np.isscalar(exponent):
+            mask = Masked(base).mask
+            nmask = np.logical_not(mask)
+            res = np.zeros_like(base)
+            res[nmask] = np.power(base[nmask], exponent)
+            res = Masked(res,mask=mask)
+        elif not(np.isscalar(base)) and not(np.isscalar(exponent)):
+            if base.shape != exponent.shape:
+                raise ValueError("Base and exponent must have the same shape.")
+            mask = np.logical_or(Masked(base).mask, Masked(exponent).mask)
+            nmask = np.logical_not(mask)
+            res = np.zeros_like(base)
+            res[nmask] = np.power(base[nmask], exponent[nmask])
+            res = Masked(res,mask=mask)
+        else:
+            raise ValueError("Masking not needed for scalar power.")
+        return res
 
     @abstractmethod
     def mmax(self, t:Quantity["time"]) -> Quantity["mass"]:
@@ -530,12 +582,7 @@ class MIST(Isochrone):
 
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
-        if method == "pchip":
-            f = lambda x,x0,y0: pchip_interpolate(x0,y0,x)[0]
-        elif method == "linear":
-            f = lambda x,x0,y0: np.interp(x,x0,y0)[0]
-        else:
-            raise ValueError("method must be either pchip or linear")
+        f = self._get_interpolator(method)
         end = time.time()
         if self.profile:
             print("\t\tSet up of inerpolation took: ", end-start)
@@ -609,12 +656,7 @@ class MIST(Isochrone):
             (eeps_, ms_, qs_): the EEP values, masses, and requested quantity
                 for the constructed isochrone at age t.
         """
-        if method == "pchip":
-            interp = lambda x,x0,y0: pchip_interpolate(x0,y0,x)
-        elif method == "linear":
-            interp = lambda x,x0,y0: np.interp(x,x0,y0)
-        else:
-            raise ValueError("method must be either pchip or linear")
+        interp = self._get_interpolator(method)
         age = t.to(u.yr).value
         (eeps_,ms_,qs_) = ([],[],[])
         for eep in range(1, self.max_eep+1):
@@ -658,13 +700,7 @@ class MIST(Isochrone):
             qi: the specified quantity at the requested age (t) and range of initial
                 masses (mini)
         """
-        if method == "pchip":
-            interp = lambda x,x0,y0: pchip_interpolate(x0,y0,x)
-        elif method == "linear":
-            interp = lambda x,x0,y0: np.interp(x,x0,y0)
-        else:
-            raise ValueError("method must be either pchip or linear")
-
+        interp = self._get_interpolator(method)
         (eeps_, ms_, qs_) = self._construct_eep_isochrone(t, label, method=method)
         # make sure masses are monotonically increasing (not guaranteed by above interp)
         ms_ = se_utils.make_monotonic_increasing(eeps_, ms_)
@@ -675,7 +711,6 @@ class MIST(Isochrone):
         mask = np.logical_or(mini < min(ms_), mini > max(ms_))
         qi = np.ma.masked_array(qi, mask=mask)
         return qi
-
 
     ######## OTHER HELPER FUNCTIONS ########
     def _get_mmax_age_interp(self):
@@ -719,6 +754,12 @@ class MIST(Isochrone):
                 # throw error
                 raise ValueError("t must be a scalar, or length 1 array")
         else:
+            if self.interp_op == "iso":
+                if (t < min(self.ages)*u.yr) or (t > max(self.ages)*u.yr):
+                    raise ValueError("t is outside the range of the isochrones")
+            else:
+                if (t < min(self.min_ages)*u.yr) or (t > max(self.max_ages)*u.yr):
+                    raise ValueError("t is outside the range of the isochrones")
             t = np.array([t.value])*t.unit
 
         if self.interp_op == "iso":
@@ -776,9 +817,8 @@ class MIST(Isochrone):
         Returns:
             Quantity["power"]: the bolometric luminosity of the star.
         """
-        logLbol_res = Masked(self._interp_quantity(mini, t, 'log_L', method=method))
-        Lbol_res = np.power(10, logLbol_res)*u.Lsun
-        return Lbol_res
+        logLbol_res = self._interp_quantity(mini, t, 'log_L', method=method)
+        return self._masked_power(10, logLbol_res)*u.Lsun
 
     def teff(self, mini:Quantity["mass"], t: Quantity["time"], 
              method:str="pchip") -> Quantity["temperature"]:
@@ -792,9 +832,8 @@ class MIST(Isochrone):
             Quantity["temperature"]: the effective surface temperature of the star.
         """
         # interpolating from EEPs
-        logTeff_res = Masked(self._interp_quantity(mini, t, 'log_Teff', method=method))
-        Teff_res = np.power(10, logTeff_res)*u.K
-        return Teff_res
+        logTeff_res = self._interp_quantity(mini, t, 'log_Teff', method=method)
+        return self._masked_power(10, logTeff_res)*u.K
 
     def mini(self, t: Quantity["time"], method:str="pchip") -> (int, Quantity["mass"]):
         """
