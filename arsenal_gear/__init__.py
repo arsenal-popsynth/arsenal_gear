@@ -75,16 +75,27 @@ class StellarPopulation():
         """
         Returns the bolometric luminosity of the population at time t
         """
-        return np.sum(self.lbol_iso(t))
+        if np.isscalar(t):
+            return np.sum(self.lbol_iso(t))
+        else:
+            return np.array([np.sum(self.lbol_iso(ti)).value for ti in t])*u.Lsun
     
     def teff(self, t:Quantity["time"]) -> Quantity["power"]:
         """
         Returns the bolometric luminosity weighted
         effective temperature of the population at time t
         """
-        teffs = self.teff_iso(t)
-        lbols = self.lbol_iso(t)
-        return np.sum(teffs*lbols)/np.sum(lbols)
+        if np.isscalar(t):
+            teffs = self.teff_iso(t)
+            lbols = self.lbol_iso(t)
+            return np.sum(teffs*lbols)/np.sum(lbols)
+        else:
+            teff_arr = []
+            for ti in t:
+                teffs = self.teff_iso(ti)
+                lbols = self.lbol_iso(ti)
+                teff_arr.append((np.sum(teffs*lbols)/np.sum(lbols)).value)
+            return np.array(teff_arr)*u.K
 
     def lbol_iso(self, t:Quantity["time"]) -> Quantity["power"]:
         """
