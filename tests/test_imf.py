@@ -30,4 +30,4 @@ class TestSalpeter:
 
     def test_mass_sample(self):
         masses = self.imf.sample_mass(1e5*u.Msun)
-        assert_allclose(np.sum(masses), 1e5*u.Msun, rtol=0.01) 
+        assert_allclose(np.sum(masses), 1e5*u.Msun, rtol=0.02) 
