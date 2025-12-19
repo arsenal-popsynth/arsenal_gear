@@ -20,7 +20,7 @@ dependencies = [
     "sphinx>=7",
     "scipy>=1.10",
     "astropy",
-    ]
+    "tqdm"]
 dynamic = ["version"]
 
 [tool.setuptools]
