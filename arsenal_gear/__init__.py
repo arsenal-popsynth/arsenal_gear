@@ -71,6 +71,24 @@ class StellarPopulation():
         Mmaxdot = self.iso.mmaxdot(t)
         return -self.imf.pdf(Mmax)*Mmaxdot*(Mmax.value>8)*self.Nstar
 
+    def lbol(self, t:Quantity["time"]) -> Quantity["power"]:
+        """
+        Returns the bolometric luminosity of the population at time t
+        """
+        return np.sum(self.lbol_iso(t))
+
+    def lbol_iso(self, t:Quantity["time"]) -> Quantity["power"]:
+        """
+        Returns the bolometric luminosity of each star in the population at time t
+        """
+        return self.iso.lbol(self.masses, t)
+
+    def teff_iso(self, t:Quantity["time"]) -> Quantity["temperature"]:
+        """
+        Returns the effective temperature of each star in the population at time t
+        """
+        return self.iso.teff(self.masses, t)
+
     def __call__(self, N:int) -> population.StarPopulation:
         """
         Return a
