@@ -14,7 +14,7 @@ from astropy.units import Quantity
 from . import dist_funcs, feedbacks, population, stellar_evolution
 
 __version__ = '0.0.1'
-__all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution']
+__all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution', 'StellarPopulation']
 
 class StellarPopulation():
     """
