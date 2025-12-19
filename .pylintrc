@@ -447,7 +447,8 @@ disable=raw-checker-failed,
         unnecessary-lambda,
         unnecessary-pass,
         attribute-defined-outside-init,
-        too-many-branches
+        too-many-branches,
+        unused-variable
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

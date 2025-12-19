@@ -74,7 +74,7 @@ class Isochrone(ABC):
         except requests.exceptions.TooManyRedirects as e:
             raise RuntimeError('Too many redirects. Check the URL.') from e
         except requests.exceptions.RequestException as e:
-            raise Exception(f'Request failed: {e}') from e
+            raise RuntimeError(f'Download failed: {e}') from e
 
         # Get file size
         total_size = int(response.headers.get('content-length', 0))
@@ -594,8 +594,8 @@ class MIST(Isochrone):
         return q_res
 
     ######## EEP INTERPOLATION FUNCTIONS ########
-    def _interp_eep_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
-                             label:str, method:str="pchip") -> np.float64:
+    def _construct_eep_isochrone(self, t:Quantity["time"], label:str,
+                                 method:str="pchip") -> (np.float64, np.float64, np.float64):
         """
         Follows the instructions of the MIST0 and MIST1 papers by looping over
         all EEPs and
@@ -605,6 +605,50 @@ class MIST(Isochrone):
             2. We interpolate this relationship to find M(t) for the given EEP
             3. We then interpolate the requested quantity, given by "label" in mass for
                the given EEP.
+        Returns:
+            (eeps_, ms_, qs_): the EEP values, masses, and requested quantity
+                for the constructed isochrone at age t.
+        """
+        if method == "pchip":
+            interp = lambda x,x0,y0: pchip_interpolate(x0,y0,x)
+        elif method == "linear":
+            interp = lambda x,x0,y0: np.interp(x,x0,y0)
+        else:
+            raise ValueError("method must be either pchip or linear")
+        age = t.to(u.yr).value
+        (eeps_,ms_,qs_) = ([],[],[])
+        for eep in range(1, self.max_eep+1):
+            (age_set, mass_set, q_set) = ([], [], [])
+            for (j,track) in enumerate(self.tracks):
+                ages = track["star_age"]
+                if eep <= len(ages):
+                    # get the age at the given EEP
+                    age_set.append(ages[eep-1])
+                    mass_set.append(self.masses[j])
+                    q_set.append(track[label][eep-1])
+            age_set = np.array(age_set)
+            mass_set = np.array(mass_set)
+            q_set = np.array(q_set)
+            age_test = min(age_set) < age < max(age_set)
+            if ((len(age_set) > 0) and age_test):
+                eeps_.append(eep)
+                age_set = se_utils.make_monotonic_decreasing(mass_set, age_set)
+                m = interp(age, age_set[::-1], mass_set[::-1])[0]
+                q = interp(m, mass_set, q_set)
+                ms_.append(m)
+                qs_.append(q)
+        # this is the constructed isochrone for property q given by "label"
+        eeps_ = np.array(eeps_)
+        ms_ = np.array(ms_)
+        qs_ = np.array(qs_)
+        return (eeps_, ms_, qs_)
+
+    def _interp_eep_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
+                             label:str, method:str="pchip") -> np.float64:
+        """
+        Uses _construct_eep_isochrone to construct an isochrone at the requested age
+        processes the isochrones to insure monotonicity and then interpolates to the
+        requested input masses
         Args:
             mini: the initial mass of the star.
             t: the age of the isochrone.
@@ -621,32 +665,7 @@ class MIST(Isochrone):
         else:
             raise ValueError("method must be either pchip or linear")
 
-        age = t.to(u.yr).value
-        (eeps_,ms_,qs_) = ([],[],[])
-        for eep in range(1, self.max_eep+1):
-            (age_set, mass_set, q_set) = ([], [], [])
-            for (j,track) in enumerate(self.tracks):
-                ages = track["star_age"]
-                if eep <= len(ages):
-                    # get the age at the given EEP
-                    age_set.append(ages[eep-1])
-                    mass_set.append(self.masses[j])
-                    q_set.append(track[label][eep-1])        
-            age_set = np.array(age_set)
-            mass_set = np.array(mass_set)
-            q_set = np.array(q_set)
-            age_test = min(age_set) < age < max(age_set)
-            if ((len(age_set) > 0) and age_test):
-                eeps_.append(eep)
-                age_set = se_utils.make_monotonic_decreasing(mass_set, age_set)
-                m = interp(age, age_set[::-1], mass_set[::-1])[0]
-                q = interp(m, mass_set, q_set)
-                ms_.append(m)
-                qs_.append(q)
-        # this is the constructed isochrone for property q given by "label"
-        eeps_ = np.array(eeps_)
-        ms_ = np.array(ms_)
-        qs_ = np.array(qs_)
+        (eeps_, ms_, qs_) = self._construct_eep_isochrone(t, label, method=method)
         # make sure masses are monotonically increasing (not guaranteed by above interp)
         ms_ = se_utils.make_monotonic_increasing(eeps_, ms_)
         # finally we interpolate the requested quantity to the requested masses
