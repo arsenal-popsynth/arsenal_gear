@@ -43,6 +43,7 @@ class StellarPopulation():
             end_samp = time.time()
             if self.verbose:
                 print("Time to sample masses: ", end_samp - start_samp)
+            self.Nstar = len(self.masses)
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 

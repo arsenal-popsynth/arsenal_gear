@@ -26,8 +26,24 @@ import numpy as np
 from scipy.interpolate import pchip_interpolate
 
 from . import utils as se_utils
+from dataclasses import dataclass
 
-class Isochrone(ABC):
+@dataclass
+class Isochrone:
+    """
+    Data class for storing isochrone data.
+    
+    Attributes:
+        mini: Array of initial stellar masses
+        teff: Array of effective temperatures
+        lbol: Array of bolometric luminosities
+    """
+    eep: int
+    mini: Quantity["mass"]
+    teff: Quantity["temperature"]
+    lbol: Quantity["power"]
+
+class IsochroneSystem(ABC):
     """
     This class is used to load and interpret isochrones from various sources
     """
@@ -243,7 +259,24 @@ class Isochrone(ABC):
         """
         pass
 
-class MIST(Isochrone):
+    @abstractmethod
+    def construct_isochrone(self, t: Quantity["time"]) -> Isochrone:
+        """
+        Constructs an isochrone at age t for the specified quantity label.
+
+        Default function in base class
+        
+        Args:
+            t: the age of the isochrone.
+            label: the label of the quantity to construct the isochrone for.
+        Returns:
+            Tuple[Quantity["mass"], Quantity["temperature"], Quantity["power"]]:
+                The initial masses, effective temperatures, and bolometric luminosities
+                of the stars in the isochrone. 
+        """
+        pass
+
+class MIST(IsochroneSystem):
     """
 
     Reads in MIST isochrone files.
@@ -834,16 +867,27 @@ class MIST(Isochrone):
         # interpolating from EEPs
         logTeff_res = self._interp_quantity(mini, t, 'log_Teff', method=method)
         return self._masked_power(10, logTeff_res)*u.K
-
-    def mini(self, t: Quantity["time"], method:str="pchip") -> (int, Quantity["mass"]):
+    
+    def construct_isochrone(self, t: Quantity["time"], method:str="pchip") -> Isochrone:
         """
-        at a given age t, return the realationship between initial mass and EEP
+        Constructs an isochrone at age t for the specified quantity label.
+
+        Default function in base class
+        
         Args:
-            t: the age of the isochrone. Should be a single time (for now...)
+            t: the age of the isochrone.
         Returns:
-            Quantity["mass"]: the ZAMS mass of the star.
+            Isochrone: The isochrone object containing initial masses,
+                effective temperatures, and bolometric luminosities
+                of the stars in the isochrone. 
         """
-
-        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',make_monotonic=True,
-                                                     method=method)
-        return (eepi,massi)
+        if self.interp_op == "iso":
+            (eep, mini) = self._interp_iso_quantity_eep(t, 'initial_mass',
+                                                         make_monotonic=True,
+                                                         method=method)
+            lbol = self.lbol(mini, t, method=method)
+        else:
+            (eep, mini, lbol) = self._construct_eep_isochrone(t, 'log_L',
+                                                              method=method)
+        teff = self.teff(mini, t, method=method)
+        return Isochrone(eep=eep, mini=mini, teff=teff, lbol=lbol)
