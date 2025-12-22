@@ -493,8 +493,6 @@ class MIST(IsochroneInterpolator):
         else:
             eep_file_pattern = [("?????M.track.eep",),]
             mass_file_list = self._find_match(eep_file_pattern, self.rootdir / self.modeldir)
-            mass_nums = [int(f.split("/")[-1].split("M")[0]) for f in mass_file_list]
-            self.num_masses = len(mass_nums)
 
             masses = []
             eeps_list = []
@@ -503,14 +501,13 @@ class MIST(IsochroneInterpolator):
             max_ages = []
             for f in mass_file_list:
                 # read in the EEP file
-                #minit, eeps, min_age, max_age, data = self.read_eep_file(f)
-                eep_file = self.read_eep_file(f)
+                minit, eeps, min_age, max_age, data = self.read_eep_file(f)
                 # store the mass and EEP data
-                masses.append(eep_file[0])
-                eeps_list.append(eep_file[1])
-                min_ages.append(eep_file[2])
-                max_ages.append(eep_file[3])
-                tracks.append(eep_file[4])
+                masses.append(minit)
+                eeps_list.append(eeps)
+                min_ages.append(min_age)
+                max_ages.append(max_age)
+                tracks.append(data)
             self.masses = np.array(masses)
             self.eeps_list = eeps_list
             self.min_ages = np.array(min_ages)
@@ -866,8 +863,8 @@ class MIST(IsochroneInterpolator):
                 raise ValueError("t must be a scalar, or length 1 array")
         else:
             if self.interp_op == "iso":
-                min_age = np.power(10,min(self.ages))*u.yr
-                max_age = np.power(10,max(self.ages))*u.yr
+                min_age = np.power(10,min(self.iset.ages))*u.yr
+                max_age = np.power(10,max(self.iset.ages))*u.yr
                 if (t < min_age) or (t > max_age):
                     raise ValueError("t is outside the range of the isochrones")
             else:
