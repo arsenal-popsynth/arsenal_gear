@@ -669,7 +669,7 @@ class MIST(IsochroneInterpolator):
         """
         return [q[np.where(eep == j)[0]][0] for (q,eep) in zip(qs,eeps)]
 
-    def _interp_iso_quantity_eep(self, t:Quantity["time"], label:str, method:str="pchip",
+    def _interp_iso_quantity(self, t:Quantity["time"], label:str, method:str="pchip",
                                  make_monotonic:bool=False) -> (np.float64, np.float64):
         """
         Interpolates between isochrones using the EEP values to create an
@@ -719,7 +719,7 @@ class MIST(IsochroneInterpolator):
     def _interp_iso_quantity_mass(self, mini:Quantity["mass"], t:Quantity["time"],
                                   label:str, method:str="pchip") -> np.float64:
         """
-        Uses _interp_iso_quantity_eep to interpolate a provided quantity in both
+        Uses _interp_iso_quantity to interpolate a provided quantity in both
         that quantity and in initial mass as a funciton of EEP and then returns the
         value of the quantity at the requested initial mass
         Args:
@@ -732,12 +732,12 @@ class MIST(IsochroneInterpolator):
         """
         # construct isochrone for mass/luminosity relationship
         timing = -1*time.time()
-        (eepi, qi) = self._interp_iso_quantity_eep(t, label,method=method)
+        (eepi, qi) = self._interp_iso_quantity(t, label,method=method)
         timing += time.time()
         if self.profile:
             print(f"\tTime to interpolate {label}: ", timing)
         timing = -1*time.time()
-        (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',
+        (eepi,massi) = self._interp_iso_quantity(t, 'initial_mass',
                                                      method=method,
                                                      make_monotonic=True)
         timing += time.time()
