@@ -23,7 +23,6 @@ import astropy.units as u
 from astropy.units import Quantity
 from astropy.utils.masked import Masked
 import numpy as np
-# TODO(ltlancas: add CubicSpline interpolation as an option)
 from scipy.interpolate import pchip_interpolate
 
 from . import utils as se_utils
@@ -34,14 +33,18 @@ class Isochrone:
     Data class for storing isochrone data.
     
     Attributes:
+        age: Age of the isochrone
         mini: Array of initial stellar masses
-        teff: Array of effective temperatures
-        lbol: Array of bolometric luminosities
+        lteff: Array of log_10(effective temperatures)
+        llbol: Array of log_10(bolometric luminosities)
+        qs: Dictionary of additional quantities
     """
+    age: Quantity["time"]
     eep: int
     mini: Quantity["mass"]
-    teff: Quantity["temperature"]
-    lbol: Quantity["power"]
+    lteff: np.float64
+    llbol: np.float64
+    qs: dict
 
 class IsochroneSystem(ABC):
     """
@@ -291,16 +294,15 @@ class MIST(IsochroneSystem):
     def __init__(self, **kwargs) -> None:
         """
         Args:
-            met: the metallicity of the isochrone relative to solar
+            kwargs: Keyword arguments for the isochrone system.
 
         Usage:
-            >> iso = read_mist_models.ISO('MIST_v1.0_feh_p0.00_afe_p0.0_vvcrit0.4.iso')
-            >> age_ind = iso._age_index(8.0)
-            >> logTeff = iso.isos[age_ind]['log_Teff']
-            >> logL = iso.isos[age_ind]['log_L']
-            >> plt.plot(logTeff, logL) #plot the HR diagram for logage = 8.0
+            >> iso = MIST(met=0.0, vvcrit="0.0", interp_op="eep")
+            >> mini = np.array([1.0, 5.0, 10.0])*u.Msun
+            >> lbol = iso.lbol(mini, 10*u.Myr)
+            >> teff = iso.teff(mini, 10*u.Myr)
 
-        Attributes:
+        Attributes: TODO(ltlancas): change this to be relevant for arsenal_gear
             version     Dictionary containing the MIST and MESA version numbers.
             abun        Dictionary containing Yinit, Zinit, [Fe/H], and [a/Fe] values.
             rot         Rotation in units of surface v/v_crit.
@@ -414,10 +416,26 @@ class MIST(IsochroneSystem):
             None
         """
         if self.interp_op == "iso":
-            self.ages, self.hdr_list, self.isos = self.read_iso_file()
+            self.ages, self.hdr_list, isos_mist = self.read_iso_file()
+            self.isos = []
+            for (i,iso) in enumerate(isos_mist):
+                age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
+                eep = iso['EEP']
+                mini = iso['initial_mass']*u.Msun
+                lteff = iso['log_Teff']
+                llbol = iso['log_L']
+                # primary paramters keys
+                pkeys = ['log10_isochrone_age_yr','EEP']
+                qs = {}
+                for label in self.hdr_list:
+                    if label not in pkeys:
+                        qs[label] = iso[label]
+                iso_data = Isochrone(age=age, eep=eep,
+                                     mini=mini, lteff=lteff, llbol=llbol, qs=qs)
+                self.isos.append(iso_data)
             # get the maximum mass still alive for each isochrone
             na = self.num_ages
-            self.mmaxes = np.array([np.max(self.isos[i]['initial_mass']) for i in range(na)])
+            self.mmaxes = np.array([np.max(isos_mist[i]['initial_mass']) for i in range(na)])
             self.MMAX = self.mmaxes[0]
             self.metallicity = self.abun['[Fe/H]']
         else:
@@ -453,6 +471,9 @@ class MIST(IsochroneSystem):
     def read_iso_file(self):
         """
         Reads in the isochrone file.
+
+        This is essentially copied from read_mist_models.py in the MIST Github
+        https://github.com/jieunchoi/MIST_codes/blob/master/scripts/read_mist_models.py
 
         """
 
@@ -491,6 +512,9 @@ class MIST(IsochroneSystem):
 
         """
         Reads in an EEP file.
+
+        This is essentially copied from read_mist_models.py in the MIST Github
+        https://github.com/jieunchoi/MIST_codes/blob/master/scripts/read_mist_models.py
 
         """
 
@@ -598,7 +622,7 @@ class MIST(IsochroneSystem):
         Interpolates between isochrones using the EEP values to create an
         intermediate age isochrone
         Args:
-            t: The age of the isochrone to be generated, should a single value.
+            t: The age of the isochrone to be generated, should be a single value.
             label: The label of the quantity to be interpolated.
         Returns:
             qi: The specified quantity at the requested age. This is a function of
@@ -610,19 +634,21 @@ class MIST(IsochroneSystem):
         ais = self._get_ai_range(ai, 4)
         lages = np.array([self.ages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
-        qs = [self.isos[i][label] for i in ais]
-        eeps = [self.isos[i]['EEP'] for i in ais]
+        qs = [self.isos[i].qs[label] for i in ais]
+        eeps = [self.isos[i].eep for i in ais]
+        #qs = [self.isos[i][label] for i in ais]
+        #eeps = [self.isos[i]['EEP'] for i in ais]
 
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
         f = self._get_interpolator(method)
         end = time.time()
         if self.profile:
-            print("\t\tSet up of inerpolation took: ", end-start)
+            print("\t\tSet up of interpolation took: ", end-start)
 
         # interpolate in log(age) at each eep
         start = time.time()
-        qi = np.array([f(lt, lages, self._fixed_eep_q(j,eeps,qs)) for j in eepi])
+        qi = np.array([f(lt, lages, self._fixed_eep_q(j,eeps,qs))[0] for j in eepi])
         end = time.time()
         if self.profile:
             print("\t\tInterpolation took: ", end-start)
@@ -788,7 +814,9 @@ class MIST(IsochroneSystem):
                 raise ValueError("t must be a scalar, or length 1 array")
         else:
             if self.interp_op == "iso":
-                if (t < min(self.ages)*u.yr) or (t > max(self.ages)*u.yr):
+                min_age = np.power(10,min(self.ages))*u.yr
+                max_age = np.power(10,max(self.ages))*u.yr
+                if (t < min_age) or (t > max_age):
                     raise ValueError("t is outside the range of the isochrones")
             else:
                 if (t < min(self.min_ages)*u.yr) or (t > max(self.max_ages)*u.yr):
@@ -870,7 +898,7 @@ class MIST(IsochroneSystem):
     
     def construct_isochrone(self, t: Quantity["time"], method:str="pchip") -> Isochrone:
         """
-        Constructs an isochrone at age t for the specified quantity label.
+        Constructs an isochrone at age t
 
         Default function in base class
         
@@ -890,4 +918,6 @@ class MIST(IsochroneSystem):
             (eep, mini, lbol) = self._construct_eep_isochrone(t, 'log_L',
                                                               method=method)
         teff = self.teff(mini, t, method=method)
-        return Isochrone(eep=eep, mini=mini, teff=teff, lbol=lbol)
+        # TODO(ltlancas): add other quantities to Isochone object that's interpolated here?
+        #                 Should this function default to returning all quantities?
+        return Isochrone(eep=eep, mini=mini, teff=teff, lbol=lbol, qs={})

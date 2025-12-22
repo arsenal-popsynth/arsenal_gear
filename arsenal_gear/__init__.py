@@ -47,7 +47,7 @@ class StellarPopulation():
         self.tmin = 0.0*u.Myr
         self.tmax = 40.0*u.Myr
 
-        # initialize the isochrone
+        # initialize the isochrone system
         self.iso = stellar_evolution.isochrone.MIST(**kwargs)
 
     def nsn(self, t:Quantity["time"]) -> int:
@@ -86,7 +86,7 @@ class StellarPopulation():
         Returns the bolometric luminosity weighted
         effective temperature of the population at time t
         """
-        if np.isscalar(t):
+        if np.isscalar(t.value):
             teffs = self.teff_iso(t)
             lbols = self.lbol_iso(t)
             return np.sum(teffs*lbols)/np.sum(lbols)
