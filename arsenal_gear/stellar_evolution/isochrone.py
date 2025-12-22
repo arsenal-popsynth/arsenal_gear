@@ -629,7 +629,7 @@ class MIST(IsochroneSystem):
                 initial mass which can also be generated in this way.
             eepi: The EEP values corresponding to the interpolated isochrone.
         """    
-        start = time.time()
+        timing = -1*time.time()
         ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
         lages = np.array([self.ages[i] for i in ais])
@@ -642,25 +642,25 @@ class MIST(IsochroneSystem):
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
         f = self._get_interpolator(method)
-        end = time.time()
+        timing += time.time()
         if self.profile:
-            print("\t\tSet up of interpolation took: ", end-start)
+            print("\t\tSet up of interpolation took: ", timing)
 
         # interpolate in log(age) at each eep
-        start = time.time()
+        timing = -1*time.time()
         qi = np.array([f(lt, lages, self._fixed_eep_q(j,eeps,qs))[0] for j in eepi])
-        end = time.time()
+        timing += time.time()
         if self.profile:
-            print("\t\tInterpolation took: ", end-start)
+            print("\t\tInterpolation took: ", timing)
 
 
         if make_monotonic:
-            start = time.time()
+            timing = -1*time.time()
             if np.any(np.diff(qi) < 0):
                 qi = se_utils.make_monotonic_increasing(eepi,qi)
-            end = time.time()
+            timing += time.time()
             if self.profile:
-                print("\t\tMonotonic interpolation took: ", end-start)
+                print("\t\tMonotonic interpolation took: ", timing)
 
         return (eepi,qi)
 
@@ -679,18 +679,18 @@ class MIST(IsochroneSystem):
             q_res: the specified quantity at the requested initial mass.
         """
         # construct isochrone for mass/luminosity relationship
-        start = time.time()
+        timing = -1*time.time()
         (eepi, qi) = self._interp_iso_quantity_eep(t, label,method=method)
-        end = time.time()
+        timing += time.time()
         if self.profile:
-            print(f"\tTime to interpolate {label}: ", end-start)
-        start = time.time()
+            print(f"\tTime to interpolate {label}: ", timing)
+        timing = -1*time.time()
         (eepi,massi) = self._interp_iso_quantity_eep(t, 'initial_mass',
                                                      method=method,
                                                      make_monotonic=True)
-        end = time.time()
+        timing += time.time()
         if self.profile:
-            print("\tTime to interpolate mass: ", end-start)
+            print("\tTime to interpolate mass: ", timing)
 
         mini = mini.to(u.Msun).value
         q_res = pchip_interpolate(massi, qi, mini)
