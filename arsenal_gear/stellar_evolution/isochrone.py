@@ -34,19 +34,71 @@ class Isochrone:
     
     Attributes:
         age: Age of the isochrone
-        mini: Array of initial stellar masses
-        lteff: Array of log_10(effective temperatures)
-        llbol: Array of log_10(bolometric luminosities)
-        qs: Dictionary of additional quantities
+        eep_name: variable name for equivalent evolutionary phase
+        mini_name: variable name for initial stellar masses
+        lteff_name: variable name for log_10(effective temperature)
+        llbol_name: variable name for log_10(bolometric luminosities)
+        qs: Dictionary of isochrone quantities. These should minimally include
+            EEP, initial_mass, log_Teff, and log_L but can include others.
     """
     age: Quantity["time"]
-    eep: int
-    mini: Quantity["mass"]
-    lteff: np.float64
-    llbol: np.float64
+    eep_name: str
+    mini_name: str
+    lteff_name: str
+    llbol_name: str
     qs: dict
 
-class IsochroneSystem(ABC):
+@dataclass
+class StellarTrack:
+    """
+    Data class for storing stellar track data.
+    
+    Attributes:
+        mass: Initial mass of the stellar track
+        eep_name: variable name for equivalent evolutionary phase
+        lteff_name: variable name for log_10(effective temperature)
+        llbol_name: variable name for log_10(bolometric luminosities)
+        qs: Dictionary of stellar track quantities. These should minimally include
+            EEP, log_Teff, and log_L but can include others.
+    """
+    mass: Quantity["mass"]
+    eep_name: str
+    lteff_name: str
+    llbol_name: str
+    qs: dict
+
+@dataclass
+class IsochroneSet:
+    """
+    Data class for storing a set of isochrones.
+    
+    Attributes:
+        ages: List of ages of the isochrones
+        hdr_list: List of column headers for the isochrone data
+        isos: List of Isochrone objects
+    """
+    ages: list[Quantity["time"]]
+    hdr_list: list[str]
+    isos: list[Isochrone]
+    max_mass: float
+
+@dataclass
+class TrackSet:
+    """
+    Data class for storing a set of stellar evolution tracks.
+    
+    Attributes:
+        masses: List of initial masses of the tracks
+        hdr_list: List of column headers for the track data
+        tracks: List of Track objects
+        max_eep: Maximum equivalent evolutionary phase number across all tracks
+    """
+    masses: list[Quantity["mass"]]
+    hdr_list: list[str]
+    tracks: list[StellarTrack]
+    max_eep: int
+
+class IsochroneInterpolator(ABC):
     """
     This class is used to load and interpret isochrones from various sources
     """
@@ -279,7 +331,7 @@ class IsochroneSystem(ABC):
         """
         pass
 
-class MIST(IsochroneSystem):
+class MIST(IsochroneInterpolator):
     """
 
     Reads in MIST isochrone files.
@@ -416,28 +468,28 @@ class MIST(IsochroneSystem):
             None
         """
         if self.interp_op == "iso":
-            self.ages, self.hdr_list, isos_mist = self.read_iso_file()
-            self.isos = []
-            for (i,iso) in enumerate(isos_mist):
+            ages, hdr_list, isos_mist = self.read_iso_file()
+            isos = []
+            for iso in isos_mist:
                 age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-                eep = iso['EEP']
-                mini = iso['initial_mass']*u.Msun
-                lteff = iso['log_Teff']
-                llbol = iso['log_L']
-                # primary paramters keys
-                pkeys = ['log10_isochrone_age_yr','EEP']
                 qs = {}
                 for label in self.hdr_list:
-                    if label not in pkeys:
+                    if label != "log10_isochrone_age_yr":
                         qs[label] = iso[label]
-                iso_data = Isochrone(age=age, eep=eep,
-                                     mini=mini, lteff=lteff, llbol=llbol, qs=qs)
-                self.isos.append(iso_data)
+                iso_data = Isochrone(age=age,
+                                     eep_name='EEP',
+                                     mini_name='initial_mass',
+                                     lteff_name='log_Teff',
+                                     llbol_name='log_L',
+                                     qs=qs)
+                isos.append(iso_data)
             # get the maximum mass still alive for each isochrone
-            na = self.num_ages
-            self.mmaxes = np.array([np.max(isos_mist[i]['initial_mass']) for i in range(na)])
-            self.MMAX = self.mmaxes[0]
-            self.metallicity = self.abun['[Fe/H]']
+            self.max_mass = np.max(isos_mist[0]['initial_mass'])
+            self.iset = IsochroneSet(ages=ages,
+                                     hdr_list=hdr_list,
+                                     isos=isos,
+                                     max_mass=self.max_mass)
+            
         else:
             eep_file_pattern = [("?????M.track.eep",),]
             mass_file_list = self._find_match(eep_file_pattern, self.rootdir / self.modeldir)
@@ -550,12 +602,13 @@ class MIST(IsochroneSystem):
 
         """
         lage = np.log10(age.to(u.yr).value)
-        if (max(lage) > max(self.ages)) or (min(lage) < min(self.ages)):
+        ages = self.iset.ages
+        if (max(lage) > max(ages)) or (min(lage) < min(ages)):
             print('The requested age is outside the range. Try between '
-                  + str(min(self.ages)) + ' and ' + str(max(self.ages)))
+                  + str(min(ages)) + ' and ' + str(max(ages)))
             raise ValueError("Age is outside the range of the isochrones")
 
-        ais = [np.where(np.array(self.ages) - la < 0)[0][-1] for la in lage]
+        ais = [np.where(np.array(ages) - la < 0)[0][-1] for la in lage]
         ais = np.array(ais, dtype=int)
 
         return ais
@@ -571,7 +624,7 @@ class MIST(IsochroneSystem):
         Returns:
             ais: the indices of the isochrones to use for interpolation.
         """
-        nages = len(self.ages)
+        nages = len(self.iset.ages)
 
         if (self.test and (ai in (0, nages-1))):
             raise ValueError("Test Isochrone must be in middle of isochrone range")
@@ -632,12 +685,11 @@ class MIST(IsochroneSystem):
         timing = -1*time.time()
         ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
-        lages = np.array([self.ages[i] for i in ais])
+        lages = np.array([self.iset.ages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
-        qs = [self.isos[i].qs[label] for i in ais]
-        eeps = [self.isos[i].eep for i in ais]
-        #qs = [self.isos[i][label] for i in ais]
-        #eeps = [self.isos[i]['EEP'] for i in ais]
+        qs = [self.iset.isos[i].qs[label] for i in ais]
+        eep_str = self.iset.isos[0].eep_name
+        eeps = [self.iset.isos[i].qs[eep_str] for i in ais]
 
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
@@ -706,8 +758,8 @@ class MIST(IsochroneSystem):
         Follows the instructions of the MIST0 and MIST1 papers by looping over
         all EEPs and
             1. Looping over all Mass tracks and getting the age at the given EEP
-               This then constitutes an age vs. mass realtionship which is eforced to be
-               montonic (decreasing as a function of mas)
+               This then constitutes an age vs. mass relationship which is enforced to be
+               monotonic (decreasing as a function of mass)
             2. We interpolate this relationship to find M(t) for the given EEP
             3. We then interpolate the requested quantity, given by "label" in mass for
                the given EEP.
@@ -778,8 +830,8 @@ class MIST(IsochroneSystem):
         properly interpreted from either the isochrone or EEP data.
         """
         if self.interp_op == "iso":
-            lages = self.ages
-            mmax = self.mmaxes
+            lages = self.iset.ages
+            mmax = np.array([np.max(iso[iso.mini_name]) for iso in self.iset.isos])
         else:
             # interpolating from EEPs
             lages = np.log10(self.max_ages)[::-1]
@@ -847,7 +899,7 @@ class MIST(IsochroneSystem):
         (lages, mmax) = self._get_mmax_age_interp()
         # cubic spline interpolation in log(age)
         interp = pchip_interpolate(lages,mmax, lt)
-        interp[np.where(lt < min(lages))] = self.MMAX
+        interp[np.where(lt < min(lages))] = self.max_mass
         interp[np.where(lt > max(lages))] = 0.0
         return interp*u.Msun
 
@@ -904,13 +956,14 @@ class MIST(IsochroneSystem):
         
         Args:
             t: the age of the isochrone.
+            method: the interpolation method to use, either pchip or linear
         Returns:
             Isochrone: The isochrone object containing initial masses,
                 effective temperatures, and bolometric luminosities
                 of the stars in the isochrone. 
         """
         if self.interp_op == "iso":
-            (eep, mini) = self._interp_iso_quantity_eep(t, 'initial_mass',
+            (eep, mini) = self._interp_iso_quantity(t, 'initial_mass',
                                                          make_monotonic=True,
                                                          method=method)
             lbol = self.lbol(mini, t, method=method)
@@ -920,4 +973,12 @@ class MIST(IsochroneSystem):
         teff = self.teff(mini, t, method=method)
         # TODO(ltlancas): add other quantities to Isochone object that's interpolated here?
         #                 Should this function default to returning all quantities?
-        return Isochrone(eep=eep, mini=mini, teff=teff, lbol=lbol, qs={})
+        qs = {'EEP': eep,
+              'initial_mass': mini,
+              'log_Teff': np.log10(teff.to(u.K).value),
+              'log_L': np.log10(lbol.to(u.Lsun).value)}
+        return Isochrone(age=t,
+                         eep_name='EEP',
+                         mini_name='initial_mass',
+                         lteff_name='log_Teff',
+                         llbol_name='log_L', qs=qs)
