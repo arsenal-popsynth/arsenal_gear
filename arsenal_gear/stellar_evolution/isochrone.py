@@ -14,6 +14,7 @@ from pathlib import Path
 import tarfile
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import requests
 from tqdm import tqdm
@@ -26,7 +27,6 @@ import numpy as np
 from scipy.interpolate import pchip_interpolate
 
 from . import utils as se_utils
-from dataclasses import dataclass
 
 @dataclass
 class Isochrone:
@@ -182,7 +182,7 @@ class IsochroneSystem(ABC):
         Returns:
             The result of base ** exponent, with masked values preserved as masked.
         """
-        if np.isscalar(base) and not(np.isscalar(exponent)):
+        if np.isscalar(base) and not np.isscalar(exponent):
             mask = Masked(exponent).mask
             nmask = np.logical_not(mask)
             res = np.zeros_like(exponent)
@@ -194,7 +194,7 @@ class IsochroneSystem(ABC):
             res = np.zeros_like(base)
             res[nmask] = np.power(base[nmask], exponent)
             res = Masked(res,mask=mask)
-        elif not(np.isscalar(base)) and not(np.isscalar(exponent)):
+        elif not np.isscalar(base) and not np.isscalar(exponent):
             if base.shape != exponent.shape:
                 raise ValueError("Base and exponent must have the same shape.")
             mask = np.logical_or(Masked(base).mask, Masked(exponent).mask)
