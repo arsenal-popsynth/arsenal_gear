@@ -56,13 +56,15 @@ class StellarTrack:
     Attributes:
         mass: Initial mass of the stellar track
         eep_name: variable name for equivalent evolutionary phase
+        age_name: variable name for age
         lteff_name: variable name for log_10(effective temperature)
         llbol_name: variable name for log_10(bolometric luminosities)
         qs: Dictionary of stellar track quantities. These should minimally include
             EEP, log_Teff, and log_L but can include others.
     """
     mass: Quantity["mass"]
-    eep_name: str
+    eeps: np.ndarray[int]
+    age_name: str
     lteff_name: str
     llbol_name: str
     qs: dict
@@ -73,14 +75,14 @@ class IsochroneSet:
     Data class for storing a set of isochrones.
     
     Attributes:
-        ages: List of ages of the isochrones
+        lages: Array of log_10(ages/yr) of the isochrones
         hdr_list: List of column headers for the isochrone data
         isos: List of Isochrone objects
     """
-    ages: list[Quantity["time"]]
+    lages: np.ndarray[np.float64]
     hdr_list: list[str]
     isos: list[Isochrone]
-    max_mass: float
+    max_mass: Quantity["mass"]
 
 @dataclass
 class TrackSet:
@@ -93,7 +95,9 @@ class TrackSet:
         tracks: List of Track objects
         max_eep: Maximum equivalent evolutionary phase number across all tracks
     """
-    masses: list[Quantity["mass"]]
+    masses: np.ndarray[Quantity["mass"]]
+    min_ages: np.ndarray[Quantity["time"]]
+    max_ages: np.ndarray[Quantity["time"]]
     hdr_list: list[str]
     tracks: list[StellarTrack]
     max_eep: int
@@ -468,12 +472,12 @@ class MIST(IsochroneInterpolator):
             None
         """
         if self.interp_op == "iso":
-            ages, hdr_list, isos_mist = self.read_iso_file()
+            lages, hdr_list, isos_mist = self.read_iso_file()
             isos = []
             for iso in isos_mist:
                 age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
                 qs = {}
-                for label in self.hdr_list:
+                for label in hdr_list:
                     if label != "log10_isochrone_age_yr":
                         qs[label] = iso[label]
                 iso_data = Isochrone(age=age,
@@ -485,7 +489,7 @@ class MIST(IsochroneInterpolator):
                 isos.append(iso_data)
             # get the maximum mass still alive for each isochrone
             self.max_mass = np.max(isos_mist[0]['initial_mass'])
-            self.iset = IsochroneSet(ages=ages,
+            self.iset = IsochroneSet(lages=lages,
                                      hdr_list=hdr_list,
                                      isos=isos,
                                      max_mass=self.max_mass)
@@ -495,27 +499,35 @@ class MIST(IsochroneInterpolator):
             mass_file_list = self._find_match(eep_file_pattern, self.rootdir / self.modeldir)
 
             masses = []
-            eeps_list = []
             tracks = []
             min_ages = []
             max_ages = []
+            max_eep = 0
             for f in mass_file_list:
                 # read in the EEP file
                 minit, eeps, min_age, max_age, data = self.read_eep_file(f)
                 # store the mass and EEP data
+                max_eep = max(max_eep, np.max(eeps))
                 masses.append(minit)
-                eeps_list.append(eeps)
                 min_ages.append(min_age)
                 max_ages.append(max_age)
-                tracks.append(data)
-            self.masses = np.array(masses)
-            self.eeps_list = eeps_list
-            self.min_ages = np.array(min_ages)
-            self.max_ages = np.array(max_ages)
+                tracks.append(StellarTrack(mass=minit*u.Msun,
+                                           eeps=eeps,
+                                           age_name='star_age',
+                                           lteff_name='log_Teff',
+                                           llbol_name='log_L',
+                                           qs=data))
+            masses = np.array(masses)*u.Msun
+            min_ages = np.array(min_ages)*u.yr
+            max_ages = np.array(max_ages)*u.yr
             self.tracks = tracks
-            self.MMAX = np.max(masses)
-            self.min_eep = int(np.min([np.min(tracki) for tracki in self.eeps_list]))
-            self.max_eep = int(np.max([np.max(tracki) for tracki in self.eeps_list]))
+            self.max_mass = np.max(masses.value)
+            self.tset = TrackSet(masses=masses,
+                                 min_ages=min_ages,
+                                 max_ages=max_ages,
+                                 hdr_list=data.keys(),
+                                 tracks=tracks,
+                                 max_eep=max_eep)
 
     def read_iso_file(self):
         """
@@ -599,7 +611,7 @@ class MIST(IsochroneInterpolator):
 
         """
         lage = np.log10(age.to(u.yr).value)
-        ages = self.iset.ages
+        ages = self.iset.lages
         if (max(lage) > max(ages)) or (min(lage) < min(ages)):
             print('The requested age is outside the range. Try between '
                   + str(min(ages)) + ' and ' + str(max(ages)))
@@ -621,7 +633,7 @@ class MIST(IsochroneInterpolator):
         Returns:
             ais: the indices of the isochrones to use for interpolation.
         """
-        nages = len(self.iset.ages)
+        nages = len(self.iset.lages)
 
         if (self.test and (ai in (0, nages-1))):
             raise ValueError("Test Isochrone must be in middle of isochrone range")
@@ -682,7 +694,7 @@ class MIST(IsochroneInterpolator):
         timing = -1*time.time()
         ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
-        lages = np.array([self.iset.ages[i] for i in ais])
+        lages = np.array([self.iset.lages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
         qs = [self.iset.isos[i].qs[label] for i in ais]
         eep_str = self.iset.isos[0].eep_name
@@ -767,17 +779,17 @@ class MIST(IsochroneInterpolator):
         interp = self._get_interpolator(method)
         age = t.to(u.yr).value
         (eeps_,ms_,qs_) = ([],[],[])
-        for eep in range(1, self.max_eep+1):
+        for eep in range(1, self.tset.max_eep+1):
             (age_set, mass_set, q_set) = ([], [], [])
-            for (j,track) in enumerate(self.tracks):
-                ages = track["star_age"]
+            for (j,track) in enumerate(self.tset.tracks):
+                ages = track.qs[track.age_name]
                 if eep <= len(ages):
                     # get the age at the given EEP
                     age_set.append(ages[eep-1])
-                    mass_set.append(self.masses[j])
-                    q_set.append(track[label][eep-1])
+                    mass_set.append(self.tset.masses[j].value)
+                    q_set.append(track.qs[label][eep-1])
             age_set = np.array(age_set)
-            mass_set = np.array(mass_set)
+            mass_set = np.array(mass_set)*self.tset.masses.unit
             q_set = np.array(q_set)
             age_test = min(age_set) < age < max(age_set)
             if ((len(age_set) > 0) and age_test):
@@ -827,12 +839,12 @@ class MIST(IsochroneInterpolator):
         properly interpreted from either the isochrone or EEP data.
         """
         if self.interp_op == "iso":
-            lages = self.iset.ages
+            lages = self.iset.lages
             mmax = np.array([np.max(iso[iso.mini_name]) for iso in self.iset.isos])
         else:
             # interpolating from EEPs
-            lages = np.log10(self.max_ages)[::-1]
-            mmax = self.masses[::-1]
+            lages = np.log10(self.tset.max_ages)[::-1]
+            mmax = self.tset.masses[::-1]
             sel = se_utils.index_monotonic(lages)
             lages = lages[sel]
             mmax = mmax[sel]
@@ -863,13 +875,15 @@ class MIST(IsochroneInterpolator):
                 raise ValueError("t must be a scalar, or length 1 array")
         else:
             if self.interp_op == "iso":
-                min_age = np.power(10,min(self.iset.ages))*u.yr
-                max_age = np.power(10,max(self.iset.ages))*u.yr
-                if (t < min_age) or (t > max_age):
-                    raise ValueError("t is outside the range of the isochrones")
+                min_age = np.power(10,min(self.iset.lages))*u.yr
+                max_age = np.power(10,max(self.iset.lages))*u.yr
             else:
-                if (t < min(self.min_ages)*u.yr) or (t > max(self.max_ages)*u.yr):
-                    raise ValueError("t is outside the range of the isochrones")
+                min_age = min(self.tset.min_ages)*u.yr
+                max_age = max(self.tset.max_ages)*u.yr
+            if (t < min_age) or (t > max_age):
+                emsg = f"t = {t.value} yrs is outside the range of applicability: " + \
+                        f"{min_age.value} - {max_age.value} yrs"
+                raise ValueError(emsg)
             t = np.array([t.value])*t.unit
 
         if self.interp_op == "iso":
@@ -963,6 +977,7 @@ class MIST(IsochroneInterpolator):
             (eep, mini) = self._interp_iso_quantity(t, 'initial_mass',
                                                          make_monotonic=True,
                                                          method=method)
+            mini = mini*u.Msun
             lbol = self.lbol(mini, t, method=method)
         else:
             (eep, mini, lbol) = self._construct_eep_isochrone(t, 'log_L',

@@ -48,12 +48,12 @@ def test_mist_interp():
     (L_err_eep, L_err_iso) = ([],[])
     (T_err_eep, T_err_iso) = ([],[])
 
-    ais = np.arange(len(sp_iso.iso.iset.ages))
+    ais = np.arange(len(sp_iso.iso.iset.lages))
     for ai in ais[2::5]:
         ai += 1
-        t = (1+1e-6)*np.power(10,np.array([sp_iso.iso.ages[ai]])-6)*u.Myr
+        t = (1+1e-6)*np.power(10,np.array([sp_iso.iso.iset.lages[ai]])-6)*u.Myr
 
-        ms = sp_iso.iso.iset.isos[ai]["initial_mass"] * u.Msun
+        ms = sp_iso.iso.iset.isos[ai].qs["initial_mass"] * u.Msun
         xi = sp_iso.imf.pdf(ms)
 
         T_eep = (sp_eep.iso.teff(ms, t)/u.K).value
@@ -62,8 +62,8 @@ def test_mist_interp():
         T_iso = (sp_iso.iso.teff(ms, t)/u.K).value
         L_iso = (sp_iso.iso.lbol(ms, t)/u.Lsun).value
 
-        L_ref = np.power(10, sp_iso.iso.isos[ai]["log_L"])
-        T_ref = np.power(10, sp_iso.iso.isos[ai]["log_Teff"])
+        L_ref = np.power(10, sp_iso.iso.iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, sp_iso.iso.iset.isos[ai].qs["log_Teff"])
         lum = trapezoid(L_ref*xi, ms.value)
         lw_teff = trapezoid(L_ref*xi*T_ref, ms.value)/lum
 
