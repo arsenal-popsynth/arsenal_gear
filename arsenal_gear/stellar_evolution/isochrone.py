@@ -113,8 +113,6 @@ class IsochroneDataReader(ABC):
         self.met = kwargs.get('met', 0.0)
         # decides on verbose output
         self.verbose = kwargs.get('verbose', False)
-        # whether or not to print output related to code profiling
-        self.profile = kwargs.get('profile', False)
         # decides whether or not to force a download of the isochrone data
         self.force_download = kwargs.get('force_download', False)
 
@@ -492,8 +490,6 @@ class IsochroneInterpolator():
         self.test = kwargs.get('test', False)
         # decides on verbose output
         self.verbose = kwargs.get('verbose', False)
-        # whether or not to print output related to code profiling
-        self.profile = kwargs.get('profile', False)
         # decides whether or not to force a download of the isochrone data
         self.interp_op = kwargs.get("interp_op", "iso")
         if self.interp_op not in ["iso", "eep"]:
@@ -682,7 +678,6 @@ class IsochroneInterpolator():
             labels = self.supplement_labels(labels)
 
         # get nearby isochrones and interpolate between them
-        timing = -1*time.time()
         ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
         lages = np.array([self.iset.lages[i] for i in ais])
@@ -694,26 +689,15 @@ class IsochroneInterpolator():
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
         f = self._get_interpolator(method)
-        timing += time.time()
-        if self.profile:
-            print("\t\tSet up of interpolation took: ", timing)
 
         # interpolate in log(age) at each eep
-        timing = -1*time.time()
         qis = [np.array([f(lt, lages, self._fixed_eep_q(j,eeps,q))[0] for j in eepi]) for q in qs]
-        timing += time.time()
-        if self.profile:
-            print("\t\tInterpolation took: ", timing)
 
         # make sure initial mass is monotonic in interpolation
         for (i,label) in enumerate(labels):
             if label == self.iset.isos[0].mini_name:
-                timing = -1*time.time()
                 if np.any(np.diff(qis[0]) < 0):
                     qis[i] = se_utils.make_monotonic_increasing(eepi,qis[i])
-                timing += time.time()
-                if self.profile:
-                    print("\t\tMonotonic interpolation took: ", timing)
         iso_qs = {labels[i]: qis[i] for i in range(len(labels))}
         iso_qs["EEP"] = eepi
         if supplement:
@@ -747,14 +731,10 @@ class IsochroneInterpolator():
             q_res: the specified quantity at the requested initial mass.
         """
         # construct isochrone for mass/luminosity relationship
-        timing = -1*time.time()
         labels = [self.iset.isos[0].mini_name, label]
         iso = self._construct_iso_isochrone(t, labels,method=method,supplement=False)
         qi = iso.qs[label]
         massi = iso.qs[self.iset.isos[0].mini_name]
-        timing += time.time()
-        if self.profile:
-            print(f"\tTime to interpolate {label}: ", timing)
 
         mini = mini.to(u.Msun).value
         q_res = pchip_interpolate(massi, qi, mini)
