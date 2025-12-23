@@ -10,12 +10,11 @@ from functools import reduce
 
 import astropy.units as u
 from astropy.units import Quantity
-from astropy.utils.masked import Masked
 import numpy as np
 from scipy.interpolate import pchip_interpolate
 
 # local imports
-from ..utils import array_utils
+from ..utils import array_utils, masked_power
 from .se_data_structures import Isochrone
 from .data_reader import MISTReader
 
@@ -47,8 +46,12 @@ class IsochroneInterpolator():
 
         if self.interp_op == "iso":
             self.iset = self.reader.read_iso_data()
+            self.llbol_label = self.iset.isos[0].llbol_name
+            self.lteff_label = self.iset.isos[0].lteff_name
         else:
             self.tset = self.reader.read_track_data()
+            self.llbol_label = self.tset.tracks[0].llbol_name
+            self.lteff_label = self.tset.tracks[0].lteff_name
 
     @staticmethod
     def _get_interpolator(method:str):
@@ -68,40 +71,6 @@ class IsochroneInterpolator():
         else:
             raise ValueError("method must be either pchip or linear")
         return interp
-
-    @staticmethod
-    def _masked_power(base, exponent):
-        """
-        Computes base raised to the exponent, handling masked values appropriately.
-        Args:
-            base: The base value (can be masked).
-            exponent: The exponent value (can be masked).
-        Returns:
-            The result of base ** exponent, with masked values preserved as masked.
-        """
-        if np.isscalar(base) and not np.isscalar(exponent):
-            mask = Masked(exponent).mask
-            nmask = np.logical_not(mask)
-            res = np.zeros_like(exponent)
-            res[nmask] = np.power(base, exponent[nmask])
-            res = Masked(res,mask=mask)
-        elif not(np.isscalar(base)) and np.isscalar(exponent):
-            mask = Masked(base).mask
-            nmask = np.logical_not(mask)
-            res = np.zeros_like(base)
-            res[nmask] = np.power(base[nmask], exponent)
-            res = Masked(res,mask=mask)
-        elif not np.isscalar(base) and not np.isscalar(exponent):
-            if base.shape != exponent.shape:
-                raise ValueError("Base and exponent must have the same shape.")
-            mask = np.logical_or(Masked(base).mask, Masked(exponent).mask)
-            nmask = np.logical_not(mask)
-            res = np.zeros_like(base)
-            res[nmask] = np.power(base[nmask], exponent[nmask])
-            res = Masked(res,mask=mask)
-        else:
-            raise ValueError("Masking not needed for scalar power.")
-        return res
 
     def supplement_labels(self, labels:list[str]) -> list[str]:
         """
@@ -221,6 +190,8 @@ class IsochroneInterpolator():
         if supplement:
             labels = self.supplement_labels(labels)
 
+        if np.isscalar(t.value):
+            t = Quantity([t.value], t.unit)
         # get nearby isochrones and interpolate between them
         ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
@@ -525,8 +496,12 @@ class IsochroneInterpolator():
         Returns:
             Quantity["power"]: the bolometric luminosity of the star.
         """
-        logLbol_res = self._interp_quantity(mini, t, 'log_L', method=method)
-        return self._masked_power(10, logLbol_res)*u.Lsun
+        if self.interp_op == "iso":
+            llbol_label = self.iset.isos[0].llbol_name
+        else:
+            llbol_label = self.tset.tracks[0].llbol_name
+        logLbol_res = self._interp_quantity(mini, t, llbol_label, method=method)
+        return masked_power(10, logLbol_res)*u.Lsun
 
     def teff(self, mini:Quantity["mass"], t: Quantity["time"], 
              method:str="pchip") -> Quantity["temperature"]:
@@ -540,9 +515,13 @@ class IsochroneInterpolator():
         Returns:
             Quantity["temperature"]: the effective surface temperature of the star.
         """
+        if self.interp_op == "iso":
+            lteff_label = self.iset.isos[0].lteff_name
+        else:
+            lteff_label = self.tset.tracks[0].lteff_name
         # interpolating from EEPs
-        logTeff_res = self._interp_quantity(mini, t, 'log_Teff', method=method)
-        return self._masked_power(10, logTeff_res)*u.K
+        logTeff_res = self._interp_quantity(mini, t, lteff_label, method=method)
+        return masked_power(10, logTeff_res)*u.K
     
     def construct_isochrone(self, t: Quantity["time"],
                             method:str="pchip", labels=None) -> Isochrone:
