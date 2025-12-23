@@ -34,8 +34,6 @@ class IsochroneInterpolator():
         # selection of the isochrone data to leave out the 
         # data being compared against.
         self.test = kwargs.get('test', False)
-        # decides on verbose output
-        self.verbose = kwargs.get('verbose', False)
         # decides whether or not to force a download of the isochrone data
         self.interp_op = kwargs.get("interp_op", "iso")
         if self.interp_op not in ["iso", "eep"]:
