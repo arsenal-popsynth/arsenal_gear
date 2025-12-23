@@ -104,18 +104,13 @@ class TrackSet:
     tracks: list[StellarTrack]
     max_eep: int
 
-class IsochroneInterpolator(ABC):
+class IsochroneDataReader(ABC):
     """
-    This class is used to load and interpret isochrones from various sources
+    Abstract base class for reading isochrone data from various sources.
     """
     def __init__(self, **kwargs) -> None:
         # log10(Z/Zsun)
         self.met = kwargs.get('met', 0.0)
-        # determines whether or not thie isochrone instance
-        # is being used for testing or not. This changes the 
-        # selection of the isochrone data to leave out the 
-        # data being compared against.
-        self.test = kwargs.get('test', False)
         # decides on verbose output
         self.verbose = kwargs.get('verbose', False)
         # whether or not to print output related to code profiling
@@ -214,135 +209,23 @@ class IsochroneInterpolator(ABC):
                 break
         return f
 
-    @staticmethod
-    def _get_interpolator(method:str):
-        """
-        Returns the appropriate interpolation function based on the method string
-        Args:
-            method: the interpolation method to use, either pchip or linear
-        Returns:
-            interp: the interpolation function
-        """
-        if method == "pchip":
-            def interp(x,x0,y0):
-                return pchip_interpolate(x0,y0,x)
-        elif method == "linear":
-            def interp(x,x0,y0):
-                return np.interp(x,x0,y0)
-        else:
-            raise ValueError("method must be either pchip or linear")
-        return interp
-
-    @staticmethod
-    def _masked_power(base, exponent):
-        """
-        Computes base raised to the exponent, handling masked values appropriately.
-        Args:
-            base: The base value (can be masked).
-            exponent: The exponent value (can be masked).
-        Returns:
-            The result of base ** exponent, with masked values preserved as masked.
-        """
-        if np.isscalar(base) and not np.isscalar(exponent):
-            mask = Masked(exponent).mask
-            nmask = np.logical_not(mask)
-            res = np.zeros_like(exponent)
-            res[nmask] = np.power(base, exponent[nmask])
-            res = Masked(res,mask=mask)
-        elif not(np.isscalar(base)) and np.isscalar(exponent):
-            mask = Masked(base).mask
-            nmask = np.logical_not(mask)
-            res = np.zeros_like(base)
-            res[nmask] = np.power(base[nmask], exponent)
-            res = Masked(res,mask=mask)
-        elif not np.isscalar(base) and not np.isscalar(exponent):
-            if base.shape != exponent.shape:
-                raise ValueError("Base and exponent must have the same shape.")
-            mask = np.logical_or(Masked(base).mask, Masked(exponent).mask)
-            nmask = np.logical_not(mask)
-            res = np.zeros_like(base)
-            res[nmask] = np.power(base[nmask], exponent[nmask])
-            res = Masked(res,mask=mask)
-        else:
-            raise ValueError("Masking not needed for scalar power.")
-        return res
-
     @abstractmethod
-    def mmax(self, t:Quantity["time"]) -> Quantity["mass"]:
+    def read_iso_data(self) -> IsochroneSet:
         """
-        get the maximum mass of the stellar population that hasn't
-        died yet (in e.g. a SN) as a function of age, t
-
-        default function in base class
+        Abstract method for reading isochrone data.
         """
         pass
 
     @abstractmethod
-    def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
+    def read_track_data(self) -> TrackSet:
         """
-        get the rate of change of the maximum mass of the stellar population
-        with respect to time.
-
-        Default function in base class
-        Args:
-            t: the age of the isochrone.
+        Abstract method for reading stellar track data.
         """
         pass
 
-    @abstractmethod
-    def lbol(self, mini:Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
-        """
-        get the bolometric luminosity of a star of initial mass mini at age age
-
-        Default function in base class
-        
-        Args:
-            mini: the initial mass of the star.
-            t: the age of the isochrone.
-        Returns:
-            Quantity["power"]: the bolometric luminosity of the star.
-        """
-        pass
-
-    @abstractmethod
-    def teff(self, mini:Quantity["mass"],
-             t: Quantity["time"]) -> Quantity["temperature"]:
-        """
-        get the bolometric luminosity of a star of initial mass mini at age age
-
-        Default function in base class
-        
-        Args:
-            mini: the initial mass of the star.
-            t: the age of the isochrone.
-        Returns:
-            Quantity["temperature"]: the effective temperature of the star.
-        """
-        pass
-
-    @abstractmethod
-    def construct_isochrone(self, t: Quantity["time"]) -> Isochrone:
-        """
-        Constructs an isochrone at age t for the specified quantity label.
-
-        Default function in base class
-        
-        Args:
-            t: the age of the isochrone.
-            label: the label of the quantity to construct the isochrone for.
-        Returns:
-            Tuple[Quantity["mass"], Quantity["temperature"], Quantity["power"]]:
-                The initial masses, effective temperatures, and bolometric luminosities
-                of the stars in the isochrone. 
-        """
-        pass
-
-class MIST(IsochroneInterpolator):
+class MISTReader(IsochroneDataReader):
     """
-
     Reads in MIST isochrone files.
-
-
     """
     # basic options for MIST isochrones
     mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/{}"
@@ -386,8 +269,6 @@ class MIST(IsochroneInterpolator):
         # decide whether to use EEPs or isochrones to interpolate
         # creating between for new isochrones
         self.interp_op = kwargs.get("interp_op", "iso")
-        if self.interp_op not in ["iso", "eep"]:
-            raise ValueError("interp_op must be either iso or eep")
 
         # set directories, download data if necessary
         data_acq_start = time.time()
@@ -396,15 +277,6 @@ class MIST(IsochroneInterpolator):
         if self.verbose:
             print("Time to acquire data: ", data_acq_end - data_acq_start)
 
-        if self.verbose:
-            print('Reading in data...')
-        data_read_start = time.time()
-        self.read_data()
-        data_read_end = time.time()
-        if self.verbose:
-            print("Time to read data: ", data_read_end - data_read_start)
-
-    ######## DATA ACQUISITION AND READING ########
     def get_data(self):
         """
         Retrieves the MIST isochrone data from a local directory or downloads it if
@@ -465,71 +337,69 @@ class MIST(IsochroneInterpolator):
             self.downloader(self.rootdir / self.tarfile, url, message)
             self.extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
 
-    def read_data(self):
+    def read_iso_data(self) -> IsochroneSet:
         """
-        Once the necessary isochrone data has been retrieved from the web, this method
-        loads the appropriate data into the class instance.
-
-        Returns:
-            None
+        Abstract method for reading isochrone data.
         """
-        if self.interp_op == "iso":
-            lages, hdr_list, isos_mist = self.read_iso_file()
-            isos = []
-            for iso in isos_mist:
-                age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-                qs = {}
-                for label in hdr_list:
-                    if label != "log10_isochrone_age_yr":
-                        qs[label] = iso[label]
-                iso_data = Isochrone(age=age,
-                                     eep_name='EEP',
-                                     mini_name='initial_mass',
-                                     lteff_name='log_Teff',
-                                     llbol_name='log_L',
-                                     qs=qs)
-                isos.append(iso_data)
-            # get the maximum mass still alive for each isochrone
-            self.max_mass = np.max(isos_mist[0]['initial_mass'])
-            self.iset = IsochroneSet(lages=lages,
-                                     hdr_list=hdr_list,
-                                     isos=isos,
-                                     max_mass=self.max_mass)
-            
-        else:
-            eep_file_pattern = [("?????M.track.eep",),]
-            mass_file_list = self._find_match(eep_file_pattern, self.rootdir / self.modeldir)
+        lages, hdr_list, isos_mist = self.read_iso_file()
+        isos = []
+        for iso in isos_mist:
+            age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
+            qs = {}
+            for label in hdr_list:
+                if label != "log10_isochrone_age_yr":
+                    qs[label] = iso[label]
+            iso_data = Isochrone(age=age,
+                                    eep_name='EEP',
+                                    mini_name='initial_mass',
+                                    lteff_name='log_Teff',
+                                    llbol_name='log_L',
+                                    qs=qs)
+            isos.append(iso_data)
+        # get the maximum mass still alive for each isochrone
+        max_mass = np.max(isos_mist[0]['initial_mass'])
+        iset = IsochroneSet(lages=lages,
+                            hdr_list=hdr_list,
+                            isos=isos,
+                            max_mass=max_mass*u.Msun)
+        return iset
 
-            masses = []
-            tracks = []
-            min_ages = []
-            max_ages = []
-            max_eep = 0
-            for f in mass_file_list:
-                # read in the EEP file
-                minit, eeps, min_age, max_age, data = self.read_eep_file(f)
-                # store the mass and EEP data
-                max_eep = max(max_eep, np.max(eeps))
-                masses.append(minit)
-                min_ages.append(min_age)
-                max_ages.append(max_age)
-                tracks.append(StellarTrack(mass=minit*u.Msun,
-                                           eeps=eeps,
-                                           age_name='star_age',
-                                           lteff_name='log_Teff',
-                                           llbol_name='log_L',
-                                           qs=data))
-            masses = np.array(masses)*u.Msun
-            min_ages = np.array(min_ages)*u.yr
-            max_ages = np.array(max_ages)*u.yr
-            self.tracks = tracks
-            self.max_mass = np.max(masses.value)
-            self.tset = TrackSet(masses=masses,
-                                 min_ages=min_ages,
-                                 max_ages=max_ages,
-                                 hdr_list=data.keys(),
-                                 tracks=tracks,
-                                 max_eep=max_eep)
+    def read_track_data(self) -> TrackSet:
+        """
+        Abstract method for reading stellar track data.
+        """
+        eep_file_pattern = [("?????M.track.eep",),]
+        mass_file_list = self._find_match(eep_file_pattern, self.rootdir / self.modeldir)
+
+        masses = []
+        tracks = []
+        min_ages = []
+        max_ages = []
+        max_eep = 0
+        for f in mass_file_list:
+            # read in the EEP file
+            minit, eeps, min_age, max_age, data = self.read_eep_file(f)
+            # store the mass and EEP data
+            max_eep = max(max_eep, np.max(eeps))
+            masses.append(minit)
+            min_ages.append(min_age)
+            max_ages.append(max_age)
+            tracks.append(StellarTrack(mass=minit*u.Msun,
+                                        eeps=eeps,
+                                        age_name='star_age',
+                                        lteff_name='log_Teff',
+                                        llbol_name='log_L',
+                                        qs=data))
+        masses = np.array(masses)*u.Msun
+        min_ages = np.array(min_ages)*u.yr
+        max_ages = np.array(max_ages)*u.yr
+        tset = TrackSet(masses=masses,
+                                min_ages=min_ages,
+                                max_ages=max_ages,
+                                hdr_list=data.keys(),
+                                tracks=tracks,
+                                max_eep=max_eep)
+        return tset
 
     def read_iso_file(self):
         """
@@ -600,6 +470,94 @@ class MIST(IsochroneInterpolator):
         max_age = max(data["star_age"])
 
         return minit, eeps, min_age, max_age, data
+
+class IsochroneInterpolator():
+    """
+    This class is used to interpolate isochrones from various sources
+    It can be used to interpolate stellar tracks or isochrones from any 
+    stellar evolution code, provided there is a IsochroneDataReader class
+    implemented in order to read the data.
+    """
+    def __init__(self, **kwargs) -> None:
+        # log10(Z/Zsun)
+        self.met = kwargs.get('met', 0.0)
+        # determines whether or not the isochrone instance
+        # is being used for testing or not. This changes the 
+        # selection of the isochrone data to leave out the 
+        # data being compared against.
+        self.test = kwargs.get('test', False)
+        # decides on verbose output
+        self.verbose = kwargs.get('verbose', False)
+        # whether or not to print output related to code profiling
+        self.profile = kwargs.get('profile', False)
+        # decides whether or not to force a download of the isochrone data
+        self.interp_op = kwargs.get("interp_op", "iso")
+        if self.interp_op not in ["iso", "eep"]:
+            raise ValueError("interp_op must be either iso or eep")
+    
+        self.isochrone_opt = kwargs.get("isochrone_opt", "mist")
+        if self.isochrone_opt.lower() == "mist":
+            self.reader = MISTReader(**kwargs)
+        else:
+            raise ValueError("isochrone_opt must be mist for now")
+
+        if self.interp_op == "iso":
+            self.iset = self.reader.read_iso_data()
+        else:
+            self.tset = self.reader.read_track_data()
+
+    @staticmethod
+    def _get_interpolator(method:str):
+        """
+        Returns the appropriate interpolation function based on the method string
+        Args:
+            method: the interpolation method to use, either pchip or linear
+        Returns:
+            interp: the interpolation function
+        """
+        if method == "pchip":
+            def interp(x,x0,y0):
+                return pchip_interpolate(x0,y0,x)
+        elif method == "linear":
+            def interp(x,x0,y0):
+                return np.interp(x,x0,y0)
+        else:
+            raise ValueError("method must be either pchip or linear")
+        return interp
+
+    @staticmethod
+    def _masked_power(base, exponent):
+        """
+        Computes base raised to the exponent, handling masked values appropriately.
+        Args:
+            base: The base value (can be masked).
+            exponent: The exponent value (can be masked).
+        Returns:
+            The result of base ** exponent, with masked values preserved as masked.
+        """
+        if np.isscalar(base) and not np.isscalar(exponent):
+            mask = Masked(exponent).mask
+            nmask = np.logical_not(mask)
+            res = np.zeros_like(exponent)
+            res[nmask] = np.power(base, exponent[nmask])
+            res = Masked(res,mask=mask)
+        elif not(np.isscalar(base)) and np.isscalar(exponent):
+            mask = Masked(base).mask
+            nmask = np.logical_not(mask)
+            res = np.zeros_like(base)
+            res[nmask] = np.power(base[nmask], exponent)
+            res = Masked(res,mask=mask)
+        elif not np.isscalar(base) and not np.isscalar(exponent):
+            if base.shape != exponent.shape:
+                raise ValueError("Base and exponent must have the same shape.")
+            mask = np.logical_or(Masked(base).mask, Masked(exponent).mask)
+            nmask = np.logical_not(mask)
+            res = np.zeros_like(base)
+            res[nmask] = np.power(base[nmask], exponent[nmask])
+            res = Masked(res,mask=mask)
+        else:
+            raise ValueError("Masking not needed for scalar power.")
+        return res
 
     ######## ISOCHRONE INTERPOLATION FUNCTIONS ########
     def _age_index(self, age : Quantity["time"]) -> int:
@@ -680,8 +638,8 @@ class MIST(IsochroneInterpolator):
         """
         return [q[np.where(eep == j)[0]][0] for (q,eep) in zip(qs,eeps)]
 
-    def _interp_iso_quantity(self, t:Quantity["time"], label:str, method:str="pchip",
-                             make_monotonic:bool=False) -> tuple[np.ndarray[int], np.ndarray[np.float64]]:
+    def _interp_iso_quantity(self, t:Quantity["time"], label:str, make_monotonic:bool=False,
+                             method:str="pchip") -> tuple[np.ndarray[int], np.ndarray[np.float64]]:
         """
         Interpolates between isochrones using the EEP values to create an
         intermediate age isochrone
@@ -777,7 +735,7 @@ class MIST(IsochroneInterpolator):
         Returns:
             Isochrone: an isochrone data structure at the requested age t
         """
-        # pre-process list of labels to 
+        # pre-process list of labels to include teff and lbol if wanted
         if not single_val:
             lteff_label = self.tset.tracks[0].lteff_name
             llbol_label = self.tset.tracks[0].llbol_name
@@ -810,9 +768,8 @@ class MIST(IsochroneInterpolator):
                 m = interp(age, age_set[::-1], mass_set[::-1])[0]
                 ms_.append(m)
                 for i in range(nq):
-                    q = interp(m, mass_set, q_set[i])
-                    qs_[i].append(q)
-        # this is the constructed isochrone for property q given by "label"
+                    qs_[i].append(interp(m, mass_set, q_set[i]))
+        # this is the constructed isochrone for property qs given by "labels"
         iso_qs = {labels[i]: np.array(qs_[i]) for i in range(nq)}
         iso_qs["EEP"] = np.array(eeps_)
         iso_qs["initial_mass"] = np.array(ms_)
@@ -870,10 +827,10 @@ class MIST(IsochroneInterpolator):
         """
         if self.interp_op == "iso":
             lages = self.iset.lages
-            mmax = np.array([np.max(iso[iso.mini_name]) for iso in self.iset.isos])
+            mmax = np.array([np.max(iso.qs[iso.mini_name]) for iso in self.iset.isos])
         else:
             # interpolating from EEPs
-            lages = np.log10(self.tset.max_ages)[::-1]
+            lages = np.log10((self.tset.max_ages).to(u.yr).value)[::-1]
             mmax = self.tset.masses[::-1]
             sel = se_utils.index_monotonic(lages)
             lages = lages[sel]
@@ -940,7 +897,11 @@ class MIST(IsochroneInterpolator):
         (lages, mmax) = self._get_mmax_age_interp()
         # cubic spline interpolation in log(age)
         interp = pchip_interpolate(lages,mmax, lt)
-        interp[np.where(lt < min(lages))] = self.max_mass
+        if self.interp_op == "iso":
+            max_mass = (self.iset.max_mass).to(u.Msun).value
+        else:
+            max_mass = np.max(self.tset.masses.to(u.Msun).value)
+        interp[np.where(lt < min(lages))] = max_mass
         interp[np.where(lt > max(lages))] = 0.0
         return interp*u.Msun
 

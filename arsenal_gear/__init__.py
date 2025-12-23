@@ -48,7 +48,7 @@ class StellarPopulation():
         self.tmax = 40.0*u.Myr
 
         # initialize the isochrone system
-        self.iso = stellar_evolution.isochrone.MIST(**kwargs)
+        self.iso = stellar_evolution.isochrone.IsochroneInterpolator(**kwargs)
 
     def nsn(self, t:Quantity["time"]) -> int:
         """
