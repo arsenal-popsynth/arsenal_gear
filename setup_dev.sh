@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# Initialize our virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install development requirements
+pip install -r dev-requirements.txt
+
+# Activate git pre-commit hooks
+pre-commit install
+
+# Install arsenal
+pip install -e .
