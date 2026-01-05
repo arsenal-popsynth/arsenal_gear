@@ -12,6 +12,7 @@ from scipy.stats import rv_continuous
 
 __all__ = ["IMF", "Salpeter"]
 
+
 class IMF(rv_continuous):
     """
     This class is the superclass of all Initial Mass Functions (IMFs)
@@ -25,8 +26,10 @@ class IMF(rv_continuous):
     :param seed: Random seed for sampling
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
-    def __init__(self, min_mass: Quantity["mass"], max_mass: Quantity["mass"],
-                 name="", seed=None):
+
+    def __init__(
+        self, min_mass: Quantity["mass"], max_mass: Quantity["mass"], name="", seed=None
+    ):
         self.min_mass: float = min_mass.to(u.Msun).value
         self.max_mass: float = max_mass.to(u.Msun).value
         super().__init__(a=self.min_mass, b=self.max_mass, name=name, seed=seed)
@@ -40,7 +43,7 @@ class IMF(rv_continuous):
         :return: List of masses of stars
         :rtype: Quantity["mass"]
         """
-        N_samp = round((mtot/self.mean()).value)
+        N_samp = round((mtot / self.mean()).value)
         return self.sample(N_samp)
 
     def sample(self, N: int) -> Quantity["mass"]:
@@ -52,7 +55,8 @@ class IMF(rv_continuous):
         :return: List of masses of stars
         :rtype: Quantity["mass"]
         """
-        return self.rvs(size=N)*u.Msun
+        return self.rvs(size=N) * u.Msun
+
 
 class Salpeter(IMF):
     """
@@ -68,20 +72,26 @@ class Salpeter(IMF):
     :param seed: Random seed for sampling
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
-    def __init__(self, min_mass: Quantity["mass"], max_mass: Quantity["mass"],
-                 alpha:float=2.35, seed=None):
+
+    def __init__(
+        self,
+        min_mass: Quantity["mass"],
+        max_mass: Quantity["mass"],
+        alpha: float = 2.35,
+        seed=None,
+    ):
         self.alpha = alpha
         self.name = "Salpeter"
         assert alpha >= 0
         super().__init__(min_mass, max_mass, self.name, seed=seed)
 
     def _pdf(self, x: np.float64, *args) -> np.float64:
-        upper = np.power(self.max_mass, 1-self.alpha)
-        lower = np.power(self.min_mass, 1-self.alpha)
-        norm = (upper-lower)/(1-self.alpha)
-        return np.power(x, -self.alpha)/norm
+        upper = np.power(self.max_mass, 1 - self.alpha)
+        lower = np.power(self.min_mass, 1 - self.alpha)
+        norm = (upper - lower) / (1 - self.alpha)
+        return np.power(x, -self.alpha) / norm
 
     def _ppf(self, q: np.float64, *args) -> np.float64:
-        upper = np.power(self.max_mass, 1-self.alpha)
-        lower = np.power(self.min_mass, 1-self.alpha)
-        return (q*(upper-lower)+lower)**(1./(1-self.alpha))
+        upper = np.power(self.max_mass, 1 - self.alpha)
+        lower = np.power(self.min_mass, 1 - self.alpha)
+        return (q * (upper - lower) + lower) ** (1.0 / (1 - self.alpha))

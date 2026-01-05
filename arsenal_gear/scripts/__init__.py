@@ -4,6 +4,7 @@ scripts
 
 Tools for running arsenal from the command line.
 """
+
 import argparse
 
 import astropy.units as u
@@ -13,8 +14,17 @@ from arsenal_gear.dist_funcs import *
 from arsenal_gear.population import *
 
 
-def zams_single(IMF, *, N=None, mass=None, metals=0, rot=0*u.km/u.s,
-                tform=0*u.Myr, min_mass=0.1*u.Msun, max_mass=100*u.Msun):
+def zams_single(
+    IMF,
+    *,
+    N=None,
+    mass=None,
+    metals=0,
+    rot=0 * u.km / u.s,
+    tform=0 * u.Myr,
+    min_mass=0.1 * u.Msun,
+    max_mass=100 * u.Msun,
+):
     """
     Create a zero-age main sequence single star population.
     """
@@ -23,11 +33,12 @@ def zams_single(IMF, *, N=None, mass=None, metals=0, rot=0*u.km/u.s,
         raise ValueError("Either a total mass or number of stars must be specified.")
     if N is not None and mass is not None:
         raise ValueError("Fixing both total mass and number of stars is not possible.")
-    if N is not None: # We are operating in fixed-N mode
+    if N is not None:  # We are operating in fixed-N mode
         masses = imf_.sample(N)
-    else: # We are operating in fixed-mass mode
+    else:  # We are operating in fixed-mass mode
         masses = imf_.sample_mass(mass)
     return StarPopulation(mass=masses, metals=metals, rot=rot, tform=tform)
+
 
 def evolve_population(population, evolution, outputs, interval):
     """
@@ -36,12 +47,15 @@ def evolve_population(population, evolution, outputs, interval):
     """
     print(population, evolution, outputs, interval)
 
+
 def main():
     """
     This is the primary method for running arsenal from the command line.
     """
-    parser = argparse.ArgumentParser(description="Arsenal Gear is a Population Synthesis Tool")
-    parser.add_argument('paramfile')
+    parser = argparse.ArgumentParser(
+        description="Arsenal Gear is a Population Synthesis Tool"
+    )
+    parser.add_argument("paramfile")
     args = parser.parse_args()
-    with open(args.paramfile, encoding='utf-8') as f:
+    with open(args.paramfile, encoding="utf-8") as f:
         exec(f.read())
