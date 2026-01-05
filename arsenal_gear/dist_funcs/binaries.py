@@ -256,6 +256,7 @@ class Fraction:
     :type stars: StarPopulation
     :param name: Name of the binary fraction function
     :type name: str
+
     """
 
     def __init__(
@@ -281,6 +282,7 @@ class StepFraction(Fraction):
 
     :param mass: Changeover mass between binary fractions of 0 and 1
     :type mass: astropy mass unit
+
     """
 
     def __init__(
@@ -373,6 +375,7 @@ class UniformMassRatio(MassRatio):
 class Period(rv_continuous):
     """
     This class is the superclass of all orbital period distributions
+
     :param min_p: Minimum orbital period
     :type min_p: astropy time unit
     :param max_p: Maximum orbital period
@@ -404,11 +407,13 @@ class LogUniformPeriod(Period):
     """
     A simple step function distribution of semi-major axes, with a log-uniform
     distribution above and below the changeover semi-major axis
+
     :param sma: Changeover semi-major axis
     :type sma: astropy length unit
     :param ratio: Ratio of probabilities for close and wide binaries
     :type ratio: float
     A simple loguniform distribution of semi-major axes
+
     """
 
     def __init__(
@@ -429,6 +434,7 @@ class LogUniformPeriod(Period):
 class Semimajor(rv_continuous):
     """
     This class is the superclass of all semi-major axis distributions
+
     :param min_a: Minimum semi-major axis
     :type min_a: astropy length unit
     :param max_a: Maximum semi-major axis
@@ -460,6 +466,7 @@ class LogUniformSemimajor(Semimajor):
     """
     A simple step function distribution of semi-major axes, with a log-uniform
     distribution above and below the changeover semi-major axis
+
     :param sma: Changeover semi-major axis
     :type sma: astropy length unit
     :param ratio: Ratio of probabilities for close and wide binaries

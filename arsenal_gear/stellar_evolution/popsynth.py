@@ -1,6 +1,6 @@
 """
 output from population synthesis
-==========
+================================
 
 This submodule defines the interface to various binary population
 synthesis codes through interpreting and processing their outputs
