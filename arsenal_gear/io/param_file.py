@@ -4,41 +4,43 @@ param_file
 
 Functions for loading and checking the arsenal param file.
 """
+
 import yaml
 
 param_types = {
-    'outputs': str,
-    'formation': {
-        'binaries': bool,
-        'ages': {
-            'type': str,
-            'tform': float,
+    "outputs": str,
+    "formation": {
+        "binaries": bool,
+        "ages": {
+            "type": str,
+            "tform": float,
         },
-        'metals': {
-            'type': str,
-            'metals': float,
+        "metals": {
+            "type": str,
+            "metals": float,
         },
-        'imf': {
-            'type': str,
-            'min_mass': float,
-            'max_mass': float,
-            'N': int,
+        "imf": {
+            "type": str,
+            "min_mass": float,
+            "max_mass": float,
+            "N": int,
         },
     },
-    'evolution': {
-        'SN': {
-            'type': str,
-            'min_mass': float,
-            'max_mass': float,
-            'calculate': [str],
-            'energy': float,
+    "evolution": {
+        "SN": {
+            "type": str,
+            "min_mass": float,
+            "max_mass": float,
+            "calculate": [str],
+            "energy": float,
         },
     },
 }
 
+
 def load_param_file(filename: str) -> dict:
     """
-    Load a YAML parameter file and return its contents as a nested set of 
+    Load a YAML parameter file and return its contents as a nested set of
     dictionaries.
 
     Parameters
@@ -51,11 +53,14 @@ def load_param_file(filename: str) -> dict:
     dict
         The contents of the YAML file as a dictionary.
     """
-    with open(filename, 'r', encoding='utf-8') as file:
+    with open(filename, encoding="utf-8") as file:
         params = yaml.safe_load(file)
     return params
 
-def check_param_file(params: dict) -> bool: # pylint: disable=too-many-return-statements
+
+def check_param_file(
+    params: dict,
+) -> bool:  # pylint: disable=too-many-return-statements
     """
     Check if the parameter file is valid.
 
@@ -79,8 +84,10 @@ def check_param_file(params: dict) -> bool: # pylint: disable=too-many-return-st
                     print(f"Unknown parameter: {k}.{sub_k}")
                     return False
                 if not isinstance(params[k][sub_k], param_types[k][sub_k]):
-                    print(f"Incorrect type for {k}.{sub_k}: expected "
-                          f"{param_types[k][sub_k]}, got {type(params[k][sub_k])}")
+                    print(
+                        f"Incorrect type for {k}.{sub_k}: expected "
+                        f"{param_types[k][sub_k]}, got {type(params[k][sub_k])}"
+                    )
                     return False
         elif isinstance(param_types[k], list):
             if not isinstance(params[k], list):
@@ -88,10 +95,14 @@ def check_param_file(params: dict) -> bool: # pylint: disable=too-many-return-st
                 return False
             for item in params[k]:
                 if not isinstance(item, param_types[k][0]):
-                    print(f"Incorrect type for item in {k}: expected "
-                          f"{param_types[k][0]}, got {type(item)}")
+                    print(
+                        f"Incorrect type for item in {k}: expected "
+                        f"{param_types[k][0]}, got {type(item)}"
+                    )
                     return False
         elif not isinstance(params[k], param_types[k]):
-            print(f"Incorrect type for {k}: expected {param_types[k]}, got {type(params[k])}")
+            print(
+                f"Incorrect type for {k}: expected {param_types[k]}, got {type(params[k])}"
+            )
             return False
     return True
