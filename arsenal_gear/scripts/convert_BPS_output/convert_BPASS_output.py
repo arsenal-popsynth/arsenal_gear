@@ -105,6 +105,11 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
 
     model_directory = BPASS_directory + '/NEWBINMODS/NEWBINMODS/'
 
+    # Values for disrupted or modified systems, when looking for new systems
+    M_single = np.concatenate((np.arange(0.1, 10., 0.1) , 
+                               np.arange(10, 100, 1),
+                               np.arange(100, 325, 25)))
+
     for metal_directory in os.listdir(model_directory):
         
         if not metal_directory.startswith("z"):
@@ -116,9 +121,8 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
         # Times for time array
         num_times = 502 # from log(age/yr) = 4 to 9, with 10 times more models than the public models and a 0
         times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
-        # Save 12 properties: time, primary mass, period, kick (does not evolve), companion mass,
-        # luminosities, temperatures, radii, and system mass loss rate
-        data = np.zeros((num_files, 12, num_times))
+        # Save 12 properties: time, primary mass, companion mass, luminosities, temperatures, radii,
+        data = np.zeros((num_files, 9, num_times))
         data[:, 0, :] = np.tile(times, (num_files, 1))
 
         i = 0
@@ -128,12 +132,21 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
 
                 merger = False
                 supernova = False
+                rejuvenated = False
+                accreted_mass = 0
+                accretion_time = None
+                effective_time = None
+                rejuvenated_file = None
 
                 _data = np.genfromtxt(model_directory + '/' + metal_directory 
                                   + '/' + model)
 
                 # Replace NaNs by 0s --> What about files without a companion?
                 _data = np.nan_to_num(_data)
+
+                # Effective companion mass
+                M2_eff = _data[0, 37]
+                
                 # We want to extract the following values
                 _times = _data[:, 1]
                 for t in range(len(_times)):
@@ -147,47 +160,100 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
                             supernova = True
                     else:
                         _mask = np.where((_times[t] >= times) & (_times[t-1] < times))[0]
-                        if (_data[t, 5] > _data[t-1, 5]) and (_data[t, 37] == _data[t-1, 37]) and (merger == False):
+                        if (_data[t, 5] > _data[t-1, 5]) and (_data[t, 37] == _data[t-1, 37]):# and (merger == False):
                             # Assume merger if M1 increased but M2 remained fixed
+                            # Note that this can take place over several timesteps
                             merger = True
+                            accreted_mass += _data[t, 5] - _data[t-1, 5]
+                        elif (_data[t, 37] > _data[t-1, 37]) and (merger == False):
+                            # Assume accretion if M2 increased
+                            M2_eff = _data[t, 37]
+                            if (_data[t, 37]/_data[0, 37] >= 1.05) and (_data[0, 37] >= 2):
+                                rejuvenated = True
+                            if accretion_time == None:
+                                accretion_time = _times[t]
 
-                    if supernova:
-                        print("Recomputing orbital elements post-SN...")
-                        M1 = _data[t, 5] * u.Msun
-                        M2 = _data[t, 37] * u.Msun
-                        MR = _data[t, 29] * u.Msun
-                        a = 10**_data[t, 35] * u.Rsun
-                        v = apply_kick(M1, M2, MR, a, kick_velocity=100 * u.km/u.s, kick_direction=np.array([0, -1, 0]))
+                    if supernova and not merger:
+
+                        # Set mass to use for post-SN star
+                        M2_closest = M_single[np.argmin(np.abs(M_single - M2_eff))]
+                        if np.round(M2_closest, 1) == np.round(M2_closest, 0):
+                            M2_closest = str(int(M2_closest))
+                        elif M2_closest < 10:
+                            M2_closest = str(np.round(M2_closest, 1))
+                        else:
+                            M2_closest = str(int(M2_closest))
+
+                        # Set current time for the rejuvenated star
+                        if accretion_time:
+                            effective_time = _times[t] - accretion_time
+                        else:
+                            effective_time = _times[t]
+
+                        rejuvenated_file = BPASS_directory + '/NEWSINMODS/' + metal_directory + '/sneplot-' + metal_directory + '-' + M2_closest
+
 
                     else:
                         
                         for m in _mask:
 
                             data[i, 1, m] = _data[t, 5]      # mass in MSun
-                            data[i, 2, m] = _data[t, 34]     # period in yr
-                            # skip kick for now
-                            data[i, 3, m] = _data[t, 29]     # remnant mass in MSun
-                            data[i, 4, m] = 10**_data[t, 4]  # Lsun
-                            #if t == (len(_times) - 1):
-                            #    data[i, 4, m] *= 0 # must set to 0 after SN
-                            data[i, 5, m] = 10**_data[t, 3]  # K 
-                            data[i, 6, m] = 10**_data[t, 2]  # Rsun
+                            data[i, 2, m] = 10**_data[t, 4]  # Lsun
+                            if t == (len(_times) - 1):
+                                data[i, 2, m] *= 0 # must set to 0 after SN
+                            data[i, 3, m] = 10**_data[t, 3]  # K 
+                            data[i, 4, m] = 10**_data[t, 2]  # Rsun
                             # Companion
                             if not merger:
-                                data[i, 7, m] = _data[t, 37]     # companion mass in MSun
-                                data[i, 8, m] = 10**_data[t, 48] # Lsun, companion
-                                data[i, 9, m] = 10**_data[t, 47] # K, companion
-                                data[i, 10, m] = 10**_data[t, 46] # Rsun, companion
-                            # System mass loss rate
-                            data[i, 11, m] = ((_data[t, 39] + _data[t, 40] + _data[t, 43] + _data[t, 44] - _data[t, 41] 
-                                               - _data[t, 42]) * u.Msun / (1.989 * u.s)).to(u.Msun / u.yr).value
+                                data[i, 5, m] = _data[t, 37]     # companion mass in MSun
+                                data[i, 6, m] = 10**_data[t, 48] # Lsun, companion
+                                data[i, 7, m] = 10**_data[t, 47] # K, companion
+                                data[i, 8, m] = 10**_data[t, 46] # Rsun, companion
+                            if merger: 
+                                if (_data[t, 5] - _data[t-1, 5]) > 0: # If still accreting
+                                    data[i, 5, m] = _data[t, 37] - accreted_mass
+                                    data[i, 6, m] = 10**_data[t, 48] # Lsun, companion
+                                    data[i, 7, m] = 10**_data[t, 47] # K, companion
+                                    data[i, 8, m] = 10**_data[t, 46] # Rsun, companion
+
+                    if rejuvenated_file:
+
+                        _data_M2 = np.genfromtxt(rejuvenated_file)
+
+                        # Replace NaNs by 0s --> What about files without a companion?
+                        _data_M2 = np.nan_to_num(_data_M2)
+
+                        _times_M2 = _data_M2[:, 1][_data_M2[:, 1] > effective_time]
+                        
+                        for t in range(len(_times_M2)):
+
+                            if (t == (len(_times_M2) - 1)) and (_times_M2[-1] < times[-1]):
+                                _mask = np.arange(len(times))[np.where(_times_M2[t] >= times)[0][-1]:]
+                            else:
+                                _mask = np.where((_times_M2[t] >= times) & (_times_M2[t-1] < times))[0]
+
+
+                            for m in _mask:
+
+                                # Keep primary mass
+                                data[i, 1, m] = data[i, 1, m-1]      # mass in MSun
+                                # Companion properties
+                                data[i, 5, m] = _data_M2[t, 5]      # mass in MSun
+                                data[i, 6, m] = 10**_data_M2[t, 4]  # Lsun
+                                if t == (len(_times_M2) - 1):
+                                    data[i, 6, m] *= 0 # must set to 0 after SN
+                                data[i, 7, m] = 10**_data_M2[t, 3]  # K 
+                                data[i, 8, m] = 10**_data_M2[t, 2]  # Rsun
 
 
             i += 1
 
+
         # Sort by mass
-        _sort = np.argsort(data[:, 1, 0])
-        data_to_save = data[_sort, :, :]
+        #_sort = np.argsort(data[:, 1, 0])
+        #data_to_save = data[_sort, :, :]
+        data_to_save = data
+        #print(data)
 
         if (metal_directory + '.npy') not in os.listdir(model_directory) or overwrite:
             np.save(output_directory + '/binaries_' + metal_directory + '.npy', data_to_save)
