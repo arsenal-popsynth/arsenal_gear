@@ -50,7 +50,7 @@ class LimongiChieffi2018(YieldTables):
     def __init__(self, model: str = "R") -> None:
         """
         Args:
-            model: choise of model to load, see Limongi & Chieffi (2018) for details
+            model: choice of model to load, see Limongi & Chieffi (2018) for details.
 
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
@@ -107,7 +107,7 @@ class LimongiChieffi2018(YieldTables):
         starPop: StarPopulation,
         interpolate: str = "nearest",
         extrapolate: bool = False,
-    ) -> Quantity["mass"]:
+    ) -> dict[str, Quantity["mass"]]:
         """Interpolate yields from core-collapse supernovae for specified elements.
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
@@ -125,12 +125,14 @@ class LimongiChieffi2018(YieldTables):
             starPop["metals"].value,
             starPop["mass"].to(u.M_sun).value,
         ]
-        return (
+        yld_array = (
             self.ccsn.get_yld(
                 elements, args, interpolate=interpolate, extrapolate=extrapolate
             )
             * u.M_sun
         )
+
+        return {el: yld_array[i] for i, el in enumerate(elements)}
 
     def wind_yields(
         self,
@@ -138,7 +140,7 @@ class LimongiChieffi2018(YieldTables):
         starPop: StarPopulation,
         interpolate: str = "nearest",
         extrapolate: bool = False,
-    ) -> Quantity["mass"]:
+    ) -> dict[str, Quantity["mass"]]:
         """Interpolate yields from massive stars ejected as winds for specified elements.
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
@@ -156,12 +158,13 @@ class LimongiChieffi2018(YieldTables):
             starPop["metals"].value,
             starPop["mass"].to(u.M_sun).value,
         ]
-        return (
+        yld_array = (
             self.wind.get_yld(
                 elements, args, interpolate=interpolate, extrapolate=extrapolate
             )
             * u.M_sun
         )
+        return {el: yld_array[i] for i, el in enumerate(elements)}
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""

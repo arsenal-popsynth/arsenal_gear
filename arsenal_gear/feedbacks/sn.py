@@ -23,21 +23,11 @@ def lifetimes_Raiteri(stars: StarPopulation) -> Quantity["time"]:
     :return: lifetime of each star in the population
     :rtype: Quantity["time"]
     """
-    a0 = (
-        10.13
-        + 0.07547 * np.log10(stars["metals"])
-        - 0.008084 * np.power(np.log10(stars["metals"]), 2)
-    )
-    a1 = (
-        -4.424
-        - 0.7939 * np.log10(stars["metals"])
-        - 0.1187 * np.power(np.log10(stars["metals"]), 2)
-    )
-    a2 = (
-        1.262
-        + 0.3385 * np.log10(stars["metals"])
-        + 0.05417 * np.power(np.log10(stars["metals"]), 2)
-    )
+    Z = stars["metals"]
+    Z = np.clip(Z, 1e-6, None)  # avoid log10(0) or negative
+    a0 = 10.13 + 0.07547 * np.log10(Z) - 0.008084 * np.power(np.log10(Z), 2)
+    a1 = -4.424 - 0.7939 * np.log10(Z) - 0.1187 * np.power(np.log10(Z), 2)
+    a2 = 1.262 + 0.3385 * np.log10(Z) + 0.05417 * np.power(np.log10(Z), 2)
     return (
         np.power(
             10,

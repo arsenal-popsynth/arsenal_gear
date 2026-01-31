@@ -6,7 +6,7 @@ in the code. We describe each block below. Some of these choices may be more or 
 compatible with one another. Where there is an egregious example of poorly matched
 choices, the code will provide a warning.
 
-## Population Parameters 
+## Population Parameters
 
 This block specifies properties of the population of stars that you would like to
 simulate. This includes the distribution of stars as a function of mass (the IMF) as well
