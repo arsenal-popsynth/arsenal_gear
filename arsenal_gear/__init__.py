@@ -7,6 +7,7 @@ relevant for stellar feedback from massive stars.
 """
 
 import time
+import warnings
 
 import astropy.units as u
 import numpy as np
@@ -37,7 +38,8 @@ class StellarPopulation:
         # expected number of stars
         self.Nstar = (self.Mtot / self.imf.mean()).value
         # log10(Z/Zsun)
-        self.metallicity = kwargs.get("metallicity", 0.0)
+        self.metallicity = kwargs.get("metallicity", 0.0) * u.dimensionless_unscaled
+        self.rot = kwargs.get("rot", 0.0) * u.km * u.s**-1
         # generate masses
         if self.discrete:
             start_samp = time.time()
@@ -50,6 +52,35 @@ class StellarPopulation:
 
         # initialize the isochrone
         self.iso = stellar_evolution.isochrone.MIST(**kwargs)
+
+        # Yield model
+        self.yield_model = kwargs.get("yield_model", None)
+
+        if self.yield_model is None:
+            from .element_yields import LimongiChieffi2018
+
+            self.yield_model = LimongiChieffi2018(model="R")
+
+    def __getitem__(self, key):
+        """
+        Allow dict-like access: pop['mass'], pop['metals'], etc.
+        Introduced to support lifetimes_Raitieri function
+        """
+        if key == "mass":
+            return self.masses
+        if key == "metals":
+            # Assuming uniform metallicity; return array matching mass shape
+            return (
+                np.full_like(self.masses.value, self.metallicity)
+                * self.metallicity.unit
+            )
+        if key == "rot":
+            # Assuming uniform rotation; return array matching mass shape
+            return np.full_like(self.masses.value, 0.0) * u.km * u.s**-1
+        if key in self.__dict__:
+            return self.__dict__[key]
+
+        raise KeyError(f"'{key}' not found in StellarPopulation")
 
     def nsn(self, t: Quantity["time"]) -> int:
         """

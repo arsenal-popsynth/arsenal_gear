@@ -36,4 +36,3 @@ packages = ["arsenal_gear",
     "arsenal_gear.element_yields",
     "arsenal_gear.scripts",
     "arsenal_gear.stellar_evolution",]
-
