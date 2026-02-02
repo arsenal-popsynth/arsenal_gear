@@ -6,7 +6,15 @@ provides information for developers who want to contribute to the project.
 ## Recommended Development Environment
 You are of course free to use whatever set of tools you prefer, but we have
 found that the following tools make a fairly low-friction development
-environment.
+environment.  The tools in this section are not completely essential for
+developing `arsenal_gear`, but are _strongly_ recommended, and will make your
+life and ours easier.  These tools can all be easily installed and set up
+automatically on your local machine by running:
+```
+source setup_dev
+```
+from the project root directory, and then using the virtual environment that
+is built in the project root's `.venv` directory for testing, linting, etc.
 
 ### Virtual Environment
 I typically just use the standard python `venv` module to manage my virtual
@@ -27,6 +35,91 @@ pip install -e .[all]
 The `-e` flag tells pip to install the package in "editable" mode, which just
 symlinks the source to the installed package so you don't need to re-run `pip
 install` every time you change the source code.
+
+## Linting and Code Style
+We use [pylint](https://pylint.pycqa.org/en/stable/index.html) as our linter.
+You can manually run it with:
+```
+pylint arsenal_gear/
+```
+By default, we have it configured to only show `FATAL`, `ERROR`, and `WARNING`
+messages (with `exec-used` excluded).  We allow the use of `exec()` because
+Arsenal Gear's parameter file is itself a python script.  The security concern
+with `exec()` isn't a concern for us because Arsenal Gear is scientific software
+that isn't going to be exposed to untrusted input.  If you want to run `pylint`
+with all messages enabled (including some of the more annoying convention
+messages), you can use:
+```
+pylint --enable=all arsenal_gear/
+```
+We also use the [black](https://black.readthedocs.io/en/stable/) code formatter
+which will make the linter happy at all times provided you run it prior to
+running the linter.  You can run black manually with:
+```
+black arsenal_gear
+```
+
+## Automated Tests
+We use [pytest](https://pytest.org/) as our testing framework. The testing suite
+is located in `tests/`.  You can run them with `pytest` from the project root
+directory.
+
+It is good practice to try and get tests that cover as large a fraction of your
+code as possible.  One easy way to check your test coverage is with the
+`pytest-cov` plugin.  You can install it with `pip install pytest-cov`, and then
+run your tests with coverage reporting with:
+```
+pytest --cov=arsenal_gear tests/
+```
+This will generate a report showing you the test coverage of each file in the
+`arsenal_gear` package using the tests in the `tests/` directory.
+
+### Pre-Commit Hooks
+It's nice to have some tests and linting done automatically before you commit
+your changes (this avoids some of the "million little commits to fix a typo"
+problem).  We use git's pre-commit hooks to do this.  To set them up, you can run:
+
+```
+pip install pre-commit && pre-commit install
+```
+from within the project directory.  The pre-commit hooks are defined in the
+`.pre-commit-config.yaml` file, and will then run every time you run `git
+commit`.  Most of the hooks will automatically apply themselves, so if your
+commit appears to fail, you can just re-run `git commit` and it will usually
+just work.
+
+## GitHub Actions
+We use GitHub Actions to run our automated tests on every pull request and push
+to the main branch. Currently, we have three workflows:
+
+- `documentation.yml`: This workflow builds the sphinx documentation and deploys it to GitHub Pages.  See [here](docs.md) for more information.
+- `pylint.yml`: This workflow runs `pylint` to check for any errors that can be caught by static analysis.
+- `pytest.yml`: This workflow runs our unit tests using `pytest`.
+
+## Extra Handy Tools
+In addition to the key tools that will be setup when you `source setup_dev`,
+there are some useful tools that many of the `arsenal_gear` developers use.
+
+### Local Actions
+While all our tests can be run locally, you may want to run the tests and/or
+linter exactly as it will be run by GitHub.  There is a very cool tool developed
+for this called  [act](https://github.com/nektos/act).  `act` uses a Docker
+container for a GitHub Actions runner to run your workflows locally.
+
+You will need to set up Docker on your local machine, so follow the instructions
+for your operating system [here](https://docs.docker.com/get-docker/).  Docker
+is also in many Linux distributions' package managers, so you may be able to
+install it with a package manager like `apt` or `dnf` (or load it as a module on
+some HPC systems).   Once Docker is set up, you can install `act` following the
+instructions [here](https://nektosact.com/installation/index.html).
+
+Running act is straightforward.  To simulate a push, you just run
+
+```
+act push
+```
+
+and `act` will pull the docker container, spin it up, and run your workflows.
 
 ### direnv
 Sometimes you need to do more than just set up a python virtual environment, but
@@ -51,75 +144,3 @@ make your development experience better:
 - _Python Debugger_ (`ms-python.debugpy`): Debugging support for Python.
 - _Python Environments_ (`ms-python.vscode-python-envs`): Automatically manage and activate your virtual environments.
 - _Vim_ (`vscodevim.vim`): Essential if you have incurable vim brain.
-
-## Linting and Code Style
-We use `pylint` as our linter.  You can manually run it with:
-```
-pylint arsenal_gear/
-```
-By default, we have it configured to only show `FATAL`, `ERROR`, and `WARNING`
-messages (with `exec-used` excluded).  We allow the use of `exec()` because
-Arsenal Gear's parameter file is itself a python script.  The security concern
-with `exec()` isn't a concern for us because Arsenal Gear is scientific software
-that isn't going to be exposed to untrusted input.  If you want to run `pylint`
-with all messages enabled (including some of the more annoying convention
-messages), you can use:
-```
-pylint --enable=all arsenal_gear/
-```
-
-## Automated Tests
-We use `pytest` as our testing framework. The testing suite is located in `tests/`.  You can
-run them with `pytest` from the project root directory.
-
-It is good practice to try and get tests that cover as large a fraction of your
-code as possible.  One easy way to check your test coverage is with the `pytest-cov` plugin.
-You can install it with `pip install pytest-cov`, and then run your tests with coverage reporting with:
-```
-pytest --cov=arsenal_gear tests/
-```
-This will generate a report showing you the test coverage of each file in the `arsenal_gear` package using
-the tests in the `tests/` directory.
-
-### Pre-Commit Hooks
-It's nice to have some tests and linting done automatically before you commit
-your changes (this avoids some of the "million little commits to fix a typo"
-problem).  We use git's pre-commit hooks to do this.  To set them up, you can run:
-
-```
-pip install pre-commit && pre-commit install
-```
-from within the project directory.  The pre-commit hooks are defined in the
-`.pre-commit-config.yaml` file, and will then run every time you run `git
-commit`.  Most of the hooks will automatically apply themselves, so if your
-commit appears to fail, you can just re-run `git commit` and it will usually
-just work.
-
-## GitHub Actions
-We use GitHub Actions to run our automated tests on every pull request and push
-to the main branch. Currently, we have three workflows:
-
-- `documentation.yml`: This workflow builds the sphinx documentation and deploys it to GitHub Pages.  See [here](docs.md) for more information.
-- `pylint.yml`: This workflow runs `pylint` to check for any errors that can be caught by static analysis.
-- `pytest.yml`: This workflow runs our unit tests using `pytest`.
-
-### Local Actions
-While all our tests can be run locally, you may want to run the tests and/or
-linter exactly as it will be run by GitHub.  There is a very cool tool developed
-for this called  [act](https://github.com/nektos/act).  `act` uses a Docker
-container for a GitHub Actions runner to run your workflows locally.
-
-You will need to set up Docker on your local machine, so follow the instructions
-for your operating system [here](https://docs.docker.com/get-docker/).  Docker
-is also in many Linux distributions' package managers, so you may be able to
-install it with a package manager like `apt` or `dnf` (or load it as a module on
-some HPC systems).   Once Docker is set up, you can install `act` following the
-instructions [here](https://nektosact.com/installation/index.html).
-
-Running act is straightforward.  To simulate a push, you just run
-
-```
-act push
-```
-
-and `act` will pull the docker container, spin it up, and run your workflows.

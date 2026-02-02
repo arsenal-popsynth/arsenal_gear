@@ -25,6 +25,7 @@ class IsochroneInterpolator():
     stellar evolution code, provided there is a IsochroneDataReader class
     implemented in order to read the data.
     """
+
     def __init__(self, **kwargs) -> None:
         # log10(Z/Zsun)
         self.met = kwargs.get('met', 0.0)
@@ -93,7 +94,7 @@ class IsochroneInterpolator():
         return labels
 
     ######## ISOCHRONE INTERPOLATION FUNCTIONS ########
-    def _age_index(self, age : Quantity["time"]) -> int:
+    def _age_index(self, age: Quantity["time"]) -> int:
         """
 
         Returns the index of the isochrone closest to the requested age
@@ -116,7 +117,7 @@ class IsochroneInterpolator():
 
         return ais
 
-    def _get_ai_range(self, ai:int, n:int)-> int:
+    def _get_ai_range(self, ai: int, n: int) -> int:
         """
         Gets the range of age indices to use for isochrone interpolation
         on n nearby points around age index ai. Leaves out the nearest
@@ -129,37 +130,43 @@ class IsochroneInterpolator():
         """
         nages = len(self.iset.lages)
 
-        if (self.test and (ai in (0, nages-1))):
+        if self.test and (ai in (0, nages - 1)):
             raise ValueError("Test Isochrone must be in middle of isochrone range")
-        if n<=1:
+        if n <= 1:
             raise ValueError("Must Request more than one point for interpolation")
-    
+
         # decide on right range of isochrone indices
-        if ai-n//2 <= 0:
+        if ai - n // 2 <= 0:
             if self.test:
-                ais = np.concatenate((np.arange(0, ai), np.arange(ai+1, n+1)))
+                ais = np.concatenate((np.arange(0, ai), np.arange(ai + 1, n + 1)))
             else:
                 ais = np.arange(0, n)
-        elif ai+n//2+1 >= nages:
+        elif ai + n // 2 + 1 >= nages:
             if self.test:
-                ais = np.concatenate((np.arange(nages-n-1, ai), np.arange(ai+1, nages)))
+                ais = np.concatenate(
+                    (np.arange(nages - n - 1, ai), np.arange(ai + 1, nages))
+                )
             else:
-                ais = np.arange(nages-n, nages)
+                ais = np.arange(nages - n, nages)
         else:
-            if n%2 == 0:
+            if n % 2 == 0:
                 if self.test:
-                    ais = np.concatenate((np.arange(ai-n//2, ai),np.arange(ai+1, ai+n//2+1)))
+                    ais = np.concatenate(
+                        (np.arange(ai - n // 2, ai), np.arange(ai + 1, ai + n // 2 + 1))
+                    )
                 else:
-                    ais = np.arange(ai-n//2+1, ai+n//2+1)
+                    ais = np.arange(ai - n // 2 + 1, ai + n // 2 + 1)
             else:
                 if self.test:
-                    ais = np.concatenate((np.arange(ai-n//2, ai),np.arange(ai+1,ai+n//2+2)))
+                    ais = np.concatenate(
+                        (np.arange(ai - n // 2, ai), np.arange(ai + 1, ai + n // 2 + 2))
+                    )
                 else:
-                    ais = np.arange(ai-n//2, ai+n//2+1)
-        return np.array(ais,dtype=int)
+                    ais = np.arange(ai - n // 2, ai + n // 2 + 1)
+        return np.array(ais, dtype=int)
 
     @staticmethod
-    def _fixed_eep_q(j:int, eeps:list, qs:list):
+    def _fixed_eep_q(j: int, eeps: list, qs: list):
         """
         Returns the value of a isochrone quantity at a fixed EEP
         across several isochrones at different times.
@@ -170,7 +177,7 @@ class IsochroneInterpolator():
         Returns:
             qj: the quantity at the fixed EEP.
         """
-        return [q[np.where(eep == j)[0]][0] for (q,eep) in zip(qs,eeps)]
+        return [q[np.where(eep == j)[0]][0] for (q, eep) in zip(qs, eeps)]
 
     def _construct_iso_isochrone(self, t:Quantity["time"], labels:list[str],
                                  method:str="pchip",
@@ -231,8 +238,13 @@ class IsochroneInterpolator():
                             qs=iso_qs)
         return iso
 
-    def _interp_iso_quantity_mass(self, mini:Quantity["mass"], t:Quantity["time"],
-                                  label:str, method:str="pchip") -> np.float64:
+    def _interp_iso_quantity_mass(
+        self,
+        mini: Quantity["mass"],
+        t: Quantity["time"],
+        label: str,
+        method: str = "pchip",
+    ) -> np.float64:
         """
         Uses _construct_iso_isochrone to interpolate a provided quantity in both
         that quantity and in initial mass as a funciton of EEP and then returns the
@@ -391,8 +403,13 @@ class IsochroneInterpolator():
             mmax = mmax[sel]
         return (lages, mmax)
 
-    def _interp_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
-                         label:str, method:str="pchip") -> np.float64:
+    def _interp_quantity(
+        self,
+        mini: Quantity["mass"],
+        t: Quantity["time"],
+        label: str,
+        method: str = "pchip",
+    ) -> np.float64:
         """
         Helper function to decide between which inerpolation method to use
         and properly format the arguments
@@ -408,7 +425,7 @@ class IsochroneInterpolator():
         """
 
         if np.isscalar(mini.value):
-            mini = np.array([mini.value])*mini.unit
+            mini = np.array([mini.value]) * mini.unit
 
         if not np.isscalar(t.value):
             if len(t.value) != 1:
@@ -449,7 +466,7 @@ class IsochroneInterpolator():
             mmax: the initial mass of the most massive star still alive at time t
         """
         if np.isscalar(t.value):
-            t = np.array([t.value])*t.unit
+            t = np.array([t.value]) * t.unit
 
         lt = np.log10(t.to(u.yr).value)
 
@@ -462,7 +479,7 @@ class IsochroneInterpolator():
             max_mass = np.max(self.tset.masses.to(u.Msun).value)
         interp[np.where(lt < min(lages))] = max_mass
         interp[np.where(lt > max(lages))] = 0.0
-        return interp*u.Msun
+        return interp * u.Msun
 
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
@@ -474,19 +491,20 @@ class IsochroneInterpolator():
             mmaxdot: the rate at which the maximum mass is changing with respect to time
         """
         if np.isscalar(t.value):
-            t = np.array([t.value])*t.unit
+            t = np.array([t.value]) * t.unit
 
         lt = np.log10(t.to(u.yr).value)
 
         (lages, mmax) = self._get_mmax_age_interp()
         # return the first derivative of the cubic spline
-        unitfac = u.Msun/t.to(u.Myr)/np.log(10)
-        interp = pchip_interpolate(lages,mmax, lt, der=1)*unitfac
-        interp *= np.logical_and(lt > min(lages), lt < max(lages)) 
+        unitfac = u.Msun / t.to(u.Myr) / np.log(10)
+        interp = pchip_interpolate(lages, mmax, lt, der=1) * unitfac
+        interp *= np.logical_and(lt > min(lages), lt < max(lages))
         return interp
 
-    def lbol(self, mini:Quantity["mass"], t: Quantity["time"],
-             method:str="pchip") -> Quantity["power"]:
+    def lbol(
+        self, mini: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
+    ) -> Quantity["power"]:
         """
         get the bolometric luminosity of a star of initial mass mini at age t
         Args:
@@ -503,8 +521,9 @@ class IsochroneInterpolator():
         logLbol_res = self._interp_quantity(mini, t, llbol_label, method=method)
         return masked_power(10, logLbol_res)*u.Lsun
 
-    def teff(self, mini:Quantity["mass"], t: Quantity["time"], 
-             method:str="pchip") -> Quantity["temperature"]:
+    def teff(
+        self, mini: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
+    ) -> Quantity["temperature"]:
         """
         get the atmospheric effective temperature of a star of initial mass mini
         at age t

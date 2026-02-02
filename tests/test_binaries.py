@@ -4,6 +4,7 @@ test_binaries
 
 This file contains tests for the binary population synthesis methods.
 """
+
 import astropy.units as u
 import numpy as np
 from numpy.testing import assert_allclose
@@ -13,9 +14,10 @@ import arsenal_gear
 
 class TestLogUniformPeriod:
     """Tests for the Log-Uniform Period distribution."""
+
     N = int(1e6)
-    min_p = 1*u.d
-    max_p = 1e4*u.d
+    min_p = 1 * u.d
+    max_p = 1e4 * u.d
     period = arsenal_gear.dist_funcs.binaries.LogUniformPeriod(min_p, max_p)
 
     def test_limits(self):
@@ -32,14 +34,17 @@ class TestLogUniformPeriod:
     def test_mean(self):
         """Check that the mean of the distribution is correct."""
         p = self.period.sample(self.N)
-        assert_allclose(np.mean(p), u.d*self.period.mean(),
-                        rtol=0, atol=5*self.period.var())
+        assert_allclose(
+            np.mean(p), u.d * self.period.mean(), rtol=0, atol=5 * self.period.var()
+        )
+
 
 class TestLogUniformSemimajor:
     """Tests for the Log-Uniform Semimajor axis distribution."""
+
     N = int(1e6)
-    min_a = 0.1*u.au
-    max_a = 100*u.au
+    min_a = 0.1 * u.au
+    max_a = 100 * u.au
     sma = arsenal_gear.dist_funcs.binaries.LogUniformSemimajor(min_a, max_a)
 
     def test_limits(self):
@@ -56,11 +61,14 @@ class TestLogUniformSemimajor:
     def test_mean(self):
         """Check that the mean of the distribution is correct."""
         a = self.sma.sample(self.N)
-        assert_allclose(np.mean(a), u.au*self.sma.mean(),
-                        rtol=0, atol=5*self.sma.var())
+        assert_allclose(
+            np.mean(a), u.au * self.sma.mean(), rtol=0, atol=5 * self.sma.var()
+        )
+
 
 class TestUniformMassRatio:
     """Tests for the Uniform Mass Ratio distribution."""
+
     N = int(1e6)
     min_q = 0.1
     max_q = 1
@@ -80,5 +88,6 @@ class TestUniformMassRatio:
     def test_mean(self):
         """Check that the mean of the distribution is correct."""
         q = self.mratio.sample(self.N)
-        assert_allclose(np.mean(q), self.mratio.mean(),
-                        rtol=0, atol=5*self.mratio.var())
+        assert_allclose(
+            np.mean(q), self.mratio.mean(), rtol=0, atol=5 * self.mratio.var()
+        )
