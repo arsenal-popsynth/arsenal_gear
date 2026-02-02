@@ -15,6 +15,7 @@ from astropy.units import Quantity
 from scipy.interpolate import RegularGridInterpolator
 
 from ..population import StarPopulation
+from abc import ABC, abstractmethod
 
 
 class Source:
@@ -165,22 +166,17 @@ class Source:
         return np.stack(args, axis=-1)
 
 
-class Yields:
-    """Header class for yield tables."""
+class Yields(ABC):
+    """Abstract base class for yield tables."""
 
     def __init__(self) -> None:
-
-        if self.__class__ is Yields:
-            raise NotImplementedError(
-                "This is a header class for inheritance and should not be used by itself"
-            )
-
         self.filedir = os.path.dirname(os.path.realpath(__file__))
-        self.yield_tablefile = self.filedir + "<yield file name>"
+        self.yield_tablefile = None
 
         self.elements = None
         self.atomic_num = None
 
+    @abstractmethod
     def ccsn_yields(
         self,
         elements: List[str],
@@ -188,13 +184,20 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for core-collapse SNe.
+        """Abstract method for core-collapse SNe yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: StarPopulation object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
+        pass
 
-        raise ValueError("Core-collapse SNe is not part of this yield set.")
-
+    @abstractmethod
     def snia_yields(
         self,
         elements: List[str],
@@ -202,12 +205,20 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for SNe type Ia.
+        """Abstract method for SNe type Ia yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: StarPopulation object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
-        raise ValueError("Type Ia SNe is not part of this yield set.")
+        pass
 
+    @abstractmethod
     def wind_yields(
         self,
         elements: List[str],
@@ -215,12 +226,20 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for stellar winds.
+        """Abstract method for stellar wind yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: StarPopulation object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
-        raise ValueError("Stellar winds (main sequence) is not part of this yield set.")
+        pass
 
+    @abstractmethod
     def agb_yields(
         self,
         elements: List[str],
@@ -228,10 +247,15 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for AGB mass loss.
+        """Abstract method for AGB mass loss yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: StarPopulation object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
-        raise ValueError(
-            "Stellar wind (asymptotic giant branch) is not part of this yield set."
-        )
+        pass

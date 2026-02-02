@@ -36,6 +36,14 @@ class LimongiChieffi2018(Yields):
 
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
     """
+    # hard-coded parameters of the Limongi & Chieffi (2018) tables
+    lc_url = "https://orfeo.oa-roma.inaf.it/"
+    models = ["F", "I", "M", "R"]
+    mass = np.array([13.0, 15.0, 20.0, 25.0, 30.0, 40.0, 60.0, 80.0, 120.0])
+    metal = np.array([3.236e-5, 3.2363e-4, 3.236e-3, 1.345e-2])
+    feh = np.array([-3, -2, -1, 0])
+    rot = np.array([0, 150, 300])
+    ccsn_mmax = 25
 
     def __init__(self, model: str = "R") -> None:
         """
@@ -68,20 +76,10 @@ class LimongiChieffi2018(Yields):
             wind             Source object for stellar winds (massive stars)
             ccsn             Source object for core-collapse SNe
         """
-
-        self.yield_data_source = "https://orfeo.oa-roma.inaf.it/"
-        self.models = ["F", "I", "M", "R"]
-        self.mass = np.array([13.0, 15.0, 20.0, 25.0, 30.0, 40.0, 60.0, 80.0, 120.0])
-        self.metal = np.array([3.236e-5, 3.2363e-4, 3.236e-3, 1.345e-2])
-        self.feh = np.array([-3, -2, -1, 0])
-        self.rot = np.array([0, 150, 300])
-        self.ccsn_mmax = 25
-
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-        self.filedir = os.path.dirname(os.path.realpath(__file__))
         self.filedir += "/LimongiChieffi2018"
 
         if not os.path.isdir(self.filedir):
@@ -134,6 +132,16 @@ class LimongiChieffi2018(Yields):
             * u.M_sun
         )
 
+    def snia_yields(
+        self,
+        elements: List[str],
+        starPop: StarPopulation,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Placeholder function for SNIa yields."""
+        raise NotImplementedError("SNIa yields not implemented for Limongi & Chieffi (2018).")
+
     def wind_yields(
         self,
         elements: List[str],
@@ -166,6 +174,17 @@ class LimongiChieffi2018(Yields):
             )
             * u.M_sun
         )
+
+    def agb_yields(
+        self,
+        elements: List[str],
+        starPop: StarPopulation,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Placeholder function for AGB yields."""
+        raise NotImplementedError("AGB yields not implemented for Limongi & Chieffi (2018).")
+
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
@@ -258,7 +277,7 @@ class LimongiChieffi2018(Yields):
 
         downloader(
             self.filedir + f"/{table}.tgz",
-            f"{self.yield_data_source}/2018-modelli/yields/{table}.tgz",
+            f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
             message=f"Yield file {table}.tgz not found.",
         )
 
@@ -272,25 +291,17 @@ class LimongiChieffi2018(Yields):
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""
-        if model == "a":
-            return 3
-        if model == "b":
-            return 2
-        if model == "c":
-            return 1
-        if model == "d":
-            return 0
-
-        raise ValueError("Model does not exist.")
+        met_ind_mods = {"a":3, "b":2, "c":1, "d":0}
+        if model in met_ind_mods:
+            return met_ind_mods[model]
+        else:
+            raise ValueError("Model does not exist.")
 
     @staticmethod
     def _get_rot_index_from_model(model: str) -> int:
         """Convenience function for converting table rotation labels into table index."""
-        if model == "000":
-            return 0
-        if model == "150":
-            return 1
-        if model == "300":
-            return 2
-
-        raise ValueError("Model does not exist.")
+        rot_ind_mods = {"000":0, "150":1, "300":2}
+        if model in rot_ind_mods:
+            return rot_ind_mods[model]
+        else:
+            raise ValueError("Model does not exist.")
