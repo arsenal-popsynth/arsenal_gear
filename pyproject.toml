@@ -24,6 +24,7 @@ dependencies = [
     "tqdm",
     "myst-parser",
     "xarray",
+    "pandas",
     ]
 dynamic = ["version"]
 
