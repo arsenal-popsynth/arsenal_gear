@@ -95,6 +95,6 @@ def test_mist_interp():
             # where things don't seem to work perfectly well in summary metrics, even
             # though the interpolation looks fine by eye
             assert_array_less(arr, 0.2)
-            # the averages errors over all time, especially if you weight by luminosity
+            # the average errors over all time, especially if you weight by luminosity
             # over time, which we don't do, are quite small 3% or less
             assert np.average(arr) < 0.03
