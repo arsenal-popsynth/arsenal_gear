@@ -262,6 +262,13 @@ class LimongiChieffi2018(Yields):
             message=f"Yield file {table}.tgz not found.",
         )
 
+        if not os.path.isfile(self.filedir + "/readme.txt"):
+            downloader(
+                self.filedir + "/readme.txt",
+                f"{self.yield_data_source}/2018-modelli/yields/legenda",
+                message="See downloaded readme.txt for info about yields.",
+            )
+
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""
