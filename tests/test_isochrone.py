@@ -2,7 +2,8 @@
 test_isochrone
 ==========
 
-This file contains unit tests for isochrone interpolation.
+This file contains unit tests for the isochrone interpolation methods
+which are mostly contained in stellar_evolution/isochrone.py
 """
 import astropy.units as u
 import numpy as np

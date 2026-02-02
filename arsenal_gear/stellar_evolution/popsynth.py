@@ -98,8 +98,8 @@ class BPASS_stellar_models():
         # Get file size
         total_size = int(response.headers.get('content-length', 0))
         # create a progress bar
-        tqdm_args = dict(desc='Downloading', total=total_size, unit='B',
-                        unit_scale=True, unit_divisor=1024)
+        tqdm_args = {'desc': 'Downloading', 'total': total_size, 'unit': 'B',
+                        'unit_scale': True, 'unit_divisor': 1024}
         # write the file
         with open(fname, 'wb') as f, tqdm(**tqdm_args) as prog_bar:
             for chunk in response.iter_content(chunk_size=1024):

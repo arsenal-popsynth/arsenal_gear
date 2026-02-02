@@ -2,20 +2,21 @@
 data_reader.py
 ==========
 
-This file defines classes for reading stellar evolution data from 
-various sources into a uniform data structure format defined in 
+This file defines classes for reading stellar evolution data from
+various sources into a uniform data structure format defined in
 se_data_structures.py
 """
 
-from pathlib import Path
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import astropy.units as u
 import numpy as np
 
-from .se_data_structures import Isochrone, StellarTrack, IsochroneSet, TrackSet
-from ..utils import downloader, extract_one, is_valid_txz, find_match
+from ..utils import downloader, extract_one, find_match, is_valid_txz
+from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
+
 
 class IsochroneDataReader(ABC):
     """
@@ -34,14 +35,12 @@ class IsochroneDataReader(ABC):
         """
         Abstract method for reading isochrone data.
         """
-        pass
 
     @abstractmethod
     def read_track_data(self) -> TrackSet:
         """
         Abstract method for reading stellar track data.
         """
-        pass
 
 class MISTReader(IsochroneDataReader):
     """
@@ -80,6 +79,12 @@ class MISTReader(IsochroneDataReader):
         super().__init__(**kwargs)
         self.vvcrit = kwargs.get("vvcrit", "0.0")
         self.rootdir = kwargs.get("rootdir", None)
+        # Fill out dummy attributes
+        self.hdr_list = None
+        self.num_ages = None
+        self.version = None
+        self.rot = None
+        self.abun = None
 
         if self.met<0:
             self.metstr = f"m{-1*self.met:.2f}"
@@ -137,7 +142,7 @@ class MISTReader(IsochroneDataReader):
                 # model directory doesn't exist -> check for tarfile
                 if not tarfile_path.is_file():
                     # if it doesn't exist, download it
-                    force_download = True                
+                    force_download = True
                 elif not is_valid_txz(tarfile_path):
                     # if it's not a valid tar file, download it again
                     force_download = True
