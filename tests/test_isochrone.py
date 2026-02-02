@@ -1,11 +1,15 @@
+"""
+test_isochrone
+==========
+
+This file contains unit tests for the isochrone interpolation methods
+which are mostly contained in sterellar_evolution/isochrone.py
+"""
 import astropy.units as u
 import numpy as np
-import pytest
-from numpy.testing import assert_array_equal
 from scipy.integrate import trapezoid
 
 import arsenal_gear
-from tqdm import tqdm
 
 def get_contiguous_regions(mask):
     """
@@ -36,9 +40,11 @@ def integrate_mask(y, x, mask):
     return total_integral
 
 def test_mist_interp():
-    # initialize stellar population with EEP interpolation
-    # and otherwise default parameters (which will specify MIST isochrones)
-    # test=Ture in isochrone interpolation to elave out nearest isochrone
+    """
+    initialize stellar population with EEP interpolation
+    and otherwise default parameters (which will specify MIST isochrones)
+    test=True in isochrone interpolation to leave out nearest isochrone
+    """
     sp_eep = arsenal_gear.StellarPopulation(interp_op="eep")
     sp_iso = arsenal_gear.StellarPopulation(interp_op="iso",test=True)
 
