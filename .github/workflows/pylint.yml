@@ -1,4 +1,4 @@
-name: Pylint
+name: Linter
 
 on: [push]
 
@@ -21,4 +21,4 @@ jobs:
         pip install .[all]
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files 'arsenal_gear/*.py')
+        pylint arsenal_gear tests

@@ -22,7 +22,8 @@ author = 'BW Keller'
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
               'sphinx.ext.viewcode',
-              'sphinx.ext.mathjax'
+              'sphinx.ext.mathjax',
+              'myst_parser'
               ]
 
 autosummary_generate = True
@@ -31,7 +32,13 @@ autodoc_typehints_format = 'short'
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+# -- Options for MyST -------------------------------------------------
+# https://myst-parser.readthedocs.io/en/latest/sphinx/intro.html
 
+myst_enable_extensions = [
+    "dollarmath",
+    "amsmath"
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

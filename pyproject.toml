@@ -20,11 +20,20 @@ dependencies = [
     "sphinx>=7",
     "scipy>=1.10",
     "astropy",
-    "tqdm"]
+    "pyyaml",
+    "tqdm",
+    "myst-parser",
+    ]
 dynamic = ["version"]
+
+[project.scripts]
+arsenal = "arsenal_gear.scripts:main"
 
 [tool.setuptools]
 packages = ["arsenal_gear",
     "arsenal_gear.dist_funcs",
     "arsenal_gear.feedbacks",
+    "arsenal_gear.element_yields",
+    "arsenal_gear.scripts",
     "arsenal_gear.stellar_evolution",]
+

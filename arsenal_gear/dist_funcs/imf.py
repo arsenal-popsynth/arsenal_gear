@@ -22,12 +22,14 @@ class IMF(rv_continuous):
     :type max_mass: astropy mass unit
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
+    :param seed: Random seed for sampling
+    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
     def __init__(self, min_mass: Quantity["mass"], max_mass: Quantity["mass"],
-                 name=""):
+                 name="", seed=None):
         self.min_mass: float = min_mass.to(u.Msun).value
         self.max_mass: float = max_mass.to(u.Msun).value
-        super().__init__(a=self.min_mass, b=self.max_mass, name=name)
+        super().__init__(a=self.min_mass, b=self.max_mass, name=name, seed=seed)
 
     def sample_mass(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
         """
@@ -63,13 +65,15 @@ class Salpeter(IMF):
     :param alpha: The IMF slope (note that the slope applied is -alpha, so this
                   should be positive)
     :type alpha: float
+    :param seed: Random seed for sampling
+    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
     def __init__(self, min_mass: Quantity["mass"], max_mass: Quantity["mass"],
-                 alpha:float=2.35):
+                 alpha:float=2.35, seed=None):
         self.alpha = alpha
         self.name = "Salpeter"
         assert alpha >= 0
-        super().__init__(min_mass, max_mass, self.name)
+        super().__init__(min_mass, max_mass, self.name, seed=seed)
 
     def _pdf(self, x: np.float64, *args) -> np.float64:
         upper = np.power(self.max_mass, 1-self.alpha)

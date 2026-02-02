@@ -9,8 +9,8 @@ through interpreting and processing their isochrones
 from functools import reduce
 
 import astropy.units as u
-from astropy.units import Quantity
 import numpy as np
+from astropy.units import Quantity
 from scipy.interpolate import pchip_interpolate
 
 # local imports

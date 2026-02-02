@@ -12,7 +12,7 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.integrate import trapezoid as trapz
 
-from . import dist_funcs, feedbacks, population, stellar_evolution
+from . import dist_funcs, feedbacks, element_yields, population, stellar_evolution
 from .stellar_evolution.se_data_structures import Isochrone
 from .utils import masked_power
 
