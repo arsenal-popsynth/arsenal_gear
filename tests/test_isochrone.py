@@ -1,7 +1,7 @@
 import astropy.units as u
 import numpy as np
 import pytest
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_equal, assert_array_less
 from scipy.integrate import trapezoid
 
 import arsenal_gear
@@ -100,18 +100,17 @@ def test_mist_interp():
     # these don't seem like very stringent constraints, but there are regions
     # where things don't seem to work perfectly well in summary metrics, even
     # though the interpolation looks fine by eye
-    assert(np.all(lmissed_eep < 0.35))
-    assert(np.all(lmissed_iso < 0.35))
-    assert(np.all(L_err_eep   < 0.50))
-    assert(np.all(T_err_eep   < 0.30))
-    assert(np.all(T_err_iso   < 0.30))
-
+    assert_array_less(lmissed_eep, 0.35)
+    assert_array_less(lmissed_iso, 0.35)
+    assert_array_less(L_err_eep, 0.50)
+    assert_array_less(T_err_eep, 0.30)
+    assert_array_less(T_err_iso, 0.30)
 
     # the averages errors over all time, especially if you weight by luminosity
     # over time, which we don't do, are quite small 3% or less
-    assert(np.average(lmissed_eep < 0.03))
-    assert(np.average(lmissed_iso < 0.03))
-    assert(np.average(L_err_eep)  < 0.03)
-    assert(np.average(L_err_eep)  < 0.04)
-    assert(np.average(T_err_eep)  < 0.03)
-    assert(np.average(T_err_iso)  < 0.03)
+    assert np.average(lmissed_eep) < 0.03
+    assert np.average(lmissed_iso) < 0.03
+    assert np.average(L_err_eep)  < 0.03
+    assert np.average(L_err_eep)  < 0.04
+    assert np.average(T_err_eep)  < 0.03
+    assert np.average(T_err_iso)  < 0.03
