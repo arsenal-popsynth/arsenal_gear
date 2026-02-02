@@ -11,6 +11,8 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
+from . import sn
+
 __all__ = ["FBMechanism", "sn"]
 
 

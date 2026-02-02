@@ -10,42 +10,7 @@ import argparse
 import astropy.units as u
 import numpy as np
 
-from arsenal_gear.dist_funcs import *
-from arsenal_gear.population import *
-
-
-def zams_single(
-    IMF,
-    *,
-    N=None,
-    mass=None,
-    metals=0,
-    rot=0 * u.km / u.s,
-    tform=0 * u.Myr,
-    min_mass=0.1 * u.Msun,
-    max_mass=100 * u.Msun,
-):
-    """
-    Create a zero-age main sequence single star population.
-    """
-    imf_ = IMF(min_mass, max_mass)
-    if N is None and mass is None:
-        raise ValueError("Either a total mass or number of stars must be specified.")
-    if N is not None and mass is not None:
-        raise ValueError("Fixing both total mass and number of stars is not possible.")
-    if N is not None:  # We are operating in fixed-N mode
-        masses = imf_.sample(N)
-    else:  # We are operating in fixed-mass mode
-        masses = imf_.sample_mass(mass)
-    return StarPopulation(mass=masses, metals=metals, rot=rot, tform=tform)
-
-
-def evolve_population(population, evolution, outputs, interval):
-    """
-    Evolve a population using a specified evolution model, recording specified
-    outputs at specified intervals.
-    """
-    print(population, evolution, outputs, interval)
+from arsenal_gear import *
 
 
 def main():
@@ -57,5 +22,12 @@ def main():
     )
     parser.add_argument("paramfile")
     args = parser.parse_args()
+    out_times = []
+    out_qtys = []
     with open(args.paramfile, encoding="utf-8") as f:
-        exec(f.read())
+        exec(f.read(), globals=globals())
+        for t0, t1 in zip(out_times[:-1], out_times[1:]):
+            for qty in out_qtys:
+                # sn_count = qty(t0, t1)
+                print(t0.to("Myr"), t1.to("Myr"), qty(t0, t1))
+                # print(population.masses.max())
