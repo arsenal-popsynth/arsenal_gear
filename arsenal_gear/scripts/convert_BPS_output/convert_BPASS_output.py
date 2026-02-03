@@ -45,14 +45,14 @@ def convert_singles(BPASS_directory, output_directory='./arsenal_BPASS', overwri
             continue
 
         # Create the zero array
-        # Number of files depends on the choice of IMF
+        # Number of files depends on the choice of mass limits for the IMF
         num_files = len(os.listdir(model_directory + '/' + metal_directory))
         # Times for time array
         num_times = 302 # from log(age/yr) = 6 to 9, with 10 times more models than the public models and a 0
         times = np.concatenate((np.zeros(1), np.logspace(6, 9, 301)))
-        # Save 6 properties: time, mass, luminosity, temperature, radius, and mass loss rate 
-        data = np.zeros((num_files, 6, num_times))
-        data[:, 0, :] = np.tile(times, (num_files, 1))
+        # Save 4 properties: mass, luminosity, temperature, radius
+        data = np.zeros((num_files, 4, num_times))
+        #data[:, 0, :] = np.tile(times, (num_files, 1))
 
         i = 0
         for model in os.listdir(model_directory + '/' + metal_directory):
@@ -71,24 +71,25 @@ def convert_singles(BPASS_directory, output_directory='./arsenal_BPASS', overwri
                     if t == 0:
                         _mask = np.where(_times[t] >= times)[0]
                     elif (t == (len(_times) - 1)) and (_times[-1] < times[-1]):
-                        _mask = np.arange(302)[np.where(_times[t] >= times)[0][-1]:]
+                        _mask = np.arange(len(times))[np.where(_times[t] >= times)[0][-1]:]
                     else:
                         _mask = np.where((_times[t] >= times) & (_times[t-1] < times))[0]
 
                     for m in _mask:
 
-                        data[i, 1, m] = _data[t, 5]     # mass in MSun
-                        data[i, 2, m] = 10**_data[t, 4] # Lsun
+                        data[i, 0, m] = _data[t, 5]     # mass in MSun
+                        data[i, 1, m] = 10**_data[t, 4] # Lsun
                         if t == (len(_times) - 1):
-                            data[i, 2, m] *= 0 # must set to 0 after SN
-                        data[i, 3, m] = 10**_data[t, 3] # K
-                        data[i, 4, m] = 10**_data[t, 2] # Rsun
-                        data[i, 5, m] = (_data[t, 39] * u.Msun / (1.989 * u.s)).to(u.Msun / u.yr).value
+                            data[i, 1, m] *= 0 # must set to 0 after SN
+                        data[i, 2, m] = 10**_data[t, 3] # K
+                        data[i, 3, m] = 10**_data[t, 2] # Rsun
 
             i += 1
 
         # Sort by mass
-        _sort = np.argsort(data[:, 1, 0])
+        print(data[:, 0, 0])
+        _sort = np.argsort(data[:, 0, 0])[::-1]
+        print(data[_sort, 0, 0])
         data_to_save = data[_sort, :, :]
 
         if (metal_directory + '.npy') not in os.listdir(model_directory) or overwrite:
@@ -121,9 +122,9 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
         # Times for time array
         num_times = 502 # from log(age/yr) = 4 to 9, with 10 times more models than the public models and a 0
         times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
-        # Save 12 properties: time, primary mass, companion mass, luminosities, temperatures, radii,
-        data = np.zeros((num_files, 9, num_times))
-        data[:, 0, :] = np.tile(times, (num_files, 1))
+        # Save 8 properties: masses, luminosities, temperatures, radii,
+        data = np.zeros((num_files, 8, num_times))
+        #data[:, 0, :] = np.tile(times, (num_files, 1))
 
         i = 0
         for model in os.listdir(model_directory + '/' + metal_directory):
@@ -197,24 +198,24 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
                         
                         for m in _mask:
 
-                            data[i, 1, m] = _data[t, 5]      # mass in MSun
-                            data[i, 2, m] = 10**_data[t, 4]  # Lsun
+                            data[i, 0, m] = _data[t, 5]      # mass in MSun
+                            data[i, 1, m] = 10**_data[t, 4]  # Lsun
                             if t == (len(_times) - 1):
-                                data[i, 2, m] *= 0 # must set to 0 after SN
-                            data[i, 3, m] = 10**_data[t, 3]  # K 
-                            data[i, 4, m] = 10**_data[t, 2]  # Rsun
+                                data[i, 1, m] *= 0 # must set to 0 after SN
+                            data[i, 2, m] = 10**_data[t, 3]  # K 
+                            data[i, 3, m] = 10**_data[t, 2]  # Rsun
                             # Companion
                             if not merger:
-                                data[i, 5, m] = _data[t, 37]     # companion mass in MSun
-                                data[i, 6, m] = 10**_data[t, 48] # Lsun, companion
-                                data[i, 7, m] = 10**_data[t, 47] # K, companion
-                                data[i, 8, m] = 10**_data[t, 46] # Rsun, companion
+                                data[i, 4, m] = _data[t, 37]     # companion mass in MSun
+                                data[i, 5, m] = 10**_data[t, 48] # Lsun, companion
+                                data[i, 6, m] = 10**_data[t, 47] # K, companion
+                                data[i, 7, m] = 10**_data[t, 46] # Rsun, companion
                             if merger: 
                                 if (_data[t, 5] - _data[t-1, 5]) > 0: # If still accreting
-                                    data[i, 5, m] = _data[t, 37] - accreted_mass
-                                    data[i, 6, m] = 10**_data[t, 48] # Lsun, companion
-                                    data[i, 7, m] = 10**_data[t, 47] # K, companion
-                                    data[i, 8, m] = 10**_data[t, 46] # Rsun, companion
+                                    data[i, 4, m] = _data[t, 37] - accreted_mass
+                                    data[i, 5, m] = 10**_data[t, 48] # Lsun, companion
+                                    data[i, 6, m] = 10**_data[t, 47] # K, companion
+                                    data[i, 7, m] = 10**_data[t, 46] # Rsun, companion
 
                     if rejuvenated_file:
 
@@ -236,14 +237,14 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', overwr
                             for m in _mask:
 
                                 # Keep primary mass
-                                data[i, 1, m] = data[i, 1, m-1]      # mass in MSun
+                                data[i, 0, m] = data[i, 0, m-1]      # mass in MSun
                                 # Companion properties
-                                data[i, 5, m] = _data_M2[t, 5]      # mass in MSun
-                                data[i, 6, m] = 10**_data_M2[t, 4]  # Lsun
+                                data[i, 4, m] = _data_M2[t, 5]      # mass in MSun
+                                data[i, 5, m] = 10**_data_M2[t, 4]  # Lsun
                                 if t == (len(_times_M2) - 1):
-                                    data[i, 6, m] *= 0 # must set to 0 after SN
-                                data[i, 7, m] = 10**_data_M2[t, 3]  # K 
-                                data[i, 8, m] = 10**_data_M2[t, 2]  # Rsun
+                                    data[i, 5, m] *= 0 # must set to 0 after SN
+                                data[i, 6, m] = 10**_data_M2[t, 3]  # K 
+                                data[i, 7, m] = 10**_data_M2[t, 2]  # Rsun
 
 
             i += 1
