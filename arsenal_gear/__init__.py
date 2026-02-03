@@ -25,50 +25,7 @@ __all__ = [
     "feedbacks",
     "stellar_evolution",
     "StellarPopulation",
-    "DiscreteStellarPopulation",
 ]
-
-
-class AbstractStellarPopulation(ABC):
-    """
-    This is the primary API for arsenal-gear.  Feed it what's needed to generate a population of stars,
-    and it will allow you to evolve that population forward in time and query for various properties.
-
-    :var t: Description
-    :vartype t: the
-    """
-
-    def __init__(self, IMF, Mtot, metallicity, fbin) -> None:
-        self.Mtot = Mtot
-        self.imf = IMF
-        self.metallicity = metallicity
-        self.fbin = fbin
-
-    @abstractmethod
-    def sn_count(self, t0: Quantity["time"], t1: Quantity["time"]) -> int:
-        """
-        Return the number of supernovae that have gone off between time t0 and t1
-        """
-
-
-class DiscreteStellarPopulation(AbstractStellarPopulation):
-    """
-    A stellar population where individual stars are sampled from the IMF
-    """
-
-    def __init__(self, IMF, Mtot, metallicity, fbin) -> None:
-        super().__init__(IMF, Mtot, metallicity, fbin)
-        # sample stars until we reach Mtot
-        self.masses = self.imf.sample_mass(self.Mtot)
-        self.SingleStarPop = population.SSP(
-            mass=self.masses, metals=self.metallicity, rot=0 * u.km / u.s
-        )
-
-    def sn_count(self, t0: Quantity["time"], t1: Quantity["time"]) -> int:
-        explodability = feedbacks.sn.explodable_range(8 * u.Msun, 40 * u.Msun)
-        return feedbacks.sn.get_sn_count(
-            self.SingleStarPop, t0, t1, feedbacks.sn.lifetimes_Raiteri, explodability
-        )
 
 
 class StellarPopulation:

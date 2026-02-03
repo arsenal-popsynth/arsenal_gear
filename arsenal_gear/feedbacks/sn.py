@@ -25,7 +25,7 @@ def constant_energy(stars: SSP, energy: Quantity["energy"]) -> Quantity["energy"
     :return: Explosion energy for each star in the population
     :rtype: Quantity["energy"]
     """
-    return np.full(len(stars["mass"]), energy)
+    return np.full(len(stars), energy)
 
 
 def explodable_mass_range(
@@ -42,7 +42,7 @@ def explodable_mass_range(
     """
 
     def explodability_func(stars: SSP) -> np.bool:
-        return np.logical_and(stars["mass"] >= mmin, stars["mass"] < mmax)
+        return np.logical_and(stars >= mmin, stars < mmax)
 
     return explodability_func
 
@@ -82,7 +82,7 @@ def lifetimes_Raiteri(stars: SSP) -> Quantity["time"]:
     :return: lifetime of each star in the population
     :rtype: Quantity["time"]
     """
-    Z = stars["metals"]
+    Z = stars.metals
     logZ = np.log10(np.clip(Z, 7e-5, 3e-2))
     a0 = 10.13 + 0.07547 * logZ - 0.008084 * np.power(logZ, 2)
     a1 = -4.424 - 0.7939 * logZ - 0.1187 * np.power(logZ, 2)
@@ -91,8 +91,8 @@ def lifetimes_Raiteri(stars: SSP) -> Quantity["time"]:
         np.power(
             10,
             a0
-            + a1 * np.log10(stars["mass"].to(u.Msun).value)
-            + a2 * np.power(np.log10(stars["mass"].to(u.Msun).value), 2),
+            + a1 * np.log10(stars.to(u.Msun).value)
+            + a2 * np.power(np.log10(stars.to(u.Msun).value), 2),
         )
         * u.yr
     )
@@ -109,7 +109,7 @@ def massloss_Raiteri(stars: SSP) -> Quantity["mass"]:
     :return: mass lost by each star in the population
     :rtype: Quantity["mass"]
     """
-    return 0.7682 * u.Msun * (stars["mass"] / u.Msun) ** 1.056
+    return 0.7682 * u.Msun * (stars / u.Msun) ** 1.056
 
 
 def metals_Raiteri(stars: SSP) -> dict:
@@ -124,7 +124,7 @@ def metals_Raiteri(stars: SSP) -> dict:
     :return: dictionary of mass losses by element
     :rtype: dict
     """
-    iron = 2.802e-4 * u.Msun * (stars["mass"] / u.Msun) ** 1.864
-    oxygen = 4.586e-4 * u.Msun * (stars["mass"] / u.Msun) ** 2.721
+    iron = 2.802e-4 * u.Msun * (stars / u.Msun) ** 1.864
+    oxygen = 4.586e-4 * u.Msun * (stars / u.Msun) ** 2.721
     metals = 1.06 * iron + 2.09 * oxygen
     return {"Fe": iron, "O": oxygen, "metals": metals}

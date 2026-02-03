@@ -75,7 +75,7 @@ class SNFeedbackMechanism:
         :return: mass loss from supernovae
         """
         return np.sum(
-            self.metals_func(stars)["metals"][self.explodability_func(stars, t0, t1)]
+            self.metals_func(stars[self.explodability_func(stars, t0, t1)])["metals"]
         )
 
     def mass(
@@ -94,7 +94,7 @@ class SNFeedbackMechanism:
         :type t1: Quantity["time"]
         :return: mass loss from supernovae
         """
-        return np.sum(self.mass_func(stars)[self.explodability_func(stars, t0, t1)])
+        return np.sum(self.mass_func(stars[self.explodability_func(stars, t0, t1)]))
 
     def energy(
         self,
@@ -112,7 +112,7 @@ class SNFeedbackMechanism:
         :type t1: Quantity["time"]
         :return: Energy from supernovae
         """
-        return np.sum(self.energy_func(stars)[self.explodability_func(stars, t0, t1)])
+        return np.sum(self.energy_func(stars[self.explodability_func(stars, t0, t1)]))
 
     def count(
         self,

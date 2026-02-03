@@ -19,9 +19,9 @@ def test_star():
     tform = u.Myr
     star = arsenal_gear.population.SSP(mass=mass, metals=metals, tform=tform)
 
-    assert_array_equal(star["mass"], mass)
-    assert_array_equal(star["metals"], metals)
-    assert_array_equal(star["tform"], tform)
+    assert_array_equal(star, mass)
+    assert_array_equal(star.metals, metals)
+    assert_array_equal(star.tform, tform)
 
 
 def test_binary():
@@ -37,14 +37,14 @@ def test_binary():
         primary=star1, secondary=star2, period=period, eccentricity=eccentricity
     )
     # Check the first star
-    assert_array_equal(binary.primary["mass"], star1["mass"])
-    assert_array_equal(binary.primary["metals"], star1["metals"])
-    assert_array_equal(binary.primary["tform"], star1["tform"])
+    assert_array_equal(binary.primary, star1)
+    assert_array_equal(binary.primary.metals, star1.metals)
+    assert_array_equal(binary.primary.tform, star1.tform)
 
     # Check the second star
-    assert_array_equal(binary.secondary["mass"], star2["mass"])
-    assert_array_equal(binary.secondary["metals"], star2["metals"])
-    assert_array_equal(binary.secondary["tform"], star2["tform"])
+    assert_array_equal(binary.secondary, star2)
+    assert_array_equal(binary.secondary.metals, star2.metals)
+    assert_array_equal(binary.secondary.tform, star2.tform)
     # Check binary properties
     assert_array_equal(binary["period"], period)
     assert_array_equal(binary["eccentricity"], eccentricity)
