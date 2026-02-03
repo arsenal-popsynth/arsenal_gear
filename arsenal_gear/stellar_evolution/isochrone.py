@@ -36,8 +36,8 @@ class IsochroneInterpolator():
         self.test = kwargs.get('test', False)
         # decides whether or not to force a download of the isochrone data
         self.interp_op = kwargs.get("interp_op", "iso")
-        if self.interp_op not in ["iso", "eep"]:
-            raise ValueError("interp_op must be either iso or eep")
+        if self.interp_op not in ["iso", "track"]:
+            raise ValueError("interp_op must be either iso or track")
     
         self.isochrone_opt = kwargs.get("isochrone_opt", "mist")
         if self.isochrone_opt.lower() == "mist":

@@ -59,7 +59,7 @@ class MISTReader(IsochroneDataReader):
             kwargs: Keyword arguments for the isochrone system.
 
         Usage:
-            >> iso = MIST(met=0.0, vvcrit="0.0", interp_op="eep")
+            >> iso = MIST(met=0.0, vvcrit="0.0", interp_op="track")
             >> mini = np.array([1.0, 5.0, 10.0])*u.Msun
             >> lbol = iso.lbol(mini, 10*u.Myr)
             >> teff = iso.teff(mini, 10*u.Myr)
@@ -120,7 +120,7 @@ class MISTReader(IsochroneDataReader):
             self.tarfile = tar_temp.format(self.vvcrit)
             iso_fname_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_basic.iso"
             self.isofile = iso_fname_temp.format(self.metstr, self.vvcrit)
-        elif self.interp_op == "eep":
+        elif self.interp_op == "track":
             mod_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS"
             self.modeldir = mod_temp.format(self.metstr, self.vvcrit)
             tar_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS.txz"
