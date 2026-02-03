@@ -5,7 +5,6 @@ feedbacks
 Functions for the returns from various feedback mechanisms (SN, winds, radiation, etc.)
 """
 
-
 from typing import Type
 
 import astropy.units as u
@@ -14,16 +13,18 @@ from astropy.units import Quantity
 
 __all__ = ["FBMechanism", "sn"]
 
-class FBMechanism():
+
+class FBMechanism:
     """
     This class is inherited by a given feedback mechanism.
     """
-    def __init__(self, start:Quantity["time"], end:Quantity["time"]) -> None:
+
+    def __init__(self, start: Quantity["time"], end: Quantity["time"]) -> None:
         self.start = start
         self.end = end
 
     # What units should we put out here for each band? photons? energy?
-    def radiation(self, bands:np.float64) -> np.float64:
+    def radiation(self, bands: np.float64) -> np.float64:
         """
         Ionizing radiation output of the mechanism.
         """
@@ -43,7 +44,7 @@ class FBMechanism():
         Metal fraction of the ejecta mass.
         """
 
-    def species_yields(self, species:list[str]) -> Quantity["mass"]:
+    def species_yields(self, species: list[str]) -> Quantity["mass"]:
         """
         Individual species fractions of the ejecta mass.
         """

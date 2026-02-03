@@ -5,11 +5,11 @@ population
 This submodule defines the classes for "populations", collections of single or binary stars.
 """
 
-
 import numpy as np
 from astropy.units import Quantity
 
-__all__ = ['StarPopulation', 'BinaryPopulation']
+__all__ = ["StarPopulation", "BinaryPopulation"]
+
 
 class StarPopulation(dict):
     """This class is used to instantiate populations of individual stars.
@@ -23,15 +23,19 @@ class StarPopulation(dict):
     :param tform: Formation time of the stars, defaults to zero
     :type tform: astropy time unit
     """
-    def __init__(self,
-                 mass:Quantity["mass"],
-                 metals: np.float64,
-                 rot: Quantity["velocity"],
-                 tform: Quantity["time"]= 0) -> None:
-        self['mass'] = mass
-        self['metals'] = metals
-        self['rot'] = rot
-        self['tform'] = tform
+
+    def __init__(
+        self,
+        mass: Quantity["mass"],
+        metals: np.float64,
+        rot: Quantity["velocity"],
+        tform: Quantity["time"] = 0,
+    ) -> None:
+        self["mass"] = mass
+        self["metals"] = metals
+        self["rot"] = rot
+        self["tform"] = tform
+
 
 class BinaryPopulation(dict):
     """This class is used to instantiate a population of binary star systems.
@@ -47,9 +51,15 @@ class BinaryPopulation(dict):
     :param eccentricity: the eccentricity of the binary orbits
     :type eccentricity: float
     """
-    def __init__(self, primary: StarPopulation, secondary: StarPopulation, period:
-                 Quantity["time"], eccentricity: np.float64) -> None:
+
+    def __init__(
+        self,
+        primary: StarPopulation,
+        secondary: StarPopulation,
+        period: Quantity["time"],
+        eccentricity: np.float64,
+    ) -> None:
         self.primary = primary
         self.secondary = secondary
-        self['period'] = period
-        self['eccentricity'] = eccentricity
+        self["period"] = period
+        self["eccentricity"] = eccentricity
