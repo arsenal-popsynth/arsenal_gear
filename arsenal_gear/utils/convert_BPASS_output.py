@@ -244,7 +244,7 @@ def convert_binaries(BPASS_directory, output_directory, metals='z014', overwrite
                         for m in _mask:
 
                             # Keep primary mass
-                            output_data[0, 0, m] = output_data[i, 0, m-1]      # mass in MSun
+                            output_data[0, 0, m] = output_data[0, 0, m-1]      # mass in MSun
                             # Companion properties
                             output_data[0, 3, m] = M2_data[t, 5]      # mass in MSun
                             output_data[0, 4, m] = M2_data[t, 4]  # Lsun
