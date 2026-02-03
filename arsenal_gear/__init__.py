@@ -59,7 +59,7 @@ class StellarPopulation:
         """
         Integrate a given quantity over a population given an isochrone
         """
-        return trapz(iso.qs[q]*self.imf.pdf(iso.qs[iso.mini_name]), iso.qs[iso.mini_name])
+        return self.Nstar*trapz(iso.qs[q]*self.imf.pdf(iso.qs[iso.mini_name]), iso.qs[iso.mini_name])
 
     def nsn(self, t: Quantity["time"]) -> int:
         """
