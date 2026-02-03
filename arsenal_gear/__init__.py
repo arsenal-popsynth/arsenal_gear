@@ -60,7 +60,7 @@ class DiscreteStellarPopulation(AbstractStellarPopulation):
         super().__init__(IMF, Mtot, metallicity, fbin)
         # sample stars until we reach Mtot
         self.masses = self.imf.sample_mass(self.Mtot)
-        self.SingleStarPop = population.StarPopulation(
+        self.SingleStarPop = population.SSP(
             mass=self.masses, metals=self.metallicity, rot=0 * u.km / u.s
         )
 
@@ -188,7 +188,7 @@ class StellarPopulation:
         Teffs = self.iso.teff(self.masses, t)
         return Teffs[np.logical_not(Teffs.mask)]
 
-    def __call__(self, N: int) -> population.StarPopulation:
+    def __call__(self, N: int) -> population.SSP:
         """
         Return a
         """

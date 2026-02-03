@@ -11,7 +11,7 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.stats import loguniform, rv_continuous, uniform
 
-from arsenal_gear.population import StarPopulation
+from arsenal_gear.population import SSP
 
 
 class BinaryDistribution:
@@ -253,7 +253,7 @@ class Fraction:
     :param mass_bins: Limit of the mass bins, of length k-1
     :type mass_bins: astropy mass unit
     :param stars: Potential primaries
-    :type stars: StarPopulation
+    :type stars: SSP
     :param name: Name of the binary fraction function
     :type name: str
 
@@ -263,7 +263,7 @@ class Fraction:
         self,
         fraction: float,
         mass_bins: Quantity["mass"],
-        stars: StarPopulation,
+        stars: SSP,
         name="",
     ):
         self.fraction: float = fraction
@@ -285,9 +285,7 @@ class StepFraction(Fraction):
 
     """
 
-    def __init__(
-        self, fraction: float, mass_bins: Quantity["mass"], stars: StarPopulation
-    ):
+    def __init__(self, fraction: float, mass_bins: Quantity["mass"], stars: SSP):
         self.name = "Step"
         assert len(fraction) == 2
         super().__init__(fraction, mass_bins, stars, name=self.name)
@@ -329,7 +327,7 @@ class MassRatio(rv_continuous):
     :param max_q: Maximum mass ratio
     :type max_q: float
     :param stars: Primaries
-    :type stars: StarPopulation
+    :type stars: SSP
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
@@ -381,7 +379,7 @@ class Period(rv_continuous):
     :param max_p: Maximum orbital period
     :type max_p: astropy time unit
     :param stars: Primaries
-    :type stars: StarPopulation
+    :type stars: SSP
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
@@ -440,7 +438,7 @@ class Semimajor(rv_continuous):
     :param max_a: Maximum semi-major axis
     :type max_a: astropy length unit
     :param stars: Primaries
-    :type stars: StarPopulation
+    :type stars: SSP
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """

@@ -8,10 +8,10 @@ This submodule defines the classes for "populations", collections of single or b
 import numpy as np
 from astropy.units import Quantity
 
-__all__ = ["StarPopulation", "BinaryPopulation"]
+__all__ = ["SSP", "BSP"]
 
 
-class StarPopulation(dict):
+class SSP(dict):
     """This class is used to instantiate populations of individual stars.
 
     :param mass: Initial mass of the stars
@@ -37,15 +37,15 @@ class StarPopulation(dict):
         self["tform"] = tform
 
 
-class BinaryPopulation(dict):
+class BSP(dict):
     """This class is used to instantiate a population of binary star systems.
     It is essentially a wrapper for a pair of
-    :class:`arsenal_gear.population.StarPopulation` objects.
+    :class:`arsenal_gear.population.SSP` objects.
 
     :param primary: the primary stars in the binary pairs
-    :type primary: class:arsenal_gear.population.StarPopulation
+    :type primary: class:arsenal_gear.population.SSP
     :param secondary: the secondary stars in the binary pairs
-    :type secondary: class:arsenal_gear.population.StarPopulation
+    :type secondary: class:arsenal_gear.population.SSP
     :param period: the orbital period of the binary orbits
     :type period: astropy length time
     :param eccentricity: the eccentricity of the binary orbits
@@ -54,8 +54,8 @@ class BinaryPopulation(dict):
 
     def __init__(
         self,
-        primary: StarPopulation,
-        secondary: StarPopulation,
+        primary: SSP,
+        secondary: SSP,
         period: Quantity["time"],
         eccentricity: np.float64,
     ) -> None:

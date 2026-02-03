@@ -14,7 +14,7 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..population import SSP
 from .yields import Source, Yields
 
 
@@ -97,7 +97,7 @@ class LimongiChieffi2018(Yields):
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SSP,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -130,7 +130,7 @@ class LimongiChieffi2018(Yields):
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SSP,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:

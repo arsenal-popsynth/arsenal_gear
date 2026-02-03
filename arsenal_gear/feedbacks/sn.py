@@ -11,12 +11,12 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..population import SSP
 
 
 def explodable_range(
     mmin: Quantity["mass"], mmax: Quantity["mass"]
-) -> Callable[[StarPopulation], np.bool]:
+) -> Callable[[SSP], np.bool]:
     """
     Returns a function that determines which stars are explodable based on a simple mass range.
 
@@ -24,35 +24,35 @@ def explodable_range(
     :type mmin: Quantity["mass"]
     :param mmax: Maximum mass for explodability
     :type mmax: Quantity["mass"]
-    :return: Function that takes a StarPopulation and returns a boolean array indicating explodability
+    :return: Function that takes a SSP and returns a boolean array indicating explodability
     """
 
-    def explodability_func(stars: StarPopulation) -> np.bool:
+    def explodability_func(stars: SSP) -> np.bool:
         return np.logical_and(stars["mass"] >= mmin, stars["mass"] <= mmax)
 
     return explodability_func
 
 
 def get_sn_count(
-    stars: StarPopulation,
+    stars: SSP,
     t0: Quantity["time"],
     t1: Quantity["time"],
-    lifetime_func: Callable[[StarPopulation], Quantity["time"]],
-    explodability_func: Callable[[StarPopulation], np.bool],
+    lifetime_func: Callable[[SSP], Quantity["time"]],
+    explodability_func: Callable[[SSP], np.bool],
 ) -> int:
     """
     Get the number of supernovae that have gone off between time t0 and t1.
 
     :param stars: Stellar Population
-    :type stars: StarPopulation
+    :type stars: SSP
     :param t0: Start time
     :type t0: Quantity["time"]
     :param t1: End time
     :type t1: Quantity["time"]
     :param lifetime_func: Function to calculate stellar lifetimes
-    :type lifetime_func: Callable[[StarPopulation], Quantity["time"]]
+    :type lifetime_func: Callable[[SSP], Quantity["time"]]
     :param explodability_func: Function to determine which stars explode as SNe
-    :type explodability_func: Callable[[StarPopulation], np.bool]
+    :type explodability_func: Callable[[SSP], np.bool]
     :return: Number of supernovae between t0 and t1
     :rtype: int
     """
@@ -60,14 +60,14 @@ def get_sn_count(
     return np.sum((lifetimes >= t0) & (lifetimes < t1))
 
 
-def lifetimes_Raiteri(stars: StarPopulation) -> Quantity["time"]:
+def lifetimes_Raiteri(stars: SSP) -> Quantity["time"]:
     """
     Stellar lifetimes calculated from
     `Raiteri+ 1996 <https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract>`__
     Equation 3.
 
     :param stars: Stellar Population
-    :type stars: StarPopulation
+    :type stars: SSP
     :return: lifetime of each star in the population
     :rtype: Quantity["time"]
     """

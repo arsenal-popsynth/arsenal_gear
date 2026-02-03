@@ -16,7 +16,7 @@ import requests
 from astropy.units import Quantity
 from tqdm import tqdm
 
-from arsenal_gear.population import BinaryPopulation, StarPopulation
+from arsenal_gear.population import BSP, SSP
 
 
 class BPASS_stellar_models:
@@ -35,8 +35,8 @@ class BPASS_stellar_models:
 
     def __init__(
         self,
-        singles: StarPopulation,
-        binaries: BinaryPopulation,
+        singles: SSP,
+        binaries: BSP,
         metal: str,
         time: Quantity["time"],
         bpass_dir: str,
@@ -44,8 +44,8 @@ class BPASS_stellar_models:
     ) -> None:
         """
         Args:
-            stars:     the StarPopulation instance for which we want information
-            binaries:  the BinaryPopulation instance for which we want information
+            stars:     the SSP instance for which we want information
+            binaries:  the BSP instance for which we want information
             metal:     the metallicity of the stellar population
             TO DO -CCC, 26/06/2025: Read metallicity from binaries
             time:      current simulation time
@@ -122,8 +122,13 @@ class BPASS_stellar_models:
         # Get file size
         total_size = int(response.headers.get("content-length", 0))
         # create a progress bar
-        tqdm_args = {'desc': 'Downloading', 'total': total_size, 'unit': 'B',
-                        'unit_scale': True, 'unit_divisor': 1024}
+        tqdm_args = {
+            "desc": "Downloading",
+            "total": total_size,
+            "unit": "B",
+            "unit_scale": True,
+            "unit_divisor": 1024,
+        }
         # write the file
         with open(fname, "wb") as f, tqdm(**tqdm_args) as prog_bar:
             for chunk in response.iter_content(chunk_size=1024):

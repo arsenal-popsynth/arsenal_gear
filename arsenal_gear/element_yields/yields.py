@@ -14,7 +14,7 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.interpolate import RegularGridInterpolator
 
-from ..population import StarPopulation
+from ..population import SSP
 
 
 class Source:
@@ -184,7 +184,7 @@ class Yields:
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SSP,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -198,7 +198,7 @@ class Yields:
     def snia_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SSP,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -211,7 +211,7 @@ class Yields:
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SSP,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -224,7 +224,7 @@ class Yields:
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SSP,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
