@@ -6,8 +6,10 @@ This submodule contains all the code required to load yields from
 Limongi & Chieffi (2018).
 """
 
+import io
 import os
 import re
+import tarfile
 from typing import List
 
 import astropy.units as u
@@ -15,24 +17,35 @@ import numpy as np
 from astropy.units import Quantity
 
 from ..population import StarPopulation
-from .yields import Source, Yields
+from .source import Source
+from .yieldtables import YieldTables
 
 
-class LimongiChieffi2018(Yields):
+class LimongiChieffi2018(YieldTables):
     """
     Include yields majority of elements (and isotopes) for massive stars
     [13, 15, 20, 25, 30, 40, 60, 80, 120] Msun, with initial iron abundance
     ([Fe/H]) [0, -1, -2, -3], and three different models for stellar
     rotation [0, 150, 300] km/s.
 
-    Download yields and place/link to directory LimongiChieffi2018 placed
-    in the path of this file, e.g.,
+    Upon first initialization, the yield tables are automatically downloaded.
+    If this fails, these files (.tgz) can be downloaded manually and placed/linked
+    to directory LimongiChieffi2018 placed in the path of this file, e.g.,
     ln -s /path/to/downloaded/yields /path/to/arsenal_gear/element_yields/LimongiChieffi2018
 
-    Yields available at http://orfeo.iaps.inaf.it/
+    Yields available at https://orfeo.oa-roma.inaf.it/
 
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
     """
+
+    # hard-coded parameters of the Limongi & Chieffi (2018) tables
+    lc_url = "https://orfeo.oa-roma.inaf.it/"
+    models = ["F", "I", "M", "R"]
+    mass = np.array([13.0, 15.0, 20.0, 25.0, 30.0, 40.0, 60.0, 80.0, 120.0])
+    metal = np.array([3.236e-5, 3.2363e-4, 3.236e-3, 1.345e-2])
+    feh = np.array([-3, -2, -1, 0])
+    rot = np.array([0, 150, 300])
+    ccsn_mmax = 25
 
     def __init__(self, model: str = "R") -> None:
         """
@@ -42,11 +55,11 @@ class LimongiChieffi2018(Yields):
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
             >> mass = np.linspace(8, 120, 1000)*u.M_sun
-            >> plt.plot(mass, yields.ccsn_yields('H',
-                                                 mass=mass, rot=0*u.km/u.s,
-                                                 metal = 1.345e-2*u.dimensionless_unscaled,
-                                                 interpolate='nearest'),
-                        '-', color=colors[-1])
+            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
+            >> tform = u.Myr * np.zeros(100)
+            >> rot = u.km / u.s * np.zeros(100)
+            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform, rot=rot)
+            >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
             model            Available models.
@@ -64,26 +77,20 @@ class LimongiChieffi2018(Yields):
             ccsn             Source object for core-collapse SNe
         """
 
-        self.models = ["F", "I", "M", "R"]
-        self.mass = np.array([13.0, 15.0, 20.0, 25.0, 30.0, 40.0, 60.0, 80.0, 120.0])
-        self.metal = np.array([3.236e-5, 3.2363e-4, 3.236e-3, 1.345e-2])
-        self.feh = np.array([-3, -2, -1, 0])
-        self.rot = np.array([0, 150, 300])
-        self.ccsn_mmax = 25
-
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-        self.filedir = os.path.dirname(os.path.realpath(__file__))
+        self.filedir += "/LimongiChieffi2018"
+        self.name = "Limongi & Chieffi (2018)"
 
-        self.yield_tablefile = (
-            self.filedir + f"/LimongiChieffi2018/tab_{model}/tab_yieldstot_ele_exp.dec"
-        )
-        self.wind_tablefile = (
-            self.filedir + f"/LimongiChieffi2018/tab_{model}/tabwind.dec"
-        )
+        if not os.path.isdir(self.filedir):
+            os.mkdir(self.filedir)
+            self.download_yields(table=f"tab_{model}")
+        elif not os.path.isfile(self.filedir + f"/tab_{model}.tgz"):
+            self.download_yields(table=f"tab_{model}")
 
+        self.filedir += f"/tab_{model}.tgz"
         self.elements, self.atomic_num = self.get_element_list()
 
         # Stellar wind yields
@@ -165,11 +172,14 @@ class LimongiChieffi2018(Yields):
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
-        with open(self.wind_tablefile, encoding="utf-8") as file:
-            lines = file.readlines()
 
         elements = []
         atomic_num = []
+
+        with tarfile.open(self.filedir, "r:*") as tar:
+            windfile = tar.extractfile("tabwind.dec")
+            lines = io.TextIOWrapper(windfile, encoding="utf-8").readlines()
+
         for line in lines[1:]:
             if line.split()[0] == "ele":
                 return elements, np.array(atomic_num, dtype=float)
@@ -178,9 +188,7 @@ class LimongiChieffi2018(Yields):
                 elements.append(element)
                 atomic_num.append(int(line.split()[1]))
 
-        raise ValueError(
-            f"Could not determine list of elements in file {self.wind_tablefile}."
-        )
+        raise ValueError("Could not determine list of elements from tabwind.dec")
 
     def load_wind_yields(self) -> np.ndarray:
         """Load tables of yields ejected as winds from massive stars."""
@@ -189,8 +197,9 @@ class LimongiChieffi2018(Yields):
             [len(self.elements), self.rot.size, self.metal.size, self.mass.size]
         )
 
-        with open(self.wind_tablefile, encoding="utf-8") as file:
-            lines = file.readlines()
+        with tarfile.open(self.filedir, "r:*") as tar:
+            f = tar.extractfile("tabwind.dec")
+            lines = io.TextIOWrapper(f, encoding="utf-8").readlines()
 
         for index, line in enumerate(lines):
             if line.split()[0] == "ele":
@@ -198,12 +207,15 @@ class LimongiChieffi2018(Yields):
                 ind_metal = self._get_metal_index_from_model(model[3])
                 ind_rot = self._get_rot_index_from_model(model[4:])
 
-                data = np.genfromtxt(
-                    self.wind_tablefile,
-                    usecols=[1, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                    skip_header=index + 1,
-                    max_rows=142,
-                ).T
+                with tarfile.open(self.filedir, "r:*") as tar:
+                    f = tar.extractfile("tabwind.dec")
+                    data = np.genfromtxt(
+                        f,
+                        usecols=[1, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                        skip_header=index + 1,
+                        max_rows=142,
+                    ).T
+
                 for i, atom_nr in enumerate(self.atomic_num):
                     mask = data[0] == atom_nr
                     wind_yld[i, ind_rot, ind_metal] = np.sum(data[1:, mask], axis=1)
@@ -218,8 +230,9 @@ class LimongiChieffi2018(Yields):
             [len(self.elements), self.rot.size, self.metal.size, self.mass.size]
         )
 
-        with open(self.yield_tablefile, encoding="utf-8") as file:
-            lines = file.readlines()
+        with tarfile.open(self.filedir, "r:*") as tar:
+            f = tar.extractfile("tab_yieldstot_ele_exp.dec")
+            lines = io.TextIOWrapper(f, encoding="utf-8").readlines()
 
         for index, line in enumerate(lines):
             if line.split()[0] == "ele":
@@ -227,12 +240,14 @@ class LimongiChieffi2018(Yields):
                 ind_metal = self._get_metal_index_from_model(model[3])
                 ind_rot = self._get_rot_index_from_model(model[4:])
 
-                total_yld[:, ind_rot, ind_metal, :] = np.genfromtxt(
-                    self.yield_tablefile,
-                    usecols=[4, 5, 6, 7, 8, 9, 10, 11, 12],
-                    skip_header=index + 1,
-                    max_rows=53,
-                )
+                with tarfile.open(self.filedir, "r:*") as tar:
+                    f = tar.extractfile("tab_yieldstot_ele_exp.dec")
+                    total_yld[:, ind_rot, ind_metal, :] = np.genfromtxt(
+                        f,
+                        usecols=[4, 5, 6, 7, 8, 9, 10, 11, 12],
+                        skip_header=index + 1,
+                        max_rows=53,
+                    )
 
         ccsn_yld = total_yld - wind_yld
         ccsn_yld[ccsn_yld < 0.0] = 0.0
@@ -240,28 +255,37 @@ class LimongiChieffi2018(Yields):
 
         return ccsn_yld
 
+    def download_yields(self, table: str) -> None:
+        """Downloader for tabulated yield files."""
+        from ..utils.scraper import downloader
+
+        downloader(
+            self.filedir + f"/{table}.tgz",
+            f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
+            message=f"Yield file {table}.tgz not found.",
+        )
+
+        if not os.path.isfile(self.filedir + "/readme.txt"):
+            downloader(
+                self.filedir + "/readme.txt",
+                f"{self.lc_url}/2018-modelli/yields/legenda",
+                message="See downloaded readme.txt for info about yields.",
+            )
+
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""
-        if model == "a":
-            return 3
-        if model == "b":
-            return 2
-        if model == "c":
-            return 1
-        if model == "d":
-            return 0
-
-        raise ValueError("Model does not exist.")
+        met_ind_mods = {"a": 3, "b": 2, "c": 1, "d": 0}
+        if model in met_ind_mods:
+            return met_ind_mods[model]
+        else:
+            raise ValueError("Model does not exist.")
 
     @staticmethod
     def _get_rot_index_from_model(model: str) -> int:
         """Convenience function for converting table rotation labels into table index."""
-        if model == "000":
-            return 0
-        if model == "150":
-            return 1
-        if model == "300":
-            return 2
-
-        raise ValueError("Model does not exist.")
+        rot_ind_mods = {"000": 0, "150": 1, "300": 2}
+        if model in rot_ind_mods:
+            return rot_ind_mods[model]
+        else:
+            raise ValueError("Model does not exist.")

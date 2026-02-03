@@ -1,9 +1,10 @@
 """
-utils
-==========
+array_utils.py
+==============
 
-This file conatins various general purpose helper functions for the stellar evolution
-module.
+This file contains various utility manipulation functions for arrays.
+Functions:
+    downloader: Method for downloading data from the web
 """
 
 import numpy as np
@@ -20,15 +21,15 @@ def make_monotonic_increasing(x: np.float64, y: np.float64) -> np.float64:
     """
     j = 0
     n = len(y)
-    while j < n - 1:
-        if y[j] > y[j + 1]:
-            k = j + 1
-            while (k < n) and (y[j] > y[k]):
-                k += 1
+    while j < n-1:
+        if y[j] >= y[j+1]:
+            k = j+1
+            while((k < n) and (y[j]>=y[k])):
+                k+=1
             if k == n:
                 k = n - 1
                 if y[j] > y[k]:
-                    last = y[j] * 1.1
+                    last = y[j]*1.0001
                 else:
                     last = y[k]
                 y[j + 1 :] = np.interp(x[j + 1 :], [x[j], x[k]], [y[j], last])
@@ -73,7 +74,7 @@ def make_monotonic_decreasing(x: np.float64, y: np.float64) -> np.float64:
 
 def index_monotonic(y: np.float64) -> np.ndarray:
     """
-    Return the indices of the array y such that y is monotonic increasing
+    Return the indices inds, of the array y such that y[inds] is monotonic increasing
     """
     j = 0
     out = []
