@@ -5,7 +5,7 @@ feedbacks
 Functions for the returns from various feedback mechanisms (SN, winds, radiation, etc.)
 """
 
-from typing import Type
+from typing import Callable, Type
 
 import astropy.units as u
 import numpy as np
@@ -13,40 +13,121 @@ from astropy.units import Quantity
 
 from . import sn
 
-__all__ = ["FBMechanism", "sn"]
+__all__ = ["SNFeedbackMechanism", "sn"]
 
 
-class FBMechanism:
+class SNFeedbackMechanism:
     """
-    This class is inherited by a given feedback mechanism.
+    Supernova feedback mechanism
     """
 
-    def __init__(self, start: Quantity["time"], end: Quantity["time"]) -> None:
-        self.start = start
-        self.end = end
+    def __init__(
+        self,
+        energy_func: Callable[[Type["SSP"]], Quantity["energy"]],
+        mass_func: Callable[[Type["SSP"]], Quantity["mass"]],
+        metals_func: Callable[[Type["SSP"]], dict],
+        explodability_func: Callable[
+            [Type["SSP"], Quantity["time"], Quantity["time"]], Quantity["energy"]
+        ],
+    ) -> None:
+        self.energy_func = energy_func
+        self.mass_func = mass_func
+        self.metals_func = metals_func
+        self.explodability_func = explodability_func
 
-    # What units should we put out here for each band? photons? energy?
-    def radiation(self, bands: np.float64) -> np.float64:
+    def metals_species(
+        self,
+        stars: Type["SSP"],
+        species: str,
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> int:
         """
-        Ionizing radiation output of the mechanism.
+        Get the total metal yield from supernovae between time t0 and t1.
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param species: Chemical species to retrieve
+        :type species: str
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: mass loss from supernovae
         """
+        return np.sum(
+            self.metals_func(stars)[species][self.explodability_func(stars, t0, t1)]
+        )
 
-    def ejecta_mass(self) -> Quantity["mass"]:
+    def metals_total(
+        self,
+        stars: Type["SSP"],
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> int:
         """
-        Mass ejected by the mechanism.
+        Get the total metal yield from supernovae between time t0 and t1.
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: mass loss from supernovae
         """
+        return np.sum(
+            self.metals_func(stars)["metals"][self.explodability_func(stars, t0, t1)]
+        )
 
-    def ejecta_velocity(self) -> Quantity["velocity"]:
+    def mass(
+        self,
+        stars: Type["SSP"],
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> int:
         """
-        Velocity of the ejecta.
+        Get the number of supernovae that have gone off between time t0 and t1.
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: mass loss from supernovae
         """
+        return np.sum(self.mass_func(stars)[self.explodability_func(stars, t0, t1)])
 
-    def metal_yields(self) -> Quantity["mass"]:
+    def energy(
+        self,
+        stars: Type["SSP"],
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> int:
         """
-        Metal fraction of the ejecta mass.
+        Get the number of supernovae that have gone off between time t0 and t1.
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: Energy from supernovae
         """
+        return np.sum(self.energy_func(stars)[self.explodability_func(stars, t0, t1)])
 
-    def species_yields(self, species: list[str]) -> Quantity["mass"]:
+    def count(
+        self,
+        stars: Type["SSP"],
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> int:
         """
-        Individual species fractions of the ejecta mass.
+        Get the number of supernovae that have gone off between time t0 and t1.
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: Number of supernovae
         """
+        return np.sum(self.explodability_func(stars, t0, t1))

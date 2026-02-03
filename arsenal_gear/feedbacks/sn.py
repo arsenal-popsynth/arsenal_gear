@@ -14,7 +14,21 @@ from astropy.units import Quantity
 from ..population import SSP
 
 
-def explodable_range(
+def constant_energy(stars: SSP, energy: Quantity["energy"]) -> Quantity["energy"]:
+    """
+    Returns a constant supernova explosion energy for all stars.
+
+    :param stars: Stellar Population
+    :type stars: SSP
+    :param energy: Constant explosion energy to return
+    :type energy: Quantity["energy"]
+    :return: Explosion energy for each star in the population
+    :rtype: Quantity["energy"]
+    """
+    return np.full(len(stars["mass"]), energy)
+
+
+def explodable_mass_range(
     mmin: Quantity["mass"], mmax: Quantity["mass"]
 ) -> Callable[[SSP], np.bool]:
     """
@@ -28,36 +42,33 @@ def explodable_range(
     """
 
     def explodability_func(stars: SSP) -> np.bool:
-        return np.logical_and(stars["mass"] >= mmin, stars["mass"] <= mmax)
+        return np.logical_and(stars["mass"] >= mmin, stars["mass"] < mmax)
 
     return explodability_func
 
 
-def get_sn_count(
-    stars: SSP,
-    t0: Quantity["time"],
-    t1: Quantity["time"],
+def explodable_lifetime_range(
+    tmin: Quantity["time"],
+    tmax: Quantity["time"],
     lifetime_func: Callable[[SSP], Quantity["time"]],
-    explodability_func: Callable[[SSP], np.bool],
-) -> int:
+) -> Callable[[SSP], np.bool]:
     """
-    Get the number of supernovae that have gone off between time t0 and t1.
+    Returns a function that determines which stars are explodable based on a simple lifetime range.
 
-    :param stars: Stellar Population
-    :type stars: SSP
-    :param t0: Start time
-    :type t0: Quantity["time"]
-    :param t1: End time
-    :type t1: Quantity["time"]
+    :param tmin: Minimum lifetime for explodability
+    :type tmin: Quantity["time"]
+    :param tmax: Maximum lifetime for explodability
+    :type tmax: Quantity["time"]
     :param lifetime_func: Function to calculate stellar lifetimes
     :type lifetime_func: Callable[[SSP], Quantity["time"]]
-    :param explodability_func: Function to determine which stars explode as SNe
-    :type explodability_func: Callable[[SSP], np.bool]
-    :return: Number of supernovae between t0 and t1
-    :rtype: int
+    :return: Function that takes a SSP and returns a boolean array indicating explodability
     """
-    lifetimes = lifetime_func(stars)[explodability_func(stars)]
-    return np.sum((lifetimes >= t0) & (lifetimes < t1))
+
+    def explodability_func(stars: SSP) -> np.bool:
+        lifetimes = lifetime_func(stars)
+        return np.logical_and(lifetimes >= tmin, lifetimes < tmax)
+
+    return explodability_func
 
 
 def lifetimes_Raiteri(stars: SSP) -> Quantity["time"]:
@@ -85,3 +96,35 @@ def lifetimes_Raiteri(stars: SSP) -> Quantity["time"]:
         )
         * u.yr
     )
+
+
+def massloss_Raiteri(stars: SSP) -> Quantity["mass"]:
+    """
+    Mass loss calculated from
+    `Raiteri+ 1996 <https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract>`__
+    Equation 6.
+
+    :param stars: Stellar Population
+    :type stars: SSP
+    :return: mass lost by each star in the population
+    :rtype: Quantity["mass"]
+    """
+    return 0.7682 * u.Msun * (stars["mass"] / u.Msun) ** 1.056
+
+
+def metals_Raiteri(stars: SSP) -> dict:
+    """
+    Iron mass loss calculated from
+    `Raiteri+ 1996 <https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract>`__
+    Equation 7 and 8, with total metallicity derived from Asplund+ 2009
+    <https://ui.adsabs.harvard.edu/abs/2009ARA%26A..47..481A/abstract> abundances.
+
+    :param stars: Stellar Population
+    :type stars: SSP
+    :return: dictionary of mass losses by element
+    :rtype: dict
+    """
+    iron = 2.802e-4 * u.Msun * (stars["mass"] / u.Msun) ** 1.864
+    oxygen = 4.586e-4 * u.Msun * (stars["mass"] / u.Msun) ** 2.721
+    metals = 1.06 * iron + 2.09 * oxygen
+    return {"Fe": iron, "O": oxygen, "metals": metals}
