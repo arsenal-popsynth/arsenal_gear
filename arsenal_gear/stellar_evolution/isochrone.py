@@ -107,7 +107,7 @@ class IsochroneInterpolator():
         """
         lage = np.log10(age.to(u.yr).value)
         ages = self.iset.lages
-        if (max(lage) > max(ages)) or (min(lage) < min(ages)):
+        if (max(lage) >= max(ages)) or (min(lage) <= min(ages)):
             print('The requested age is outside the range. Try between '
                   + str(min(ages)) + ' and ' + str(max(ages)))
             raise ValueError("Age is outside the range of the isochrones")
@@ -221,7 +221,7 @@ class IsochroneInterpolator():
         # make sure initial mass is monotonic in interpolation
         for (i,label) in enumerate(labels):
             if label == self.iset.isos[0].mini_name:
-                if np.any(np.diff(qis[0]) < 0):
+                if np.any(np.diff(qis[i]) <= 0):
                     qis[i] = array_utils.make_monotonic_increasing(eepi,qis[i])
         iso_qs = {labels[i]: qis[i] for i in range(len(labels))}
         iso_qs["EEP"] = eepi
