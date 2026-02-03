@@ -17,10 +17,11 @@ import numpy as np
 from astropy.units import Quantity
 
 from ..population import StarPopulation
-from .yields import Source, Yields
+from .source import Source
+from .yieldtables import YieldTables
 
 
-class LimongiChieffi2018(Yields):
+class LimongiChieffi2018(YieldTables):
     """
     Include yields majority of elements (and isotopes) for massive stars
     [13, 15, 20, 25, 30, 40, 60, 80, 120] Msun, with initial iron abundance
@@ -36,6 +37,7 @@ class LimongiChieffi2018(Yields):
 
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
     """
+
     # hard-coded parameters of the Limongi & Chieffi (2018) tables
     lc_url = "https://orfeo.oa-roma.inaf.it/"
     models = ["F", "I", "M", "R"]
@@ -57,9 +59,7 @@ class LimongiChieffi2018(Yields):
             >> tform = u.Myr * np.zeros(100)
             >> rot = u.km / u.s * np.zeros(100)
             >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform, rot=rot)
-            >> plt.plot(mass, yields.ccsn_yields('H', stars,
-                                                 interpolate='nearest'),
-                        '-', color=colors[-1])
+            >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
             model            Available models.
@@ -76,11 +76,13 @@ class LimongiChieffi2018(Yields):
             wind             Source object for stellar winds (massive stars)
             ccsn             Source object for core-collapse SNe
         """
+
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
         self.filedir += "/LimongiChieffi2018"
+        self.name = "Limongi & Chieffi (2018)"
 
         if not os.path.isdir(self.filedir):
             os.mkdir(self.filedir)
@@ -132,16 +134,6 @@ class LimongiChieffi2018(Yields):
             * u.M_sun
         )
 
-    def snia_yields(
-        self,
-        elements: List[str],
-        starPop: StarPopulation,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Placeholder function for SNIa yields."""
-        raise NotImplementedError("SNIa yields not implemented for Limongi & Chieffi (2018).")
-
     def wind_yields(
         self,
         elements: List[str],
@@ -174,17 +166,6 @@ class LimongiChieffi2018(Yields):
             )
             * u.M_sun
         )
-
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: StarPopulation,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Placeholder function for AGB yields."""
-        raise NotImplementedError("AGB yields not implemented for Limongi & Chieffi (2018).")
-
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
@@ -284,14 +265,14 @@ class LimongiChieffi2018(Yields):
         if not os.path.isfile(self.filedir + "/readme.txt"):
             downloader(
                 self.filedir + "/readme.txt",
-                f"{self.yield_data_source}/2018-modelli/yields/legenda",
+                f"{self.lc_url}/2018-modelli/yields/legenda",
                 message="See downloaded readme.txt for info about yields.",
             )
 
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""
-        met_ind_mods = {"a":3, "b":2, "c":1, "d":0}
+        met_ind_mods = {"a": 3, "b": 2, "c": 1, "d": 0}
         if model in met_ind_mods:
             return met_ind_mods[model]
         else:
@@ -300,7 +281,7 @@ class LimongiChieffi2018(Yields):
     @staticmethod
     def _get_rot_index_from_model(model: str) -> int:
         """Convenience function for converting table rotation labels into table index."""
-        rot_ind_mods = {"000":0, "150":1, "300":2}
+        rot_ind_mods = {"000": 0, "150": 1, "300": 2}
         if model in rot_ind_mods:
             return rot_ind_mods[model]
         else:
