@@ -17,7 +17,7 @@ from astropy.units import Quantity
 from tqdm import tqdm
 
 from arsenal_gear.population import BinaryPopulation, StarPopulation
-
+from arsenal_gear.utils.convert_BPASS_output import *
 
 class BPASS_stellar_models:
     """
@@ -106,9 +106,9 @@ class BPASS_stellar_models:
 
         download_url = url
         if self.dir[-1] == "/":
-            fname = self.dir + "bpass_v2.2.tar.gz"
+            fname = self.dir + "bpass_v2.2.zip"
         else:
-            fname = self.dir + "/bpass_v2.2.tar.gz"
+            fname = self.dir + "/bpass_v2.2.zip"
 
         try:
             response = requests.get(download_url, stream=True, timeout=10)
