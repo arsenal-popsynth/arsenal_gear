@@ -198,9 +198,12 @@ class IsochroneInterpolator():
             labels = self.supplement_labels(labels)
 
         if np.isscalar(t.value):
-            t = Quantity([t.value], t.unit)
+            ai = self._age_index(Quantity([t.value], t.unit))[0]
+        else:
+            if len(t) != 1:
+                raise ValueError("t must be a single value for now")
+            ai = self._age_index(Quantity([t.value[0]], t.unit))[0]
         # get nearby isochrones and interpolate between them
-        ai = self._age_index(t)[0]
         ais = self._get_ai_range(ai, 4)
         lages = np.array([self.iset.lages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
@@ -213,7 +216,7 @@ class IsochroneInterpolator():
         f = self._get_interpolator(method)
 
         # interpolate in log(age) at each eep
-        qis = [np.array([f(lt, lages, self._fixed_eep_q(j,eeps,q))[0] for j in eepi]) for q in qs]
+        qis = [np.array([f(lt, lages, self._fixed_eep_q(j,eeps,q)) for j in eepi]) for q in qs]
 
         # make sure initial mass is monotonic in interpolation
         for (i,label) in enumerate(labels):
@@ -323,7 +326,7 @@ class IsochroneInterpolator():
 
         nq = len(labels)
         interp = self._get_interpolator(method)
-        age = t.to(u.yr).value
+        age = array_utils.make_scalar_quantity(t, unit=u.yr).value
         (eeps_,ms_,qs_) = ([],[],[[] for _ in range(nq)])
         for eep in range(1, self.tset.max_eep+1):
             (age_set, mass_set, q_set) = self._get_eep_relation(eep, labels)
@@ -331,7 +334,7 @@ class IsochroneInterpolator():
             if ((len(age_set) > 0) and age_test):
                 eeps_.append(eep)
                 age_set = array_utils.make_monotonic_decreasing(mass_set, age_set)
-                m = interp(age, age_set[::-1], mass_set[::-1])[0]
+                m = interp(age, age_set[::-1], mass_set[::-1])
                 ms_.append(m)
                 for i in range(nq):
                     qs_[i].append(interp(m, mass_set, q_set[i]))
@@ -427,23 +430,17 @@ class IsochroneInterpolator():
         if np.isscalar(mini.value):
             mini = np.array([mini.value]) * mini.unit
 
-        if not np.isscalar(t.value):
-            if len(t.value) != 1:
-                # if t is an array, we can only interpolate at a single age
-                # throw error
-                raise ValueError("t must be a scalar, or length 1 array")
+        t = array_utils.make_scalar_quantity(t)
+        if self.interp_op == "iso":
+            min_age = np.power(10,min(self.iset.lages))*u.yr
+            max_age = np.power(10,max(self.iset.lages))*u.yr
         else:
-            if self.interp_op == "iso":
-                min_age = np.power(10,min(self.iset.lages))*u.yr
-                max_age = np.power(10,max(self.iset.lages))*u.yr
-            else:
-                min_age = min(self.tset.min_ages)*u.yr
-                max_age = max(self.tset.max_ages)*u.yr
-            if (t < min_age) or (t > max_age):
-                emsg = f"t = {t.value} yrs is outside the range of applicability: " + \
-                        f"{min_age.value} - {max_age.value} yrs"
-                raise ValueError(emsg)
-            t = np.array([t.value])*t.unit
+            min_age = min(self.tset.min_ages)
+            max_age = max(self.tset.max_ages)
+        if (t < min_age) or (t > max_age):
+            emsg = f"t = {t.value} yrs is outside the range of applicability: " + \
+                    f"{min_age.value} - {max_age.value} yrs"
+            raise ValueError(emsg)
 
         if self.interp_op == "iso":
             # interpolate from isochrones
@@ -548,7 +545,7 @@ class IsochroneInterpolator():
         Constructs an isochrone at age t with the requested labels
         
         Args:
-            t: the age of the isochrone.
+            t: the age of the isochrone. Should be a single time
             method: the interpolation method to use, either pchip or linear
                     default is pchip (a monotonicity-preserving cubic spline)
             labels: The labels of the quantities to be calcaulated for the isochrone
@@ -559,6 +556,7 @@ class IsochroneInterpolator():
                 effective temperatures, and bolometric luminosities
                 of the stars in the isochrone, along with any other requested quantities.
         """
+        t = array_utils.make_scalar_quantity(t)
         if labels is None:
             labels = []
         if self.interp_op == "iso":
