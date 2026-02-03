@@ -88,12 +88,12 @@ class StellarPopulation:
         Returns the bolometric luminosity of the population at time t
         """
         if self.discrete:
-            if np.isscalar(t):
+            if np.isscalar(t.value):
                 return np.sum(self.lbol_iso(t))
             else:
                 return np.array([np.sum(self.lbol_iso(ti)).value for ti in t])*u.Lsun
         else:
-            if np.isscalar(t):
+            if np.isscalar(t.value):
                 iso = self.iso.construct_isochrone(t)
                 iso.qs["L_bol"] = masked_power(10, iso.qs[self.iso.llbol_label])
                 return self._integrate_pop(iso, "L_bol")*u.Lsun

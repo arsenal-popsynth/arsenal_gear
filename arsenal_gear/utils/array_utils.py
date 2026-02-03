@@ -7,8 +7,30 @@ Functions:
     downloader: Method for downloading data from the web
 """
 
+import astropy.units as u
+from astropy.units import Quantity, Unit
 import numpy as np
 
+def make_scalar_quantity(x: Quantity, unit: Unit = None) -> Quantity:
+    """
+    Function to ensure that a quantity is a scalar quantity with a certain unit
+    
+    :param x: INput Quantity, could be scalalr or array
+    :param unit: Deisred unit for the output quantity
+    :return: A scalar Quantity with the desired unit
+    """
+    if np.isscalar(x.value):
+        if unit is None:
+            return x
+        else:
+            return x.to(unit)
+    else:
+        if len(x) != 1:
+            raise ValueError("Input quantity must be a scalar or length-1 array")
+        if unit is not None:
+            return Quantity(x.value[0], unit)
+        else:
+            return Quantity(x.value[0], x.unit)
 
 def make_monotonic_increasing(x: np.float64, y: np.float64) -> np.float64:
     """
