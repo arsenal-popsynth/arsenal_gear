@@ -8,10 +8,11 @@ from astropy import units as u
 from scipy.interpolate import interp1d
 
 from ..population import StarPopulation
-from .yields import Source, Yields
+from .source import Source
+from .yieldtables import YieldTables
 
 
-class Sukhbold2016(Yields):
+class Sukhbold2016(YieldTables):
     """
     Sukhbold et al. (2016) CCSN + wind yields.
     Uses pre-parsed CSVs:
@@ -74,27 +75,27 @@ class Sukhbold2016(Yields):
         df_ccsn = add_elemental_sums(df_ccsn, "EJECTA")
         df_wind = add_elemental_sums(df_wind, "WIND")
 
-        self.masses = df_ccsn.index.values
+        self.mass = df_ccsn.index.values
         self.elements = [c.rsplit("_", 1)[0] for c in df_ccsn.columns if "_" in c]
 
         # Build CCSN Source
-        ccsn_grid = np.zeros((len(self.elements), 1, 1, len(self.masses)))
+        ccsn_grid = np.zeros((len(self.elements), 1, 1, len(self.mass)))
         for i, el in enumerate(self.elements):
             col = f"{el}_EJECTA"
             if col in df_ccsn:
                 ccsn_grid[i, 0, 0, :] = df_ccsn[col].values
         self.ccsn = Source(
-            self.elements, [np.array([0.0]), np.array([0.02]), self.masses], ccsn_grid
+            self.elements, [np.array([0.0]), np.array([0.02]), self.mass], ccsn_grid
         )
 
         # Build wind Source
-        wind_grid = np.zeros((len(self.elements), 1, 1, len(self.masses)))
+        wind_grid = np.zeros((len(self.elements), 1, 1, len(self.mass)))
         for i, el in enumerate(self.elements):
             col = f"{el}_WIND"
             if col in df_wind:
                 wind_grid[i, 0, 0, :] = df_wind[col].values
         self.wind = Source(
-            self.elements, [np.array([0.0]), np.array([0.02]), self.masses], wind_grid
+            self.elements, [np.array([0.0]), np.array([0.02]), self.mass], wind_grid
         )
 
         # Load explosion energies
@@ -112,10 +113,10 @@ class Sukhbold2016(Yields):
         else:
             warnings.warn(f"Explosion energies not found: {energy_path}")
 
-    def get_explosion_energy(self, masses):
+    def get_explosion_energy(self, mass):
         if not self.has_energies:
-            return np.full_like(np.atleast_1d(masses), np.nan, dtype=float)
-        return self._energy_interp(np.atleast_1d(masses))
+            return np.full_like(np.atleast_1d(mass), np.nan, dtype=float)
+        return self._energy_interp(np.atleast_1d(mass))
 
     def wind_yields(
         self,
@@ -125,9 +126,9 @@ class Sukhbold2016(Yields):
         extrapolate=False,
     ):
         args = [
-            np.zeros(len(starPop.masses)),
-            np.full(len(starPop.masses), 0.02),
-            starPop.masses.to(u.Msun).value,
+            np.zeros(len(starPop["mass"])),
+            np.full(len(starPop["mass"]), 0.02),
+            starPop["mass"].to(u.Msun).value,
         ]
         yld_array = (
             self.wind.get_yld(
@@ -151,9 +152,9 @@ class Sukhbold2016(Yields):
             interpolate = "nearest"
 
         args = [
-            np.zeros(len(starPop.masses)),
-            np.full(len(starPop.masses), 0.02),
-            starPop.masses.to(u.Msun).value,
+            np.zeros(len(starPop["mass"])),
+            np.full(len(starPop["mass"]), 0.02),
+            starPop["mass"].to(u.Msun).value,
         ]
         yld_array = (
             self.ccsn.get_yld(

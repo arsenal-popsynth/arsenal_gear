@@ -119,7 +119,7 @@ class LimongiChieffi2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
         Returns:
-            List of yields matching provided element list
+            Dict of [str, Quantity["mass"]] of yields matching provided element list
 
         """
         args = [
