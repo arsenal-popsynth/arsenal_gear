@@ -100,6 +100,7 @@ class LimongiChieffi2018(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
+    ## Main interface functions
     def ccsn_yields(
         self,
         elements: List[str],
@@ -162,6 +163,7 @@ class LimongiChieffi2018(YieldTables):
             * u.M_sun
         )
 
+    ## Internal functions for loading data
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
 
@@ -247,6 +249,7 @@ class LimongiChieffi2018(YieldTables):
 
         return ccsn_yld
 
+    ## Function for downloading data from the web
     def download_yields(self, table: str) -> None:
         """Downloader for tabulated yield files."""
         from ..utils.scraper import downloader
@@ -264,6 +267,7 @@ class LimongiChieffi2018(YieldTables):
                 message="See downloaded readme.txt for info about yields.",
             )
 
+    # helper functions for reading tables
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""
