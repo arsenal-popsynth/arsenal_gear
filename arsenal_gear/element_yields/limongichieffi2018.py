@@ -7,8 +7,6 @@ Limongi & Chieffi (2018).
 """
 
 import io
-import os
-from pathlib import Path
 import re
 import tarfile
 from typing import List
