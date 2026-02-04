@@ -8,7 +8,6 @@ which are mostly contained in stellar_evolution/isochrone.py
 
 import astropy.units as u
 import numpy as np
-import pytest
 from numpy.testing import assert_array_less
 from scipy.integrate import trapezoid
 
@@ -45,25 +44,22 @@ def integrate_mask(y, x, mask):
     return total_integral
 
 
-@pytest.mark.skip(
-    reason="The luminosity error in the isochrone without EEP is too large in one element"
-)
 def test_mist_interp():
     """initialize stellar population with EEP interpolation
     and otherwise default parameters (which will specify MIST isochrones)
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "eep": arsenal_gear.StellarPopulation(interp_op="eep"),
+        "track": arsenal_gear.StellarPopulation(interp_op="track"),
         "iso": arsenal_gear.StellarPopulation(interp_op="iso", test=True),
     }
 
-    lmissed = {"eep": [], "iso": []}
-    L_err = {"eep": [], "iso": []}
-    T_err = {"eep": [], "iso": []}
+    lmissed = {"track": [], "iso": []}
+    L_err = {"track": [], "iso": []}
+    T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp['iso'].iso.iset.lages))
+    ais = np.arange(len(sp["iso"].iso.iset.lages))
     for ai in ais[2::6]:
         ai += 1
         t = (
@@ -80,7 +76,7 @@ def test_mist_interp():
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
-        for k in ["eep", "iso"]:
+        for k in ["track", "iso"]:
             T[k] = (sp[k].iso.teff(ms, t) / u.K).value
             L[k] = (sp[k].iso.lbol(ms, t) / u.Lsun).value
 
@@ -105,7 +101,7 @@ def test_mist_interp():
                 integrate_mask(np.abs(L[k] - L_ref) * xi, ms.value, nm[k]) / lum[k]
             )
 
-    for k in ["eep", "iso"]:
+    for k in ["track", "iso"]:
         lmissed[k] = np.array(lmissed[k])
         L_err[k] = np.array(L_err[k])
         T_err[k] = np.array(T_err[k])
@@ -117,3 +113,31 @@ def test_mist_interp():
             # the average errors over all time, especially if you weight by luminosity
             # over time, which we don't do, are quite small 3% or less
             assert np.average(arr) < 0.03
+
+
+def test_lbol_methods_mist():
+    """
+    Test that compares both track-based and isochrone-based methods for
+    interpolating the MIST isochronges, for both discrete and continuous
+    forms of the stellar population.
+    """
+    int_ops = ["iso", "track"]
+    discrete_ops = [True, False]
+    outs = {}
+    # array of times over which to compare bolometric luminosities
+    tlin = np.logspace(5.1,9,20)*u.yr
+    for int_op in int_ops:
+        for discrete in discrete_ops:
+            key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
+            sp = arsenal_gear.StellarPopulation(
+                interp_op=int_op, discrete=discrete
+            )
+            outs[key] = sp.lbol(tlin)
+    # compare all combinations of the four methods
+    keys = list(outs.keys())
+    n = len(keys)
+    for i in range(n):
+        for j in range(i + 1, n):
+            rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
+            # average relative error should be less than 4%
+            assert np.average(rel_err) < 0.04
