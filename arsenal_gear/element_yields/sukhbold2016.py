@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from astropy import units as u
+from astropy.units import Quantity
 from scipy.interpolate import interp1d
 
 from ..population import StarPopulation
@@ -263,7 +264,7 @@ class Sukhbold2016(YieldTables):
         starPop: StarPopulation,
         interpolate="nearest",
         extrapolate=False,
-    ):
+    ) -> dict[str, Quantity["mass"]]:
         args = [
             np.zeros(len(starPop["mass"])),
             np.full(len(starPop["mass"]), 0.02),
@@ -283,7 +284,7 @@ class Sukhbold2016(YieldTables):
         starPop: StarPopulation,
         interpolate="nearest",
         extrapolate=False,
-    ):
+    ) -> dict[str, Quantity["mass"]]:
         if interpolate != "nearest":
             warnings.warn(
                 "Sukhbold2016: forcing nearest-neighbor due to explodability islands"
