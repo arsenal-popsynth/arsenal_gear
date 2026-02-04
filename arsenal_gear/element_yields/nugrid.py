@@ -9,7 +9,6 @@ NuGrid.
 import os
 import re
 from typing import List
-from pathlib import Path
 
 import astropy.units as u
 import numpy as np
@@ -248,7 +247,6 @@ class Pignatari2016(YieldTables):
         super().__init__()
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Pignatari et al. (2016)"
-        fd = self.filedir
         if not self.filedir.is_dir():
             self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
