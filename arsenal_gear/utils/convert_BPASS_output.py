@@ -39,20 +39,17 @@ def convert_singles(BPASS_directory, output_directory, metals='z014', overwrite=
     # Create directory if it does not already exists
     Path(output_directory).mkdir(parents=True, exist_ok=True)
 
-    model_directory = 'NEWSINMODS/' + metals
-
     # Times for time array
-    num_times = 502 # from log(age/yr) = 6 to 9, with 10 times more models than the public models and a 0
+    num_times = 502 # from log(age/yr) = 4 to 9, with 10 times more models than the public models and a 0
     times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
 
     data = None
 
-    tar = tarfile.open(BPASS_directory + "/bpass-v2.2-newmodels.tar.gz", "r:gz")
+    tar = tarfile.open(BPASS_directory + "/singles_" + metals + ".tar.gz", "r:gz")
 
     for model_file in tar:
 
-        if model_file.name.startswith(model_directory + '/sneplot'):
-            print(model_file.name)
+        if model_file.name.startswith(metals + '/sneplot'):
 
             output_data = np.zeros((1, 3, num_times))
 
@@ -88,7 +85,7 @@ def convert_singles(BPASS_directory, output_directory, metals='z014', overwrite=
     tar.close()
         
     # Sort by mass
-    _sort = np.argsort(data[:, 0, 0])[::-1]
+    _sort = np.argsort(data[:, 0, 0])
     data_to_save = data[_sort, :, :]
 
     if ('singles_' + metals + '.h5') not in os.listdir(output_directory) or overwrite:
@@ -117,27 +114,27 @@ def convert_binaries(BPASS_directory, output_directory, metals='z014', overwrite
     # Create directory if it does not already exists
     Path(output_directory).mkdir(parents=True, exist_ok=True)
 
-    model_directory = 'NEWBINMODS/NEWBINMODS/' + metals
-
     # Values for disrupted or modified systems, when looking for new systems
     M_single = np.concatenate((np.arange(0.1, 10., 0.1) , 
                                np.arange(10, 100, 1),
                                np.arange(100, 325, 25)))
 
+
     # Times for time array
-    num_times = 502 # from log(age/yr) = 6 to 9, with 10 times more models than the public models and a 0
+    num_times = 502 # from log(age/yr) = 4 to 9, with 10 times more models than the public models and a 0
     times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
 
     data = None
 
-    tar = tarfile.open(BPASS_directory + "/bpass-v2.2-newmodels.tar.gz", "r:gz")
+    tar = tarfile.open(BPASS_directory + "/binaries_" + metals + ".tar.gz", "r:gz")
+    
+    tar_s = tarfile.open(BPASS_directory + "/singles_" + metals + ".tar.gz", "r:gz")
 
     for model_file in tar:
 
-        if model_file.name.startswith(model_directory + '/sneplot'):
-            print(model_file.name)
+        if model_file.name.startswith(metals + '/sneplot'):
 
-            output_data = np.zeros((1, 6, num_times))
+            output_data = np.zeros((1, 7, num_times))
 
             f = tar.extractfile(model_file)
             input_data = np.genfromtxt(f)
@@ -200,17 +197,17 @@ def convert_binaries(BPASS_directory, output_directory, metals='z014', overwrite
                     else:
                         effective_time = input_times[t]
 
-                    rejuvenated_file = 'NEWSINMODS/' + metals + '/sneplot-' + metals + '-' + M2_closest
+                    rejuvenated_file = metals + '/sneplot-' + metals + '-' + M2_closest
 
 
                 else:
                     
                     for m in _mask:
 
-                        output_data[0, 0, m] = input_data[t, 5]      # mass in MSun
+                        output_data[0, 0, m] = input_data[t, 5]  # mass in MSun
                         output_data[0, 1, m] = input_data[t, 4]  # Lsun
                         if t == (len(input_times) - 1):
-                            data[0, 1, m] *= 0 # must set to 0 after SN
+                            output_data[0, 1, m] *= 0 # must set to 0 after SN
                         output_data[0, 2, m] = input_data[t, 3]  # K 
                         # Companion
                         if not merger:
@@ -222,10 +219,12 @@ def convert_binaries(BPASS_directory, output_directory, metals='z014', overwrite
                                 output_data[0, 3, m] = input_data[t, 37] - accreted_mass
                                 output_data[0, 4, m] = input_data[t, 48] # Lsun, companion
                                 output_data[0, 5, m] = input_data[t, 47] # K, companion
+                        output_data[0, 6, m] = input_data[t, 34]  # yr
 
                 if rejuvenated_file:
 
-                    f = tar.extractfile(rejuvenated_file)
+                    
+                    f = tar_s.extractfile(rejuvenated_file)
                     M2_data = np.genfromtxt(f)
 
                     # Replace NaNs by 0s --> What about files without a companion?
@@ -277,11 +276,10 @@ def convert_binaries(BPASS_directory, output_directory, metals='z014', overwrite
             masses[m] = masses[m].ljust(4, '0')
 
         ds = xr.DataArray(data, coords=[("Model", masses), ("Property", ["Mass 1 (MSun)", "log L_bol 1 (LSun)", "log T_eff 1 (K)",
-                                                                        "Mass 2 (MSun)", "log L_bol 2 (LSun)", "log T_eff 2 (K)"]), ("Time (log t/yr)", times)])
+                                        "Mass 2 (MSun)", "log L_bol 2 (LSun)", "log T_eff 2 (K)", "P (yr)"]), ("Time (log t/yr)", times)])
         ds.to_netcdf(output_directory + '/binaries_' + metals + '.h5')
 
     else:
         print("Cannot save model. Try setting overwrite=True...")
 
     return
-        
