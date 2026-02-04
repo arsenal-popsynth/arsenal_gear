@@ -105,15 +105,13 @@ def test_mist_interp():
         lmissed[k] = np.array(lmissed[k])
         L_err[k] = np.array(L_err[k])
         T_err[k] = np.array(T_err[k])
-        # these don't seem like very stringent constraints, but there are regions
-        # where things don't seem to work perfectly well in summary metrics, even
-        # though the interpolation looks fine by eye
-        assert_array_less(lmissed[k], 0.35)
-        assert_array_less(L_err[k], 0.50)
-        assert_array_less(T_err[k], 0.30)
-        # the averages errors over all time, especially if you weight by luminosity
-        # over time, which we don't do, are quite small 3% or less
         for arr in lmissed[k], L_err[k], T_err[k]:
+            # these don't seem like very stringent constraints, but there are regions
+            # where things don't seem to work perfectly well in summary metrics, even
+            # though the interpolation looks fine by eye
+            assert_array_less(arr, 0.2)
+            # the average errors over all time, especially if you weight by luminosity
+            # over time, which we don't do, are quite small 3% or less
             assert np.average(arr) < 0.03
 
 
