@@ -8,7 +8,6 @@ which are mostly contained in stellar_evolution/isochrone.py
 
 import astropy.units as u
 import numpy as np
-import pytest
 from numpy.testing import assert_array_less
 from scipy.integrate import trapezoid
 
@@ -116,3 +115,31 @@ def test_mist_interp():
         # over time, which we don't do, are quite small 3% or less
         for arr in lmissed[k], L_err[k], T_err[k]:
             assert np.average(arr) < 0.03
+
+
+def test_lbol_methods_mist():
+    """
+    Test that compares both track-based and isochrone-based methods for
+    interpolating the MIST isochronges, for both discrete and continuous
+    forms of the stellar population.
+    """
+    int_ops = ["iso", "track"]
+    discrete_ops = [True, False]
+    outs = {}
+    # array of times over which to compare bolometric luminosities
+    tlin = np.logspace(5.1,9,20)*u.yr
+    for int_op in int_ops:
+        for discrete in discrete_ops:
+            key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
+            sp = arsenal_gear.StellarPopulation(
+                interp_op=int_op, discrete=discrete
+            )
+            outs[key] = sp.lbol(tlin)
+    # compare all combinations of the four methods
+    keys = list(outs.keys())
+    n = len(keys)
+    for i in range(n):
+        for j in range(i + 1, n):
+            rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
+            # average relative error should be less than 4%
+            assert np.average(rel_err) < 0.04
