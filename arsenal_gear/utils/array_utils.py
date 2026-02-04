@@ -7,7 +7,6 @@ Functions:
     downloader: Method for downloading data from the web
 """
 
-import astropy.units as u
 from astropy.units import Quantity, Unit
 import numpy as np
 
