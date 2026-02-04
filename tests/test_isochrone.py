@@ -50,13 +50,13 @@ def test_mist_interp():
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "eep": arsenal_gear.StellarPopulation(interp_op="eep"),
+        "track": arsenal_gear.StellarPopulation(interp_op="track"),
         "iso": arsenal_gear.StellarPopulation(interp_op="iso", test=True),
     }
 
-    lmissed = {"eep": [], "iso": []}
-    L_err = {"eep": [], "iso": []}
-    T_err = {"eep": [], "iso": []}
+    lmissed = {"track": [], "iso": []}
+    L_err = {"track": [], "iso": []}
+    T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
     ais = np.arange(len(sp["iso"].iso.iset.lages))
@@ -76,7 +76,7 @@ def test_mist_interp():
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
-        for k in ["eep", "iso"]:
+        for k in ["track", "iso"]:
             T[k] = (sp[k].iso.teff(ms, t) / u.K).value
             L[k] = (sp[k].iso.lbol(ms, t) / u.Lsun).value
 
@@ -101,7 +101,7 @@ def test_mist_interp():
                 integrate_mask(np.abs(L[k] - L_ref) * xi, ms.value, nm[k]) / lum[k]
             )
 
-    for k in ["eep", "iso"]:
+    for k in ["track", "iso"]:
         lmissed[k] = np.array(lmissed[k])
         L_err[k] = np.array(L_err[k])
         T_err[k] = np.array(T_err[k])
