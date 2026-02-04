@@ -89,7 +89,9 @@ class NuGrid(YieldTables):
 
         r18_replace = np.array([(1, 2), (3, 2), (4, 2), (1, 3), (3, 3), (4, 3)])
         bat_replace = np.array([(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)])
-        agb_yld[:, *r18_replace.T] = agb_yld_bat[bat_idx[:, None], *bat_replace.T]
+        ri, rj = r18_replace.T
+        bi, bj = bat_replace.T
+        agb_yld[:, ri, rj] = agb_yld_bat[bat_idx[:, None], bi, bj]
         self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
 
         # Stellar wind yields
