@@ -8,6 +8,7 @@ Limongi & Chieffi (2018).
 
 import io
 import os
+from pathlib import Path
 import re
 import tarfile
 from typing import List
@@ -50,7 +51,7 @@ class LimongiChieffi2018(YieldTables):
     def __init__(self, model: str = "R") -> None:
         """
         Args:
-            model: choise of model to load, see Limongi & Chieffi (2018) for details
+            model: choice of model to load, see Limongi & Chieffi (2018) for details
 
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
@@ -81,16 +82,16 @@ class LimongiChieffi2018(YieldTables):
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-        self.filedir += "/LimongiChieffi2018"
+        self.filedir = self.filedir / "data/LimongiChieffi2018"
         self.name = "Limongi & Chieffi (2018)"
 
-        if not os.path.isdir(self.filedir):
-            os.mkdir(self.filedir)
+        if not self.filedir.is_dir():
+            self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields(table=f"tab_{model}")
-        elif not os.path.isfile(self.filedir + f"/tab_{model}.tgz"):
+        elif not (self.filedir / f"tab_{model}.tgz").is_file():
             self.download_yields(table=f"tab_{model}")
 
-        self.filedir += f"/tab_{model}.tgz"
+        self.filedir = self.filedir / f"tab_{model}.tgz"
         self.elements, self.atomic_num = self.get_element_list()
 
         # Stellar wind yields
@@ -253,14 +254,14 @@ class LimongiChieffi2018(YieldTables):
         from ..utils.scraper import downloader
 
         downloader(
-            self.filedir + f"/{table}.tgz",
+            self.filedir / f"{table}.tgz",
             f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
             message=f"Yield file {table}.tgz not found.",
         )
 
-        if not os.path.isfile(self.filedir + "/readme.txt"):
+        if not (self.filedir / "readme.txt").is_file():
             downloader(
-                self.filedir + "/readme.txt",
+                self.filedir / "readme.txt",
                 f"{self.lc_url}/2018-modelli/yields/legenda",
                 message="See downloaded readme.txt for info about yields.",
             )
