@@ -49,8 +49,6 @@ class StellarPopulation:
             if self.verbose:
                 print("Time to sample masses: ", end_samp - start_samp)
             self.Nstar = len(self.masses)
-        self.tmin = 0.0*u.Myr
-        self.tmax = 40.0*u.Myr
 
         # initialize the isochrone system
         self.iso = stellar_evolution.isochrone.IsochroneInterpolator(**kwargs)
@@ -59,7 +57,7 @@ class StellarPopulation:
         """
         Integrate a given quantity over a population given an isochrone
         """
-        return trapz(iso.qs[q]*self.imf.pdf(iso.qs[iso.mini_name]), iso.qs[iso.mini_name])
+        return self.Nstar*trapz(iso.qs[q]*self.imf.pdf(iso.qs[iso.mini_name]), iso.qs[iso.mini_name])
 
     def nsn(self, t: Quantity["time"]) -> int:
         """
@@ -88,12 +86,12 @@ class StellarPopulation:
         Returns the bolometric luminosity of the population at time t
         """
         if self.discrete:
-            if np.isscalar(t):
+            if np.isscalar(t.value):
                 return np.sum(self.lbol_iso(t))
             else:
                 return np.array([np.sum(self.lbol_iso(ti)).value for ti in t])*u.Lsun
         else:
-            if np.isscalar(t):
+            if np.isscalar(t.value):
                 iso = self.iso.construct_isochrone(t)
                 iso.qs["L_bol"] = masked_power(10, iso.qs[self.iso.llbol_label])
                 return self._integrate_pop(iso, "L_bol")*u.Lsun
