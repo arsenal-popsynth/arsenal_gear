@@ -1,7 +1,6 @@
 .envrc
 .venv
 *.swp
-*.ipynb
 
 figures/
 
@@ -25,9 +24,8 @@ arsenal_gear/stellar_evolution/data/
 # plotting outputs
 plots/
 
-# Limongi & Chieffi (2018) yield date
-arsenal_gear/element_yields/LimongiChieffi2018/
-
 # Sukhbold et al. (2016) supplementary data (large, user-downloaded)
-*.tar.gz
-data/
+arsenal_gear/element_yields/Sukhbold2016/
+
+#Limongi & Chieffi (2018) supplementary data
+arsenal_gear/element_yields/LimongiChieffi2018/

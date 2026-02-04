@@ -1,4 +1,13 @@
-# arsenal_gear/element_yields/sukhbold2016.py
+"""
+sukhbold2016
+==========
+
+This submodule contains all the code necessary to load yields from Sukhbold et al. (2016)
+"""
+
+import os
+import re
+import tarfile
 import warnings
 from pathlib import Path
 
@@ -14,104 +23,234 @@ from .yieldtables import YieldTables
 
 class Sukhbold2016(YieldTables):
     """
-    Sukhbold et al. (2016) CCSN + wind yields.
-    Uses pre-parsed CSVs:
-      - sukhbold_ccsn_yields.csv
-      - sukhbold_wind_yields.csv
-      - sukhbold_explosion_energies.csv
-    All located in ../../data/Sukhbold2016/
+    Sukhbold et al. (2016) CCSN + wind yields for masses varying from 9 to 120 Msun.
+
+    Upon first initializtion of this class, the yield tables are
+    downloaded. If this fails, the user may download the .tar.gz files
+
+    Yields available at: https://wwwmpa.mpa-garching.mpg.de/ccsnarchive/data/SEWBJ_2015/
+
+    Reference: Sukhbold T, Ertl T, Woosley SE, Brown JM & Janka HT, 2016, ApJ, 821, 38
+
     """
 
-    def __init__(self):
+    base_url = "https://wwwmpa.mpa-garching.mpg.de/ccsnarchive/data/SEWBJ_2015/data/"
+    nucleosynthesis_file = "nucleosynthesis_yields.tar.gz"
+    energy_file = "explosion_results_PHOTB.tar.gz"
+
+    def __init__(self, engine="N20"):
+
         super().__init__()
-        base_dir = (
-            Path(__file__).resolve().parent.parent.parent / "data" / "Sukhbold2016"
+
+        # Valid engines per Sukhbold et al. (2016)
+        # only these engines have nucleosynthesis yields
+        # Z9.6 covers low mass (low high-mass (?)) of 9 - 12 Msun
+        # and is automatically used alongside
+        self.valid_engines = ["W18", "N20"]
+        if engine not in self.valid_engines:
+            raise ValueError(f"Engine must be one of {self.valid_engines}")
+        self.engine = engine
+
+        self.filedir = Path(__file__).resolve().parent / "Sukhbold2016"
+        self.name = "Sukhbold et al. (2016)"
+
+        if not self.filedir.exists():
+            os.mkdir(self.filedir)
+
+        for table in [self.nucleosynthesis_file, self.energy_file]:
+            if not (self.filedir / table).exists():
+                self.download_sukhbold_table(table)
+
+        # Parse nucleosynthesis yields and explosion energies
+        self.load_from_archives()
+
+    def download_sukhbold_table(self, filename):
+        from ..utils.scraper import downloader
+
+        downloader(
+            str(self.filedir / filename),
+            f"{self.base_url}/{filename}",
+            message=f"Downloading Sukhbold 2016 table: {filename}...",
         )
 
-        # Load ejecta (CCSN) and wind yields
-        ccsn_path = base_dir / "sukhbold_ccsn_yields.csv"
-        wind_path = base_dir / "sukhbold_wind_yields.csv"
-        energy_path = base_dir / "sukhbold_explosion_energies.csv"
+    def load_from_archives(self):
+        """
+        Parses nucleosynthesis yields (one .yield_table file for each mass and engine)
+        and energies (single file per engine containing all ZAMS masses)
+        """
+        all_ejecta = []
+        all_wind = []
 
-        if not ccsn_path.exists() or not wind_path.exists():
-            raise FileNotFoundError(
-                f"Missing yield CSVs in {base_dir}\n"
-                "Run parse_sukhbold_all.py to generate them."
-            )
-
-        df_ccsn = pd.read_csv(ccsn_path).set_index("mass_Msun").fillna(0.0)
-        df_wind = pd.read_csv(wind_path).set_index("mass_Msun").fillna(0.0)
-
-        # Auto-sum isotopes to elements (e.g. o16_ejecta + o17_ejecta + o18_ejecta → O_EJECTA)
-        def add_elemental_sums(df, suffix):
-            elemental = {}
-            for col in df.columns:
-                if col == "mass_Msun" or "_" not in col:
+        with tarfile.open(self.filedir / self.nucleosynthesis_file, "r:gz") as tar:
+            for member in tar.getmembers():
+                if not member.name.endswith(".yield_table"):
                     continue
-                # Get base isotope name (before _ejecta or _wind)
-                base = col.rsplit("_", 1)[0]
-                elem_raw = "".join(c for c in base if not c.isdigit())
-                elem = elem_raw.title() if elem_raw else ""
-                if elem not in elemental:
-                    elemental[elem] = []
-                elemental[elem].append(col)
+                is_base = "Z9.6" in member.name
+                is_engine = self.engine in member.name
+                is_implosion = "implosions" in member.name
 
-            # Collect all summed Series
-            summed_series = []
-            for elem, cols in elemental.items():
-                if cols:
-                    summed = (
-                        df[cols].sum(axis=1, skipna=True).rename(f"{elem}_{suffix}")
+                if is_base or is_engine or is_implosion:
+                    f = tar.extractfile(member)
+                    mass, ej_dict, wi_dict = self._parse_yield_table_stream(
+                        f, member.name
                     )
-                    summed_series.append(summed)
 
-            # One single concat if we have any
-            if summed_series:
-                summed_df = pd.concat(summed_series, axis=1)
-                df = pd.concat([df, summed_df], axis=1)
+                    if mass is not None:
+                        ej_dict["mass_Msun"] = mass
+                        wi_dict["mass_Msun"] = mass
 
-            return df
+                        all_ejecta.append(ej_dict)
+                        all_wind.append(wi_dict)
 
-        df_ccsn = add_elemental_sums(df_ccsn, "EJECTA")
-        df_wind = add_elemental_sums(df_wind, "WIND")
+        df_ccsn = pd.DataFrame(all_ejecta).fillna(0.0)
+        df_wind = pd.DataFrame(all_wind).fillna(0.0)
 
-        self.mass = df_ccsn.index.values
-        self.elements = [c.rsplit("_", 1)[0] for c in df_ccsn.columns if "_" in c]
+        df_ccsn = df_ccsn.groupby("mass_Msun").mean().reset_index()
+        df_wind = df_wind.groupby("mass_Msun").mean().reset_index()
 
-        # Build CCSN Source
-        ccsn_grid = np.zeros((len(self.elements), 1, 1, len(self.mass)))
+        df_ccsn = self.add_elemental_sums(df_ccsn)
+        df_wind = self.add_elemental_sums(df_wind)
+
+        df_ccsn = df_ccsn.sort_values("mass_Msun")
+        df_wind = df_wind.sort_values("mass_Msun")
+
+        self.masses = df_ccsn["mass_Msun"].values
+
+        all_cols = [c for c in df_ccsn.columns if c != "mass_Msun"]
+        self.elements = [el for el in all_cols if el[0].isupper()]
+
+        for col in self.elements:
+            if col not in df_wind.columns:
+                df_wind[col] = 0.0
+
+        ccsn_grid = np.zeros((len(self.elements), 1, 1, len(self.masses)))
+        wind_grid = np.zeros((len(self.elements), 1, 1, len(self.masses)))
+
         for i, el in enumerate(self.elements):
-            col = f"{el}_EJECTA"
-            if col in df_ccsn:
-                ccsn_grid[i, 0, 0, :] = df_ccsn[col].values
-        self.ccsn = Source(
-            self.elements, [np.array([0.0]), np.array([0.02]), self.mass], ccsn_grid
-        )
+            ccsn_grid[i, 0, 0, :] = df_ccsn[el].values
+            wind_grid[i, 0, 0, :] = df_wind[el].values
 
-        # Build wind Source
-        wind_grid = np.zeros((len(self.elements), 1, 1, len(self.mass)))
-        for i, el in enumerate(self.elements):
-            col = f"{el}_WIND"
-            if col in df_wind:
-                wind_grid[i, 0, 0, :] = df_wind[col].values
-        self.wind = Source(
-            self.elements, [np.array([0.0]), np.array([0.02]), self.mass], wind_grid
-        )
+        # Sukhbold et al. (2016) is solar metallicity (0.02) and non-rotating (0)
+        self.ccsn = Source(self.elements, [[0.0], [0.02], self.masses], ccsn_grid)
+        self.wind = Source(self.elements, [[0.0], [0.02], self.masses], wind_grid)
 
-        # Load explosion energies
-        self.has_energies = False
-        if energy_path.exists():
-            df_en = pd.read_csv(energy_path)
-            self._energy_interp = interp1d(
-                df_en["mass_Msun"],
-                df_en["explosion_energy"],
-                kind="nearest",
-                fill_value=0,
-                bounds_error=False,
+        # This archive contains: explosion_results_PHOTB/results_{engine}
+        all_energies = []
+        with tarfile.open(self.filedir / self.energy_file, "r:gz") as tar:
+            for member in tar.getmembers():
+                if member.isfile() and (
+                    "results_Z9.6" in member.name
+                    or f"results_{self.engine}" in member.name
+                ):
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        en_df = self._parse_energy_stream(f)
+                        all_energies.append(en_df)
+
+        self.df_energy = pd.concat(all_energies).sort_values("mass_Msun")
+        self._energy_interp = interp1d(
+            self.df_energy["mass_Msun"].values,
+            self.df_energy["explosion_energy"].values,
+            kind="nearest",
+            bounds_error=False,
+            fill_value=0.0,
+        )
+        self.has_energies = True
+
+    def _parse_yield_table_stream(self, f, filename):
+        """Helper to process individual .yield_table file contents"""
+        text = f.read().decode("utf-8")
+        # Regex to find mass in strings like 's12.25.yield_table'
+        mass_match = re.search(r"[s](\d+\.?\d*)", filename)
+        if not mass_match:
+            return None, None, None
+
+        mass = float(mass_match.group(1))
+        ej, wi = {}, {}
+        for line in text.splitlines():
+            parts = re.split(r"\s+", line.strip())
+            ## header line starts with '[': [isotope]
+            if len(parts) < 2 or parts[0].startswith("["):
+                continue
+            try:
+                iso = parts[0].lower()
+                if len(parts) == 2:
+                    # implosion file: [isotope] [wind]
+                    ej[iso] = 0.0
+                    wi[iso] = float(parts[1])
+                elif len(parts) == 3:
+                    # Standard yield file: [isotope] [ejecta] [wind]
+                    ej[iso] = float(parts[1])
+                    wi[iso] = float(parts[2])
+            except ValueError:
+                continue
+        return mass, ej, wi
+
+    def _parse_energy_stream(self, f):
+        """
+        Parses the results_{engine} text streams from the tarball.
+        Returns a DataFrame with columns ['mass_Msun', 'explosion_energy'].
+        """
+        # Decode the byte stream from the tarfile
+        text = f.read().decode("utf-8")
+
+        data = []
+        # and capture the blocks between them
+        model_matches = list(
+            re.finditer(
+                r"^([a-zA-Z]?\d+\.?\d*)\s*(?:\([^\)]*\))?\s*-*$", text, re.MULTILINE
             )
-            self.has_energies = True
-        else:
-            warnings.warn(f"Explosion energies not found: {energy_path}")
+        )
+
+        for i, match in enumerate(model_matches):
+            # Determine where this model's text block ends
+            start = match.start()
+            end = (
+                model_matches[i + 1].start()
+                if i + 1 < len(model_matches)
+                else len(text)
+            )
+            block = text[start:end]
+
+            # 1. Extract Mass from the header
+            mass_match = re.search(r"\d+\.?\d*", match.group(1))
+            if not mass_match:
+                continue
+            mass = float(mass_match.group())
+
+            # 2. Extract Explosion Energy (E_exp) in units of 'foe' (10^51 erg)
+            # Some stars collapse to BHs and have 0 or no E_exp listed
+            e_match = re.search(r"E_exp\s*=\s*([\d\.]+)\s*foe", block, re.IGNORECASE)
+
+            if e_match:
+                energy = float(e_match.group(1))
+            else:
+                # If E_exp isn't found, the star likely collapsed to a Black Hole
+                energy = 0.0
+
+            data.append({"mass_Msun": mass, "explosion_energy": energy})
+
+        return pd.DataFrame(data)
+
+    def add_elemental_sums(self, df):
+        elemental = {}
+        for col in df.columns:
+            if col == "mass_Msun" or "_" in col:
+                continue
+
+            # Extract element symbol: "o16" -> "O"
+            base = "".join(c for c in col if not c.isdigit())
+            elem = base.title()
+
+            if elem not in elemental:
+                elemental[elem] = []
+            elemental[elem].append(col)
+
+        for elem, cols in elemental.items():
+            if cols:
+                df[elem] = df[cols].sum(axis=1, skipna=True)
+
+        return df
 
     def get_explosion_energy(self, mass):
         if not self.has_energies:
