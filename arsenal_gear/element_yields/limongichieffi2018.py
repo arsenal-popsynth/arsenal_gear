@@ -50,11 +50,11 @@ class LimongiChieffi2018(YieldTables):
     def __init__(self, model: str = "R") -> None:
         """
         Args:
-            model: choise of model to load, see Limongi & Chieffi (2018) for details.
+            model: choise of model to load, see Limongi & Chieffi (2018) for details
 
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
-            >> mass = np.linspace(8, 120, 1000)*u.M_sun
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
             >> tform = u.Myr * np.zeros(100)
             >> rot = u.km / u.s * np.zeros(100)
@@ -62,15 +62,15 @@ class LimongiChieffi2018(YieldTables):
             >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
-            model            Available models.
-            mass             Tabulated masses.
-            metal            Tabulated metallicities.
-            feh              Tabulated [Fe/H].
-            rot              Tabulated stellar rotation velocities.
-            ccsn_max         Assumed minimum mass for direct collase to black hole.
-            filedir          Directory of this file (used for relative path).
-            yield_tablefile  Table filename (total yields).
-            wind_tablefile   Table filename (wind yields).
+            lc_url           Yield source website
+            model            Available models
+            mass             Tabulated masses
+            metal            Tabulated metallicities
+            feh              Tabulated [Fe/H]
+            rot              Tabulated stellar rotation velocities
+            ccsn_max         Assumed minimum mass for direct collase to black hole
+            filedir          Directory of this file (used for relative path)
+            name             Name of yield tables
             elements         Elements available in table.
             atomic_num       Atomic numbers of available elements.
             wind             Source object for stellar winds (massive stars)
@@ -112,12 +112,10 @@ class LimongiChieffi2018(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
-            mass: stellar masses, single or list/array
-            metal: stellar metallicity, single or list/array
-            rot: stellar rotation, single or list/array
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
+            starSop: StarPopulation object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -145,10 +143,8 @@ class LimongiChieffi2018(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
-            mass: stellar masses, single or list/array
-            metal: stellar metallicity, single or list/array
-            rot: stellar rotation, single or list/array
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
+            starSop: StarPopulation object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
         Returns:
