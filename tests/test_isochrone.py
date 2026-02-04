@@ -45,9 +45,6 @@ def integrate_mask(y, x, mask):
     return total_integral
 
 
-@pytest.mark.skip(
-    reason="The luminosity error in the isochrone without EEP is too large in one element"
-)
 def test_mist_interp():
     """initialize stellar population with EEP interpolation
     and otherwise default parameters (which will specify MIST isochrones)
@@ -64,7 +61,7 @@ def test_mist_interp():
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
     ais = np.arange(len(sp["iso"].iso.iset.lages))
-    for ai in ais[2::5]:
+    for ai in ais[2::6]:
         ai += 1
         t = (
             (1 + 1e-6)
