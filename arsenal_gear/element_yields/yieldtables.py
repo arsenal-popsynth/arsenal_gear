@@ -2,8 +2,10 @@
 yieldtables
 ==========
 
-This module contains class used consolidate the structure of different
-yield tables available in the litterature.
+This is basically a header file for the YieldTables class
+it specifies the **maximal** implementation of a YieldTables
+derived class, which will typically only implement a subset
+of the available yield channels.
 """
 
 from pathlib import Path
