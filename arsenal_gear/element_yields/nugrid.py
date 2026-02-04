@@ -44,25 +44,26 @@ class NuGrid(YieldTables):
     def __init__(self, model: str = "delay") -> None:
         """
         Args:
-            model: choise of model to load, see Fryer et al. (2012) for details.
+            model: choise of model to load, see Fryer et al. (2012) for details
 
         Usage:
             >> nugrid = arsenal_gear.element_yields.NuGrid()
-            >> mass = np.linspace(8, 120, 1000)*u.M_sun
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
             >> tform = u.Myr * np.zeros(100)
             >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
-            >> plt.plot(mass, nugrid.ccsn_yields('H', stars,
-                                                 interpolate='nearest'),
-                        '-', color=colors[-1])
+            >> plt.plot(mass, nugrid.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
-            models           Available models.
-            mass             Tabulated masses.
-            metal            Tabulated metallicities.
-            filedir          Directory of this file (used for relative path).
-            elements         Elements available in table.
-            atomic_num       Atomic numbers of available elements.
+            ng_url           Yield source website
+            models           Available models
+            lo_mass          Tabulated masses (low)
+            hi_mass          Tabulated masses (high)
+            metal            Tabulated metallicities
+            filedir          Directory of yield tables
+            name             Name of yields tables
+            elements         Elements available in table
+            atomic_num       Atomic numbers of available elements
             agb              Source object for stellar winds (asymptotic giant branch)
             wind             Source object for stellar winds (massive stars)
             ccsn             Source object for core-collapse SNe
@@ -111,10 +112,10 @@ class NuGrid(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: StarPopulation object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -141,10 +142,10 @@ class NuGrid(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: StarPopulation object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -167,14 +168,14 @@ class NuGrid(YieldTables):
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Interpolate yields from AGB stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
+        """Interpolate yields from AGB stars ejected as winds for specified elements
+        Stellar parameters can be provided as single value, array + single value, or arrays
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: StarPopulation object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -220,7 +221,29 @@ class Pignatari2016(YieldTables):
     metal = np.array([0.01, 0.02])
 
     def __init__(self) -> None:
+        """
+        Usage:
+            >> p16 = arsenal_gear.element_yields.Pignatari2016()
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
+            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
+            >> tform = u.Myr * np.zeros(100)
+            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> plt.plot(mass, p16.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
+        Attributes:
+            p16_url          Yield source website
+            files            Table filenames
+            lo_mass          Tabulated masses (low)
+            hi_mass          Tabulated masses (high)
+            metal            Tabulated metallicities
+            filedir          Directory of yield tables
+            name             Name of yields tables
+            elements         Elements available in table
+            atomic_num       Not available for this class
+            agb              Source object for stellar winds (asymptotic giant branch)
+            wind             Source object for stellar winds (massive stars)
+            ccsn             Source object for core-collapse SNe
+        """
         super().__init__()
         self.filedir += "/NuGrid"
         self.name = "Pignatari et al. (2016)"
@@ -259,10 +282,10 @@ class Pignatari2016(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -289,10 +312,10 @@ class Pignatari2016(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -319,10 +342,10 @@ class Pignatari2016(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -483,7 +506,32 @@ class Ritter2018(YieldTables):
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
     def __init__(self, model: str = "delay") -> None:
+        """
+        Args:
+            model: choise of model to load, see Fryer et al. (2012) for details
 
+        Usage:
+            >> r18 = arsenal_gear.element_yields.Ritter2018()
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
+            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
+            >> tform = u.Myr * np.zeros(100)
+            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> plt.plot(mass, r18.ccsn_yields('H', stars, interpolate='nearest'), '-')
+
+        Attributes:
+            p16_url          Yield source website
+            files            Table filenames
+            lo_mass          Tabulated masses (low)
+            hi_mass          Tabulated masses (high)
+            metal            Tabulated metallicities
+            filedir          Directory of yield tables
+            name             Name of yields tables
+            elements         Elements available in table
+            atomic_num       Atomic numbers of available elements
+            agb              Source object for stellar winds (asymptotic giant branch)
+            wind             Source object for stellar winds (massive stars)
+            ccsn             Source object for core-collapse SNe
+        """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
@@ -527,10 +575,10 @@ class Ritter2018(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -557,10 +605,10 @@ class Ritter2018(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -587,10 +635,10 @@ class Ritter2018(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -758,7 +806,27 @@ class Battino20192021(YieldTables):
     metal = np.array([0.001, 0.01, 0.02, 0.03])
 
     def __init__(self) -> None:
+        """
+        Usage:
+            >> bat = arsenal_gear.element_yields.Battino20192021()
+            >> mass = np.linspace(0.5, 8, 100)*u.M_sun
+            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
+            >> tform = u.Myr * np.zeros(100)
+            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> plt.plot(mass, bat.agb_yields('H', stars, interpolate='nearest'), '-')
 
+        Attributes:
+            b19_url          Yield source website (Battino et al., 2019)
+            b21_url          Yield source website (Battino et al., 2021)
+            files            Table filenames
+            mass             Tabulated masses
+            metal            Tabulated metallicities
+            filedir          Directory of yield tables
+            name             Name of yields tables
+            elements         Elements available in table
+            atomic_num       Atomic numbers of available elements
+            agb              Source object for stellar winds (asymptotic giant branch)
+        """
         super().__init__()
         self.filedir += "/NuGrid"
         self.name = "Battino et al. (2019, 2021)"
@@ -789,10 +857,10 @@ class Battino20192021(YieldTables):
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
         Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             List of yields matching provided element list
 
@@ -815,7 +883,7 @@ class Battino20192021(YieldTables):
         atomic_numbers = []
 
         data = np.genfromtxt(
-            "/Users/eric/Projects/arsenal-popsynth/arsenal_gear/arsenal_gear/element_yields/NuGrid/Battino2019_Yields_table.txt",
+            self.filedir + os.sep + self.files[0],
             skip_header=4,
             skip_footer=5,
             dtype=[("element", "U10")],
