@@ -25,5 +25,22 @@ def main():
     args = parser.parse_args()
     with open(args.paramfile, encoding="utf-8") as f:
         exec(f.read(), globals())
+        starpop = form_context.generate_population()
+        outputs = {
+            "energy": evolve_context.energy,
+            "count": evolve_context.count,
+            "mass": evolve_context.mass,
+            "metals_total": evolve_context.metals_total,
+        }
+        for elem in element_yields.elements:
+            outputs[elem] = (
+                lambda stars, t0, t1, elem=elem: evolve_context.metals_species(
+                    stars, elem, t0, t1
+                )
+            )
         for t0, t1 in zip(out_times[:-1], out_times[1:]):
-            print(t0.to("Myr"), t1.to("Myr"), *[qty(t0, t1) for qty in out_qtys])
+            print(
+                t0.to("Myr"),
+                t1.to("Myr"),
+                *[outputs[qty](starpop, t0, t1) for qty in out_qtys],
+            )

@@ -23,6 +23,7 @@ __all__ = [
     "population",
     "dist_funcs",
     "feedbacks",
+    "element_yields",
     "stellar_evolution",
     "FormationContext",
     "EvolutionContext",
@@ -54,4 +55,21 @@ class FormationContext:
 
 class EvolutionContext:
     def __init__(self, **kwargs) -> None:
-        pass
+        self.mechanisms = kwargs.get("mechanisms", [])
+
+    def mass(self, starpop, t0, t1):
+        return sum(mech.mass(starpop, t0, t1) for mech in self.mechanisms)
+
+    def metals_total(self, starpop, t0, t1):
+        return sum(mech.metals_total(starpop, t0, t1) for mech in self.mechanisms)
+
+    def metals_species(self, starpop, species, t0, t1):
+        return sum(
+            mech.metals_species(starpop, species, t0, t1) for mech in self.mechanisms
+        )
+
+    def count(self, starpop, t0, t1):
+        return sum(mech.count(starpop, t0, t1) for mech in self.mechanisms)
+
+    def energy(self, starpop, t0, t1):
+        return sum(mech.energy(starpop, t0, t1) for mech in self.mechanisms)
