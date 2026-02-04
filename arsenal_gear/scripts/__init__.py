@@ -24,6 +24,6 @@ def main():
     parser.add_argument("paramfile")
     args = parser.parse_args()
     with open(args.paramfile, encoding="utf-8") as f:
-        exec(f.read(), globals=globals())
+        exec(f.read(), globals())
         for t0, t1 in zip(out_times[:-1], out_times[1:]):
             print(t0.to("Myr"), t1.to("Myr"), *[qty(t0, t1) for qty in out_qtys])

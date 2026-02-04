@@ -1,8 +1,8 @@
 imf = dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
 
-Mtot = 1e6 * u.Msun
+form_context = FormationContext(imf=imf, mass=1e6 * u.Msun, metals=0.01)
 
-starpop = population.SSP(mass=imf.sample_mass(Mtot), metals=0.01)
+starpop = form_context.generate_population()
 
 explodability = lambda stars, t0, t1: np.logical_and(
     feedbacks.sn.explodable_mass_range(8 * u.Msun, 40 * u.Msun)(stars),
