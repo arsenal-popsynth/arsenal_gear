@@ -8,7 +8,6 @@ which are mostly contained in stellar_evolution/isochrone.py
 
 import astropy.units as u
 import numpy as np
-import pytest
 from numpy.testing import assert_array_less
 from scipy.integrate import trapezoid
 
@@ -45,44 +44,42 @@ def integrate_mask(y, x, mask):
     return total_integral
 
 
-@pytest.mark.skip(
-    reason="The luminosity error in the isochrone without EEP is too large in one element"
-)
 def test_mist_interp():
     """initialize stellar population with EEP interpolation
     and otherwise default parameters (which will specify MIST isochrones)
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "eep": arsenal_gear.StellarPopulation(interp_op="eep"),
-        "iso": arsenal_gear.StellarPopulation(interp_op="iso", test=True),
+        "eep": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
+            interp_op="eep"
+        ),
+        "iso": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
+            interp_op="iso", test=True
+        ),
     }
 
+    imf = arsenal_gear.dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
     lmissed = {"eep": [], "iso": []}
     L_err = {"eep": [], "iso": []}
     T_err = {"eep": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].iso.iset.lages))
+    ais = np.arange(len(sp["iso"].iset.lages))
     for ai in ais[2::5]:
         ai += 1
-        t = (
-            (1 + 1e-6)
-            * np.power(10, np.array([sp["iso"].iso.iset.lages[ai]]) - 6)
-            * u.Myr
-        )
+        t = (1 + 1e-6) * np.power(10, np.array([sp["iso"].iset.lages[ai]]) - 6) * u.Myr
 
-        ms = sp["iso"].iso.iset.isos[ai].qs["initial_mass"] * u.Msun
-        xi = sp["iso"].imf.pdf(ms)
+        ms = sp["iso"].iset.isos[ai].qs["initial_mass"] * u.Msun
+        xi = imf.pdf(ms)
 
-        L_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_Teff"])
+        L_ref = np.power(10, sp["iso"].iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, sp["iso"].iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
         for k in ["eep", "iso"]:
-            T[k] = (sp[k].iso.teff(ms, t) / u.K).value
-            L[k] = (sp[k].iso.lbol(ms, t) / u.Lsun).value
+            T[k] = (sp[k].teff(ms, t) / u.K).value
+            L[k] = (sp[k].lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
