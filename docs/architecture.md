@@ -6,7 +6,7 @@ The main way that users should interact with the code in python scripts
 is through the top level `StellarPopulation` class. It has member
 classes for both single and binary stellar sub-populations:
 
-    StellarPopulation 
+    StellarPopulation
     params
         samp_mode       (stochastic, integrative)
         mstar           (total stellar mass)

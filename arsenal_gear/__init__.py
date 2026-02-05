@@ -7,18 +7,25 @@ relevant for stellar feedback from massive stars.
 """
 
 import time
+import warnings
 
 import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 from scipy.integrate import trapezoid as trapz
 
-from . import dist_funcs, feedbacks, element_yields, population, stellar_evolution
+from . import dist_funcs, element_yields, feedbacks, population, stellar_evolution
 from .stellar_evolution.se_data_structures import Isochrone
 from .utils import masked_power
 
-__version__ = '0.0.1'
-__all__ = ['population', 'dist_funcs', 'feedbacks', 'stellar_evolution', 'StellarPopulation']
+__version__ = "0.0.1"
+__all__ = [
+    "population",
+    "dist_funcs",
+    "feedbacks",
+    "stellar_evolution",
+    "StellarPopulation",
+]
 
 
 class StellarPopulation:
@@ -40,7 +47,7 @@ class StellarPopulation:
         # expected number of stars
         self.Nstar = (self.Mtot / self.imf.mean()).value
         # log10(Z/Zsun)
-        self.metallicity = kwargs.get("metallicity", 0.0)
+        self.metallicity = kwargs.get("metallicity", 0.0) * u.dimensionless_unscaled
         # generate masses
         if self.discrete:
             start_samp = time.time()
@@ -53,11 +60,13 @@ class StellarPopulation:
         # initialize the isochrone system
         self.iso = stellar_evolution.isochrone.IsochroneInterpolator(**kwargs)
 
-    def _integrate_pop(self, iso:Isochrone, q:str) -> np.float64:
+    def _integrate_pop(self, iso: Isochrone, q: str) -> np.float64:
         """
         Integrate a given quantity over a population given an isochrone
         """
-        return self.Nstar*trapz(iso.qs[q]*self.imf.pdf(iso.qs[iso.mini_name]), iso.qs[iso.mini_name])
+        return self.Nstar * trapz(
+            iso.qs[q] * self.imf.pdf(iso.qs[iso.mini_name]), iso.qs[iso.mini_name]
+        )
 
     def nsn(self, t: Quantity["time"]) -> int:
         """
@@ -81,7 +90,7 @@ class StellarPopulation:
         Mmaxdot = self.iso.mmaxdot(t)
         return -self.imf.pdf(Mmax) * Mmaxdot * (Mmax.value > 8) * self.Nstar
 
-    def lbol(self, t:Quantity["time"]) -> Quantity["power"]:
+    def lbol(self, t: Quantity["time"]) -> Quantity["power"]:
         """
         Returns the bolometric luminosity of the population at time t
         """
@@ -89,21 +98,21 @@ class StellarPopulation:
             if np.isscalar(t.value):
                 return np.sum(self.lbol_iso(t))
             else:
-                return np.array([np.sum(self.lbol_iso(ti)).value for ti in t])*u.Lsun
+                return np.array([np.sum(self.lbol_iso(ti)).value for ti in t]) * u.Lsun
         else:
             if np.isscalar(t.value):
                 iso = self.iso.construct_isochrone(t)
                 iso.qs["L_bol"] = masked_power(10, iso.qs[self.iso.llbol_label])
-                return self._integrate_pop(iso, "L_bol")*u.Lsun
+                return self._integrate_pop(iso, "L_bol") * u.Lsun
             else:
                 res = []
                 for ti in t:
                     iso = self.iso.construct_isochrone(ti)
                     iso.qs["L_bol"] = masked_power(10, iso.qs[self.iso.llbol_label])
                     res.append(self._integrate_pop(iso, "L_bol"))
-                return np.array(res)*u.Lsun
-    
-    def teff(self, t:Quantity["time"]) -> Quantity["power"]:
+                return np.array(res) * u.Lsun
+
+    def teff(self, t: Quantity["time"]) -> Quantity["power"]:
         """
         Returns the bolometric luminosity weighted
         effective temperature of the population at time t
@@ -111,30 +120,30 @@ class StellarPopulation:
         if np.isscalar(t.value):
             teffs = self.teff_iso(t)
             lbols = self.lbol_iso(t)
-            return np.sum(teffs*lbols)/np.sum(lbols)
+            return np.sum(teffs * lbols) / np.sum(lbols)
         else:
             teff_arr = []
             for ti in t:
                 teffs = self.teff_iso(ti)
                 lbols = self.lbol_iso(ti)
-                teff_arr.append((np.sum(teffs*lbols)/np.sum(lbols)).value)
-            return np.array(teff_arr)*u.K
+                teff_arr.append((np.sum(teffs * lbols) / np.sum(lbols)).value)
+            return np.array(teff_arr) * u.K
 
-    def lbol_iso(self, t:Quantity["time"]) -> Quantity["power"]:
+    def lbol_iso(self, t: Quantity["time"]) -> Quantity["power"]:
         """
         Returns the bolometric luminosity of each star in the population at time t
         """
-        Lbols = self.iso.lbol(self.masses, t) 
+        Lbols = self.iso.lbol(self.masses, t)
         return Lbols[np.logical_not(Lbols.mask)]
 
-    def teff_iso(self, t:Quantity["time"]) -> Quantity["temperature"]:
+    def teff_iso(self, t: Quantity["time"]) -> Quantity["temperature"]:
         """
         Returns the effective temperature of each star in the population at time t
         """
-        Teffs = self.iso.teff(self.masses, t) 
+        Teffs = self.iso.teff(self.masses, t)
         return Teffs[np.logical_not(Teffs.mask)]
 
-    def __call__(self, N:int) -> population.StarPopulation:
+    def __call__(self, N: int) -> population.StarPopulation:
         """
         Return a
         """
