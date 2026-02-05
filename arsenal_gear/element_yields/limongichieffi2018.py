@@ -7,7 +7,6 @@ Limongi & Chieffi (2018).
 """
 
 import io
-import os
 import re
 import tarfile
 from typing import List
@@ -49,52 +48,48 @@ class LimongiChieffi2018(YieldTables):
 
     def __init__(self, model: str = "R") -> None:
         """
-                Args:
-        <<<<<<< HEAD
-                    model: choice of model to load, see Limongi & Chieffi (2018) for details.
-        =======
-                    model: choise of model to load, see Limongi & Chieffi (2018) for details
-        >>>>>>> origin/main
+        Args:
+            model: choice of model to load, see Limongi & Chieffi (2018) for details
 
-                Usage:
-                    >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
-                    >> mass = np.linspace(8, 120, 100)*u.M_sun
-                    >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-                    >> tform = u.Myr * np.zeros(100)
-                    >> rot = u.km / u.s * np.zeros(100)
-                    >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform, rot=rot)
-                    >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
+        Usage:
+            >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
+            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
+            >> tform = u.Myr * np.zeros(100)
+            >> rot = u.km / u.s * np.zeros(100)
+            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform, rot=rot)
+            >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
-                Attributes:
-                    lc_url           Yield source website
-                    model            Available models
-                    mass             Tabulated masses
-                    metal            Tabulated metallicities
-                    feh              Tabulated [Fe/H]
-                    rot              Tabulated stellar rotation velocities
-                    ccsn_max         Assumed minimum mass for direct collase to black hole
-                    filedir          Directory of this file (used for relative path)
-                    name             Name of yield tables
-                    elements         Elements available in table.
-                    atomic_num       Atomic numbers of available elements.
-                    wind             Source object for stellar winds (massive stars)
-                    ccsn             Source object for core-collapse SNe
+        Attributes:
+            lc_url           Yield source website
+            model            Available models
+            mass             Tabulated masses
+            metal            Tabulated metallicities
+            feh              Tabulated [Fe/H]
+            rot              Tabulated stellar rotation velocities
+            ccsn_max         Assumed minimum mass for direct collase to black hole
+            filedir          Directory of this file (used for relative path)
+            name             Name of yield tables
+            elements         Elements available in table.
+            atomic_num       Atomic numbers of available elements.
+            wind             Source object for stellar winds (massive stars)
+            ccsn             Source object for core-collapse SNe
         """
 
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-        self.filedir += "/LimongiChieffi2018"
+        self.filedir = self.filedir / "data/LimongiChieffi2018"
         self.name = "Limongi & Chieffi (2018)"
 
-        if not os.path.isdir(self.filedir):
-            os.mkdir(self.filedir)
+        if not self.filedir.is_dir():
+            self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields(table=f"tab_{model}")
-        elif not os.path.isfile(self.filedir + f"/tab_{model}.tgz"):
+        elif not (self.filedir / f"tab_{model}.tgz").is_file():
             self.download_yields(table=f"tab_{model}")
 
-        self.filedir += f"/tab_{model}.tgz"
+        self.filedir = self.filedir / f"tab_{model}.tgz"
         self.elements, self.atomic_num = self.get_element_list()
 
         # Stellar wind yields
@@ -105,6 +100,7 @@ class LimongiChieffi2018(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
+    ## Main interface functions
     def ccsn_yields(
         self,
         elements: List[str],
@@ -170,6 +166,7 @@ class LimongiChieffi2018(YieldTables):
         )
         return {el: yld_array[i] for i, el in enumerate(elements)}
 
+    ## Internal functions for loading data
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
 
@@ -255,23 +252,25 @@ class LimongiChieffi2018(YieldTables):
 
         return ccsn_yld
 
+    ## Function for downloading data from the web
     def download_yields(self, table: str) -> None:
         """Downloader for tabulated yield files."""
         from ..utils.scraper import downloader
 
         downloader(
-            self.filedir + f"/{table}.tgz",
+            self.filedir / f"{table}.tgz",
             f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
             message=f"Yield file {table}.tgz not found.",
         )
 
-        if not os.path.isfile(self.filedir + "/readme.txt"):
+        if not (self.filedir / "readme.txt").is_file():
             downloader(
-                self.filedir + "/readme.txt",
+                self.filedir / "readme.txt",
                 f"{self.lc_url}/2018-modelli/yields/legenda",
                 message="See downloaded readme.txt for info about yields.",
             )
 
+    # helper functions for reading tables
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""

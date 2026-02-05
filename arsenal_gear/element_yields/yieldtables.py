@@ -2,11 +2,13 @@
 yieldtables
 ==========
 
-This module contains class used consolidate the structure of different
-yield tables available in the litterature.
+This is basically a header file for the YieldTables class
+it specifies the **maximal** implementation of a YieldTables
+derived class, which will typically only implement a subset
+of the available yield channels.
 """
 
-import os
+from pathlib import Path
 from typing import List
 
 from astropy.units import Quantity
@@ -23,7 +25,7 @@ class YieldTables:
 
     def __init__(self) -> None:
         self.name = "None"
-        self.filedir = os.path.dirname(os.path.realpath(__file__))
+        self.filedir = Path(__file__).parent.absolute()
 
         self.elements = None
         self.atomic_num = None

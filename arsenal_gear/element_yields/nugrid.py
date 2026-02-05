@@ -72,7 +72,7 @@ class NuGrid(YieldTables):
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-        self.filedir += "/NuGrid"
+        self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "NuGrid"
 
         r18 = Ritter2018(model=model)
@@ -245,16 +245,13 @@ class Pignatari2016(YieldTables):
             ccsn             Source object for core-collapse SNe
         """
         super().__init__()
-        self.filedir += "/NuGrid"
+        self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Pignatari et al. (2016)"
-
-        if not os.path.isdir(self.filedir):
-            os.mkdir(self.filedir)
+        if not self.filedir.is_dir():
+            self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
         else:
-            if not all(
-                [os.path.isfile(self.filedir + os.sep + file) for file in self.files]
-            ):
+            if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
 
         self.elements, self.atomic_num = self.get_element_list()
@@ -367,7 +364,7 @@ class Pignatari2016(YieldTables):
         elements = []
         atomic_numbers = []
 
-        with open(self.filedir + os.sep + self.files[0], encoding="utf-8") as f:
+        with open(self.filedir / self.files[0], encoding="utf-8") as f:
             lines = f.readlines()
 
         for line in lines[3:]:
@@ -396,7 +393,7 @@ class Pignatari2016(YieldTables):
                 )
 
             data = np.genfromtxt(
-                self.filedir + os.sep + file,
+                self.filedir / file,
                 usecols=[2, 3, 4, 5],
                 skip_header=3,
                 delimiter="&",
@@ -425,7 +422,7 @@ class Pignatari2016(YieldTables):
                 )
 
             data = np.genfromtxt(
-                self.filedir + os.sep + file,
+                self.filedir / file,
                 usecols=[6, 7, 8],
                 skip_header=3,
                 delimiter="&",
@@ -454,7 +451,7 @@ class Pignatari2016(YieldTables):
                 )
 
             data = np.genfromtxt(
-                self.filedir + os.sep + file,
+                self.filedir / file,
                 usecols=[2, 4, 6],
                 skip_header=3,
                 delimiter="&",
@@ -470,9 +467,7 @@ class Pignatari2016(YieldTables):
 
         print("NuGrid (Pignatari et al., 2016) tables not found, starting download.")
         for file in self.files:
-            downloader(
-                self.filedir + os.sep + file, self.p16_url + os.sep + file, message=None
-            )
+            downloader(self.filedir / file, self.p16_url + os.sep + file, message=None)
 
 
 class Ritter2018(YieldTables):
@@ -519,7 +514,7 @@ class Ritter2018(YieldTables):
             >> plt.plot(mass, r18.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
-            p16_url          Yield source website
+            r18_url          Yield source website
             files            Table filenames
             lo_mass          Tabulated masses (low)
             hi_mass          Tabulated masses (high)
@@ -538,16 +533,14 @@ class Ritter2018(YieldTables):
         self.files = [file for file in self.files if model in file]
 
         super().__init__()
-        self.filedir += "/NuGrid"
+        self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Ritter et al. (2018)"
 
-        if not os.path.isdir(self.filedir):
-            os.mkdir(self.filedir)
+        if not self.filedir.is_dir():
+            self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
         else:
-            if not all(
-                [os.path.isfile(self.filedir + os.sep + file) for file in self.files]
-            ):
+            if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
 
         self.elements, self.atomic_num = self.get_element_list()
@@ -660,7 +653,7 @@ class Ritter2018(YieldTables):
         elements = []
         atomic_numbers = []
 
-        with open(self.filedir + os.sep + self.files[0], encoding="utf-8") as f:
+        with open(self.filedir / self.files[0], encoding="utf-8") as f:
             lines = f.readlines()
 
         for line in lines[10:]:
@@ -680,7 +673,7 @@ class Ritter2018(YieldTables):
             if not "winds" in file:
                 continue
 
-            with open(self.filedir + os.sep + file, encoding="utf-8") as f:
+            with open(self.filedir / file, encoding="utf-8") as f:
                 lines = f.readlines()
 
             for iline, line in enumerate(lines):
@@ -689,11 +682,11 @@ class Ritter2018(YieldTables):
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
                     if m > max(self.lo_mass):
                         continue
-                    ind_mass = np.argwhere(self.lo_mass == m)[0][0]
-                    ind_met = np.argwhere(self.metal == Z)[0][0]
+                    ind_mass = np.argmin(np.abs(self.lo_mass - m))
+                    ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
-                        self.filedir + os.sep + file,
+                        self.filedir / file,
                         usecols=[2],
                         skip_header=iline + 4,
                         max_rows=len(self.elements),
@@ -712,7 +705,7 @@ class Ritter2018(YieldTables):
             if not "winds" in file:
                 continue
 
-            with open(self.filedir + os.sep + file, encoding="utf-8") as f:
+            with open(self.filedir / file, encoding="utf-8") as f:
                 lines = f.readlines()
 
             for iline, line in enumerate(lines):
@@ -721,11 +714,11 @@ class Ritter2018(YieldTables):
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
                     if m < min(self.hi_mass):
                         continue
-                    ind_mass = np.argwhere(self.hi_mass == m)[0][0]
-                    ind_met = np.argwhere(self.metal == Z)[0][0]
+                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
-                        self.filedir + os.sep + file,
+                        self.filedir / file,
                         usecols=[2],
                         skip_header=iline + 4,
                         max_rows=len(self.elements),
@@ -744,7 +737,7 @@ class Ritter2018(YieldTables):
             if not "total" in file:
                 continue
 
-            with open(self.filedir + os.sep + file, encoding="utf-8") as f:
+            with open(self.filedir / file, encoding="utf-8") as f:
                 lines = f.readlines()
 
             for iline, line in enumerate(lines):
@@ -753,11 +746,11 @@ class Ritter2018(YieldTables):
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
                     if m < min(self.hi_mass):
                         continue
-                    ind_mass = np.argwhere(self.hi_mass == m)[0][0]
-                    ind_met = np.argwhere(self.metal == Z)[0][0]
+                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
-                        self.filedir + os.sep + file,
+                        self.filedir / file,
                         usecols=[2],
                         skip_header=iline + 4,
                         max_rows=len(self.elements),
@@ -774,9 +767,7 @@ class Ritter2018(YieldTables):
 
         print("NuGrid (Ritter et al., 2018) tables not found, starting download.")
         for file in self.files:
-            downloader(
-                self.filedir + os.sep + file, self.r18_url + os.sep + file, message=None
-            )
+            downloader(self.filedir / file, self.r18_url + os.sep + file, message=None)
 
 
 class Battino20192021(YieldTables):
@@ -828,16 +819,14 @@ class Battino20192021(YieldTables):
             agb              Source object for stellar winds (asymptotic giant branch)
         """
         super().__init__()
-        self.filedir += "/NuGrid"
+        self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Battino et al. (2019, 2021)"
 
-        if not os.path.isdir(self.filedir):
-            os.mkdir(self.filedir)
+        if not self.filedir.is_dir():
+            self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
         else:
-            if not all(
-                [os.path.isfile(self.filedir + os.sep + file) for file in self.files]
-            ):
+            if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
 
         self.elements, self.atomic_num = self.get_element_list()
@@ -883,7 +872,7 @@ class Battino20192021(YieldTables):
         atomic_numbers = []
 
         data = np.genfromtxt(
-            self.filedir + os.sep + self.files[0],
+            self.filedir / self.files[0],
             skip_header=4,
             skip_footer=5,
             dtype=[("element", "U10")],
@@ -904,7 +893,7 @@ class Battino20192021(YieldTables):
         agb_yld = np.zeros([len(self.elements), self.metal.size, self.mass.size])
 
         data = np.genfromtxt(
-            self.filedir + os.sep + self.files[0],
+            self.filedir / self.files[0],
             skip_header=4,
             skip_footer=5,
             usecols=[0, 1, 2, 3, 4, 5, 6],
@@ -933,7 +922,7 @@ class Battino20192021(YieldTables):
             )
 
         data = np.genfromtxt(
-            self.filedir + os.sep + self.files[1],
+            self.filedir / self.files[1],
             skip_header=4,
             skip_footer=5,
             usecols=[0, 1, 2],
@@ -963,13 +952,13 @@ class Battino20192021(YieldTables):
             "NuGrid (Battinoi et al., 2019, 2021) tables not found, starting download."
         )
         downloader(
-            self.filedir + os.sep + self.files[0],
-            self.b19_url + "/Yields_table.txt",
+            self.filedir / self.files[0],
+            self.b19_url + os.sep + "Yields_table.txt",
             message=None,
         )
         downloader(
-            self.filedir + os.sep + self.files[1],
-            self.b21_url + "/Yields_Table.txt",
+            self.filedir / self.files[1],
+            self.b21_url + os.sep + "Yields_Table.txt",
             message=None,
         )
 
