@@ -74,7 +74,7 @@ class Source:
             try:
                 return self.yields[elements[0]](points, method=interpolate)
             except KeyError:
-                warnings.warn("Element {elements[0]} is not part of yield set.")
+                warnings.warn(f"Element {elements[0]} is not part of yield set.")
                 return np.nan
         else:
             if all(element in list(self.yields.keys()) for element in elements):
@@ -91,7 +91,7 @@ class Source:
                 try:
                     yld.append(self.yields[element](points, method=interpolate))
                 except KeyError:
-                    warnings.warn("Element {elements[0]} is not part of yield set.")
+                    warnings.warn(f"Element {element} is not part of yield set.")
                     yld.append(np.ones(shape) * np.nan)
             return yld
 
@@ -138,19 +138,19 @@ class Source:
             Interpolation points for RegularGridInterpolator
 
         """
-        max_length = max(
-            len(param) if isinstance(param, (list, np.ndarray)) else 1
-            for param in params
-        )
+        plens = np.array([len(param) if isinstance(param, (list, np.ndarray))
+                         else 1 for param in params])
+        max_length = max(plens)
 
         # Ensure all arguments are lists or arrays of the same length
+        if np.any((plens != 1) & (plens != max_length)):
+            raise ValueError(
+                "All lists of parameters must have the same length."
+            )
+
         args = []
         for param in params:
             if isinstance(param, (list, np.ndarray)):
-                if len(param) != max_length:
-                    raise ValueError(
-                        "All list of parameters must have the same length."
-                    )
                 args.append(np.array(param))
             else:
                 # Fill with the same value
