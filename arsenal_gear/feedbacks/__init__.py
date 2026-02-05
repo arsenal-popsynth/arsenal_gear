@@ -12,9 +12,9 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from . import sn
+from . import analytic
 
-__all__ = ["SNFeedbackMechanism", "sn"]
+__all__ = ["SNFeedbackMechanism", "analytic"]
 
 
 class MechanicalFBMechanism(ABC):
@@ -130,9 +130,8 @@ class SNFeedbackMechanism(MechanicalFBMechanism):
         energy_func: Callable[[Type["SSP"]], Quantity["energy"]],
         mass_func: Callable[[Type["SSP"]], Quantity["mass"]],
         metals_func: Callable[[Type["SSP"]], dict],
-        explodability_func: Callable[
-            [Type["SSP"], Quantity["time"], Quantity["time"]], bool
-        ],
+        lifetime_func,
+        explodability_func: Callable[[Type["SSP"]], bool],
     ) -> None:
         """
         Initialize the SN feedback mechanism.  The explodability function is used
@@ -145,13 +144,33 @@ class SNFeedbackMechanism(MechanicalFBMechanism):
         :type mass_func: Callable[[SSP], Quantity["mass"]]
         :param metals_func: Function to get total and per-species metal yields from an SSP
         :type metals_func: Callable[[SSP], dict]
-        :param explodability_func: Function to determine which stars explode between t0 and t1
-        :type explodability_func: Callable[[SSP, Quantity["time"], Quantity["time"]], bool]
+        :param lifetime_func: Function to get stellar lifetimes from an SSP
+        :type lifetime_func: Callable[[SSP], Quantity["time"]] or IsochroneInterpolator
+        :param explodability_func: Function to determine which stars explode
+        :type explodability_func: Callable[[SSP], bool]
         """
         self.energy_ = energy_func
-        self.mass_ = mass_func
+        if hasattr(mass_func, "ccsn_mass"):
+            self.mass_ = mass_func.ccsn_mass
+        else:
+            self.mass_ = mass_func
         self.metals_ = metals_func
-        self.explode = explodability_func
+        if hasattr(lifetime_func, "mmax"):
+            self.explode = lambda stars, t0, t1: np.bool(
+                np.logical_and(
+                    explodability_func(stars),
+                    analytic.explodable_mass_range(
+                        lifetime_func.mmax(t1), lifetime_func.mmax(t0)
+                    )(stars),
+                )
+            )
+        else:
+            self.explode = lambda stars, t0, t1: np.bool(
+                np.logical_and(
+                    explodability_func(stars),
+                    analytic.explodable_lifetime_range(t0, t1, lifetime_func)(stars),
+                )
+            )
 
     def metals_species(self, stars, species, t0, t1):
         metals = self.metals_(stars[self.explode(stars, t0, t1)])
