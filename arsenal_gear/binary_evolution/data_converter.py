@@ -283,7 +283,7 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
     return
 
 
-class BPASS_stellar_models:
+class download_BPASS_models:
     """
     Reads in BPASS stellar model files for use with a discrete stellar population.
     """
@@ -473,7 +473,6 @@ class BPASS_stellar_models:
             print("Looking for a tar file...")
             if os.path.isfile(self.dir + tar_name):
                 self.untar(tar_name, delete_tar=False)
-                _tmp = self.read_bpass_data()
 
             else:
                 print("tar file not available at", self.dir)
@@ -483,7 +482,6 @@ class BPASS_stellar_models:
                         zip_name, target_file=tar_name, delete_zip=False, inspect=False
                     )
                     self.untar(tar_name, delete_tar=False)
-                    _tmp = self.read_bpass_data()
 
                 else:
                     print("zip file not available at", self.dir)
@@ -496,23 +494,10 @@ class BPASS_stellar_models:
                             inspect=False,
                         )
                         self.untar(tar_name, delete_tar=False)
-                        _tmp = self.read_bpass_data()
 
                     else:
                         print("Set force_download = True to download the files")
-                        _tmp = np.empty((10, 1))
 
-        return (
-            _tmp[0],
-            _tmp[1] * u.Msun,
-            _tmp[2] * u.Msun,
-            _tmp[3] * u.Rsun,
-            _tmp[4] * u.Rsun,
-            _tmp[5] * u.K,
-            _tmp[6] * u.K,
-            _tmp[7] * u.Lsun,
-            _tmp[8] * u.Lsun,
-            _tmp[9] * u.Msun / u.yr,
-        )
+        return 
 
         
