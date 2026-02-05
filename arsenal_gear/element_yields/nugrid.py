@@ -251,9 +251,7 @@ class Pignatari2016(YieldTables):
             self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
         else:
-            if not all(
-                [(self.filedir / file).is_file() for file in self.files]
-            ):
+            if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
 
         self.elements, self.atomic_num = self.get_element_list()
@@ -469,9 +467,7 @@ class Pignatari2016(YieldTables):
 
         print("NuGrid (Pignatari et al., 2016) tables not found, starting download.")
         for file in self.files:
-            downloader(
-                self.filedir / file, self.p16_url + os.sep + file, message=None
-            )
+            downloader(self.filedir / file, self.p16_url + os.sep + file, message=None)
 
 
 class Ritter2018(YieldTables):
@@ -544,9 +540,7 @@ class Ritter2018(YieldTables):
             self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
         else:
-            if not all(
-                [(self.filedir / file).is_file() for file in self.files]
-            ):
+            if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
 
         self.elements, self.atomic_num = self.get_element_list()
@@ -688,8 +682,8 @@ class Ritter2018(YieldTables):
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
                     if m > max(self.lo_mass):
                         continue
-                    ind_mass = np.argwhere(self.lo_mass == m)[0][0]
-                    ind_met = np.argwhere(self.metal == Z)[0][0]
+                    ind_mass = np.argmin(np.abs(self.lo_mass - m))
+                    ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
                         self.filedir / file,
@@ -720,8 +714,8 @@ class Ritter2018(YieldTables):
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
                     if m < min(self.hi_mass):
                         continue
-                    ind_mass = np.argwhere(self.hi_mass == m)[0][0]
-                    ind_met = np.argwhere(self.metal == Z)[0][0]
+                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
                         self.filedir / file,
@@ -752,8 +746,8 @@ class Ritter2018(YieldTables):
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
                     if m < min(self.hi_mass):
                         continue
-                    ind_mass = np.argwhere(self.hi_mass == m)[0][0]
-                    ind_met = np.argwhere(self.metal == Z)[0][0]
+                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
                         self.filedir / file,
@@ -773,9 +767,7 @@ class Ritter2018(YieldTables):
 
         print("NuGrid (Ritter et al., 2018) tables not found, starting download.")
         for file in self.files:
-            downloader(
-                self.filedir / file, self.r18_url + os.sep + file, message=None
-            )
+            downloader(self.filedir / file, self.r18_url + os.sep + file, message=None)
 
 
 class Battino20192021(YieldTables):
@@ -834,9 +826,7 @@ class Battino20192021(YieldTables):
             self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields()
         else:
-            if not all(
-                [(self.filedir / file).is_file() for file in self.files]
-            ):
+            if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
 
         self.elements, self.atomic_num = self.get_element_list()
