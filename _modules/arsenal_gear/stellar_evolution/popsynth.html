@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.stellar_evolution.popsynth &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.popsynth</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.stellar_evolution.popsynth</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">output from population synthesis</span>
+<span class="sd">================================</span>
+
+<span class="sd">This submodule defines the interface to various binary population</span>
+<span class="sd">synthesis codes through interpreting and processing their outputs</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+<span class="kn">from</span> <span class="nn">zipfile</span> <span class="kn">import</span> <span class="n">ZipFile</span>
+
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">u</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">astropy.units</span> <span class="kn">import</span> <span class="n">Quantity</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="kn">from</span> <span class="nn">arsenal_gear.population</span> <span class="kn">import</span> <span class="n">BinaryPopulation</span><span class="p">,</span> <span class="n">StarPopulation</span>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models">[docs]</a>
+<span class="k">class</span> <span class="nc">BPASS_stellar_models</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reads in BPASS stellar model files for use with a discrete stellar population.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># basic options for BPASS stellar models</span>
+    <span class="c1"># bpass_url = &quot;https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=0&quot; + \</span>
+    <span class="c1">#            &quot;&amp;e=1&amp;rlkey=7vlk7ra6kvoztzmae8wr34kmz&quot;</span>
+    <span class="c1"># Change dl=0 to dl=1 to force download</span>
+    <span class="n">bpass_url</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&quot;</span>
+        <span class="o">+</span> <span class="s2">&quot;&amp;e=1&amp;rlkey=7vlk7ra6kvoztzmae8wr34kmz&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">singles</span><span class="p">:</span> <span class="n">StarPopulation</span><span class="p">,</span>
+        <span class="n">binaries</span><span class="p">:</span> <span class="n">BinaryPopulation</span><span class="p">,</span>
+        <span class="n">metal</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">time</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+        <span class="n">bpass_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">force_download</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            stars:     the StarPopulation instance for which we want information</span>
+<span class="sd">            binaries:  the BinaryPopulation instance for which we want information</span>
+<span class="sd">            metal:     the metallicity of the stellar population</span>
+<span class="sd">            TO DO -CCC, 26/06/2025: Read metallicity from binaries</span>
+<span class="sd">            time:      current simulation time</span>
+<span class="sd">            bpass_dir: the directory for the BPASS models</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">download</span> <span class="o">=</span> <span class="n">force_download</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">metals</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;zem5&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;zem4&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z001&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z002&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z003&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z004&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z006&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z008&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z010&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z014&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z020&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z030&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;z040&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">metal</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metals</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Metallicity </span><span class="si">{</span><span class="n">metal</span><span class="si">}</span><span class="s2"> does not exist.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">metal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">metal</span>
+        <span class="k">if</span> <span class="n">bpass_dir</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;/&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">bpass_dir</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">bpass_dir</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">s_mass</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">singles</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">b_mass</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">binaries</span><span class="o">.</span><span class="n">primary</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mratio</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">binaries</span><span class="o">.</span><span class="n">secondary</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">binaries</span><span class="o">.</span><span class="n">primary</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logp</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">binaries</span><span class="p">[</span><span class="s2">&quot;period&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+<div class="viewcode-block" id="BPASS_stellar_models.downloader">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.downloader">[docs]</a>
+    <span class="k">def</span> <span class="nf">downloader</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="n">bpass_url</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;Downloading stellar models...&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Method for downloading BPASS stellar models from the web.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            url (str): The URL of the BPASS repository.</span>
+<span class="sd">            message (str): Optional message to display before downloading.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            Exception: If the download fails.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">message</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="n">download_url</span> <span class="o">=</span> <span class="n">url</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;/&quot;</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;bpass_v2.2.tar.gz&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;/bpass_v2.2.tar.gz&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">download_url</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">Timeout</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">Timeout</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Request timed out. Check your internet connection. </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RequestException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RequestException</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Request failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get file size</span>
+        <span class="n">total_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;content-length&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="c1"># create a progress bar</span>
+        <span class="n">tqdm_args</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;desc&#39;</span><span class="p">:</span> <span class="s1">&#39;Downloading&#39;</span><span class="p">,</span> <span class="s1">&#39;total&#39;</span><span class="p">:</span> <span class="n">total_size</span><span class="p">,</span> <span class="s1">&#39;unit&#39;</span><span class="p">:</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;unit_scale&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;unit_divisor&#39;</span><span class="p">:</span> <span class="mi">1024</span><span class="p">}</span>
+        <span class="c1"># write the file</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">,</span> <span class="n">tqdm</span><span class="p">(</span><span class="o">**</span><span class="n">tqdm_args</span><span class="p">)</span> <span class="k">as</span> <span class="n">prog_bar</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">iter_content</span><span class="p">(</span><span class="n">chunk_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">):</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                <span class="n">prog_bar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.unzip">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.unzip">[docs]</a>
+    <span class="k">def</span> <span class="nf">unzip</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">zip_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">target_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delete_zip</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inspect</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Un-compress the zip file downloaded from the BPASS dropbox.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            zip_name    (str): Name of expected zip file</span>
+<span class="sd">            target_file (str): Name of expected tar file in zip file</span>
+<span class="sd">                               If none, extract all tar files</span>
+<span class="sd">            delete_zip (bool): Delete the zip file after extracting the tar file</span>
+<span class="sd">            inspect    (bool): Print the names of the tar files in the zip file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;/&quot;</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="n">zip_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="n">zip_name</span>
+
+        <span class="k">with</span> <span class="n">ZipFile</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">zip_archive</span><span class="p">:</span>
+            <span class="n">file_names</span> <span class="o">=</span> <span class="n">zip_archive</span><span class="o">.</span><span class="n">namelist</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">inspect</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">file_names</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">target_file</span> <span class="ow">in</span> <span class="n">file_names</span><span class="p">:</span>
+
+                    <span class="n">zip_archive</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">target_file</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">target_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">zip_archive</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">delete_zip</span> <span class="ow">and</span> <span class="n">fname</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Deleting&quot;</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+            <span class="n">fname</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.untar">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.untar">[docs]</a>
+    <span class="k">def</span> <span class="nf">untar</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tar_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">delete_tar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Un-compress the tar file extracted from the BPASS zip file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tar_name    (str): Name of expected tar file</span>
+<span class="sd">            delete_tar (bool): Delete the tar file after extracting</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;/&quot;</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="n">tar_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="n">tar_name</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">is_tarfile</span><span class="p">(</span><span class="n">fname</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">fname</span><span class="si">}</span><span class="s2"> is not a valid tar.gz file. &quot;</span>
+                <span class="s2">&quot;Try again with `force_download=True`&quot;</span>
+            <span class="p">)</span>
+        <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;r:gz&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tar</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracting </span><span class="si">{</span><span class="n">fname</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">tar</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">delete_tar</span> <span class="ow">and</span> <span class="n">fname</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Deleting&quot;</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+            <span class="n">fname</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.data_from_model">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.data_from_model">[docs]</a>
+    <span class="k">def</span> <span class="nf">data_from_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">time_now</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract the stellar properties necessary for feedback</span>
+<span class="sd">        from a BPASS stellar model file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data                (tuple): Matrix loaded from the stellar model file</span>
+<span class="sd">            time_now (Quantity[&quot;time&quot;]): Current simulation time</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Feedback properties</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Replace NaNs by 0s --&gt; What about files without a companion?</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="c1"># We want to extract the following values</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="n">ind_now</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">time_now</span> <span class="o">-</span> <span class="n">time</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Model time</span>
+        <span class="n">t_max</span> <span class="o">=</span> <span class="n">time</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Need to use column 36 for 50-0.9-1</span>
+        <span class="n">M1</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">36</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="p">)</span>  <span class="c1"># 5 recommended in manual but doesn&#39;t conserve mass, 36 works</span>
+        <span class="n">L1</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Lsun</span>
+        <span class="n">T1</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">K</span>
+        <span class="n">R1</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Rsun</span>
+
+        <span class="n">M2</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">37</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="n">L2</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">48</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Lsun</span>
+        <span class="n">T2</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">47</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">K</span>
+        <span class="n">R2</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">46</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Rsun</span>
+
+        <span class="n">M2_init</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">37</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>  <span class="c1"># Initial companion mass</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">34</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span>  <span class="c1"># Final orbital period</span>
+
+        <span class="n">dM</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">39</span><span class="p">]</span>
+                <span class="o">+</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">40</span><span class="p">]</span>
+                <span class="o">-</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">41</span><span class="p">]</span>
+                <span class="o">-</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">42</span><span class="p">]</span>
+                <span class="o">+</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">43</span><span class="p">]</span>
+                <span class="o">+</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">44</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+            <span class="o">/</span> <span class="p">(</span><span class="mf">1.989</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">s</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">M1</span><span class="p">,</span> <span class="n">M2</span><span class="p">,</span> <span class="n">M2_init</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">R1</span><span class="p">,</span> <span class="n">R2</span><span class="p">,</span> <span class="n">T1</span><span class="p">,</span> <span class="n">T2</span><span class="p">,</span> <span class="n">L1</span><span class="p">,</span> <span class="n">L2</span><span class="p">,</span> <span class="n">dM</span><span class="p">,</span> <span class="n">t_max</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.data_from_single_model">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.data_from_single_model">[docs]</a>
+    <span class="k">def</span> <span class="nf">data_from_single_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">time_now</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract the stellar properties necessary for feedback</span>
+<span class="sd">        from a BPASS stellar model file, for a single star.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data                (tuple): Matrix loaded from the stellar model file</span>
+<span class="sd">            time_now (Quantity[&quot;time&quot;]): Current simulation time</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Feedback properties</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Replace NaNs by 0s --&gt; What about files without a companion?</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="c1"># We want to extract the following values</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="n">ind_now</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">time_now</span> <span class="o">-</span> <span class="n">time</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Model time</span>
+        <span class="n">t_max</span> <span class="o">=</span> <span class="n">time</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Need to use column 36 for 50-0.9-1</span>
+        <span class="n">M1</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="p">)</span>  <span class="c1"># 5 recommended in manual but doesn&#39;t conserve mass, 36 works</span>
+        <span class="n">L1</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Lsun</span>
+        <span class="n">T1</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">K</span>
+        <span class="n">R1</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Rsun</span>
+
+        <span class="n">dM</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">39</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.989</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">s</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">M1</span><span class="p">,</span> <span class="n">R1</span><span class="p">,</span> <span class="n">T1</span><span class="p">,</span> <span class="n">L1</span><span class="p">,</span> <span class="n">dM</span><span class="p">,</span> <span class="n">t_max</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.data_from_companion_model">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.data_from_companion_model">[docs]</a>
+    <span class="k">def</span> <span class="nf">data_from_companion_model</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">time_now</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract the stellar properties necessary for feedback</span>
+<span class="sd">        from a BPASS stellar model file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data                (tuple): Matrix loaded from the stellar model file</span>
+<span class="sd">            time_now (Quantity[&quot;time&quot;]): Current simulation time</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Feedback properties</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Replace NaNs by 0s --&gt; What about files without a companion?</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="c1"># We want to extract the following values</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="n">ind_now</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">time_now</span> <span class="o">-</span> <span class="n">time</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Model time</span>
+        <span class="n">t_max</span> <span class="o">=</span> <span class="n">time</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Directory</span>
+        <span class="n">c_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;NEWBINMODS/NEWSECMODS/&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span> <span class="o">+</span> <span class="s2">&quot;_2/&quot;</span>
+
+        <span class="c1"># Need to use column 36 for 50-0.9-1</span>
+        <span class="n">MR</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">29</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="p">)</span>  <span class="c1"># 5 recommended in manual but doesn&#39;t conserve mass, 36 works</span>
+
+        <span class="n">M2</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">37</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+
+        <span class="n">M2_init</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">37</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>  <span class="c1"># Initial companion mass</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">34</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span>  <span class="c1"># Final orbital period</span>
+
+        <span class="n">M2_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">2.2</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.3</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mf">2.7</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mf">3.2</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">,</span> <span class="mf">3.7</span><span class="p">]),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">26</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">30</span><span class="p">,</span> <span class="mi">35</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">300</span><span class="p">]),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">MR_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="mf">0.1</span><span class="p">,</span>
+                <span class="mf">0.158489</span><span class="p">,</span>
+                <span class="mf">0.199526</span><span class="p">,</span>
+                <span class="mf">0.251189</span><span class="p">,</span>
+                <span class="mf">0.316228</span><span class="p">,</span>
+                <span class="mf">0.398107</span><span class="p">,</span>
+                <span class="mf">0.501187</span><span class="p">,</span>
+                <span class="mf">0.630957</span><span class="p">,</span>
+                <span class="mf">0.794328</span><span class="p">,</span>
+                <span class="mf">1.29593</span><span class="p">,</span>
+                <span class="mf">1.4</span><span class="p">,</span>
+                <span class="mf">1.99526</span><span class="p">,</span>
+                <span class="mf">2.51189</span><span class="p">,</span>
+                <span class="mf">3.16228</span><span class="p">,</span>
+                <span class="mf">3.98107</span><span class="p">,</span>
+                <span class="mf">5.01187</span><span class="p">,</span>
+                <span class="mf">6.30957</span><span class="p">,</span>
+                <span class="mf">7.94328</span><span class="p">,</span>
+                <span class="mf">10.0000</span><span class="p">,</span>
+                <span class="mf">12.5893</span><span class="p">,</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="n">P_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">4.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+
+        <span class="n">M2_file</span> <span class="o">=</span> <span class="n">M2_vals</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">M2_vals</span> <span class="o">-</span> <span class="n">M2_init</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)))]</span>
+        <span class="k">if</span> <span class="n">M2_file</span> <span class="o">==</span> <span class="nb">int</span><span class="p">(</span><span class="n">M2_file</span><span class="p">):</span>
+            <span class="n">M2_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">M2_file</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">M2_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">M2_file</span><span class="p">)</span>
+        <span class="n">MR_file</span> <span class="o">=</span> <span class="n">MR_vals</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">MR_vals</span> <span class="o">-</span> <span class="n">MR</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)))]</span>
+        <span class="k">if</span> <span class="n">MR_file</span> <span class="o">==</span> <span class="mi">10</span><span class="p">:</span>
+            <span class="n">MR_str</span> <span class="o">=</span> <span class="s2">&quot;10.0000&quot;</span>  <span class="c1"># set manually</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">MR_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">MR_file</span><span class="p">)</span>
+        <span class="n">P_file</span> <span class="o">=</span> <span class="n">P_vals</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">P_vals</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">P</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">day</span><span class="p">))))]</span>
+        <span class="n">P_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">P_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">P_str</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">P_str</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">):</span>
+            <span class="n">P_str</span> <span class="o">=</span> <span class="n">P_str</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
+
+        <span class="n">c_fname</span> <span class="o">=</span> <span class="s2">&quot;sneplot_2-&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="n">M2_str</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="n">MR_str</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="n">P_str</span>
+
+        <span class="k">if</span> <span class="n">c_fname</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">c_dir</span><span class="p">):</span>
+            <span class="n">c_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">c_dir</span> <span class="o">+</span> <span class="n">c_fname</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">num0</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Adding 0&#39;s...&quot;</span><span class="p">)</span>
+            <span class="k">while</span> <span class="n">num0</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
+                <span class="n">c_fname</span> <span class="o">=</span> <span class="n">c_fname</span> <span class="o">+</span> <span class="s2">&quot;0&quot;</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">c_fname</span><span class="p">)</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">c_dir</span><span class="p">):</span>
+                    <span class="n">c_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">c_dir</span> <span class="o">+</span> <span class="n">c_fname</span><span class="p">)</span>
+                    <span class="n">num0</span> <span class="o">+=</span> <span class="mi">10</span>  <span class="c1"># force exit the loop if ok</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">num0</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">c_fname</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">c_dir</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Incorrect file!&quot;</span><span class="p">,</span> <span class="n">c_fname</span><span class="p">)</span>
+                <span class="n">c_fname</span> <span class="o">=</span> <span class="n">c_fname</span><span class="p">[:</span><span class="o">-</span><span class="mi">10</span><span class="p">]</span>
+                <span class="n">try_num</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">try_num</span><span class="p">:</span>
+                    <span class="n">new_num</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">c_fname</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">:])</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">n</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_num</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">new_num</span> <span class="o">=</span> <span class="n">new_num</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
+                    <span class="n">n_fname</span> <span class="o">=</span> <span class="n">c_fname</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="n">new_num</span>
+
+                    <span class="k">if</span> <span class="n">n_fname</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">c_dir</span><span class="p">):</span>
+                        <span class="n">c_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">c_dir</span> <span class="o">+</span> <span class="n">n_fname</span><span class="p">)</span>
+
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">num0</span> <span class="o">=</span> <span class="mi">0</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Adding 0&#39;s...&quot;</span><span class="p">)</span>
+                        <span class="k">while</span> <span class="n">num0</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
+                            <span class="n">n_fname</span> <span class="o">=</span> <span class="n">n_fname</span> <span class="o">+</span> <span class="s2">&quot;0&quot;</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">n_fname</span><span class="p">)</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">c_dir</span><span class="p">):</span>
+                                <span class="n">c_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">c_dir</span> <span class="o">+</span> <span class="n">n_fname</span><span class="p">)</span>
+                                <span class="n">num0</span> <span class="o">+=</span> <span class="mi">10</span>  <span class="c1"># force exit the loop if ok</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">num0</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># Replace NaNs by 0s --&gt; What about files without a companion?</span>
+        <span class="n">c_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">c_data</span><span class="p">)</span>
+        <span class="c1"># We want to extract the following values</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">c_data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="n">ind_now</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">time_now</span> <span class="o">-</span> <span class="n">time</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Model time</span>
+        <span class="n">t_max</span> <span class="o">=</span> <span class="n">time</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Need to use column 36 for 50-0.9-1</span>
+        <span class="n">M2</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">c_data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="p">)</span>  <span class="c1"># 5 recommended in manual but doesn&#39;t conserve mass, 36 works</span>
+        <span class="n">L2</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">c_data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Lsun</span>
+        <span class="n">T2</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">c_data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">K</span>
+        <span class="n">R2</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">c_data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Rsun</span>
+
+        <span class="n">dM</span> <span class="o">=</span> <span class="n">c_data</span><span class="p">[</span><span class="n">ind_now</span><span class="p">,</span> <span class="mi">39</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.989</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">s</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">M2</span><span class="p">,</span> <span class="n">R2</span><span class="p">,</span> <span class="n">T2</span><span class="p">,</span> <span class="n">L2</span><span class="p">,</span> <span class="n">dM</span><span class="p">,</span> <span class="n">t_max</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.read_bpass_data">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.read_bpass_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_bpass_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Read BPASS data from a stellar model file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># General file name, to append</span>
+        <span class="n">b_fname</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;NEWBINMODS/NEWBINMODS/&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span> <span class="o">+</span> <span class="s2">&quot;/sneplot-&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span>
+        <span class="p">)</span>
+        <span class="n">s_fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;NEWSINMODS/&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span> <span class="o">+</span> <span class="s2">&quot;/sneplot-&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">metal</span>
+        <span class="c1"># Get frequency for each unique binary and single</span>
+        <span class="n">b_props</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">b_mass</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mratio</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logp</span><span class="p">))</span>
+        <span class="n">b_vals</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">b_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+            <span class="n">b_props</span><span class="p">,</span> <span class="n">return_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span>
+        <span class="p">)</span>
+        <span class="n">s_vals</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">s_counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">s_mass</span><span class="p">,</span> <span class="n">return_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+        <span class="n">len_b</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_counts</span><span class="p">)</span>
+        <span class="n">len_s</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">s_counts</span><span class="p">)</span>
+        <span class="n">feedback</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">10</span><span class="p">,</span> <span class="n">len_b</span> <span class="o">+</span> <span class="n">len_s</span><span class="p">))</span>
+        <span class="n">feedback</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">b_counts</span><span class="p">,</span> <span class="n">s_counts</span><span class="p">))</span>
+
+        <span class="c1"># Get the properties for each unique binary</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">len_b</span> <span class="o">+</span> <span class="n">len_s</span><span class="p">):</span>
+
+            <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">len_b</span><span class="p">):</span>
+                <span class="n">_mass</span><span class="p">,</span> <span class="n">_mrat</span><span class="p">,</span> <span class="n">_logp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">b_vals</span><span class="p">[:,</span> <span class="n">i</span><span class="p">],</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="c1"># Matching file names from BPASS</span>
+                <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">_mass</span><span class="p">)[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;.0&quot;</span><span class="p">:</span>
+                    <span class="n">_mass</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">_mass</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">_logp</span><span class="p">)[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;.0&quot;</span><span class="p">:</span>
+                    <span class="n">_logp</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">_logp</span><span class="p">)</span>
+                <span class="n">fname</span> <span class="o">=</span> <span class="n">b_fname</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">_mass</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">_mrat</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">_logp</span><span class="p">)</span>
+
+                <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_from_model</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Rsun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Rsun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">K</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">K</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Lsun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Lsun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">9</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span>
+
+                <span class="c1"># Set primary properties to 0 if remnant</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">):</span>
+
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Getting data from companion... assuming no kick!&quot;</span><span class="p">)</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+                    <span class="n">data_rem</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_from_companion_model</span><span class="p">(</span>
+                        <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span>
+                    <span class="p">)</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_rem</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_rem</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Rsun</span><span class="p">)</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_rem</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">K</span><span class="p">)</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_rem</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Lsun</span><span class="p">)</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">9</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_rem</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_mass</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">s_vals</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="n">len_b</span><span class="p">],</span> <span class="n">decimals</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="c1"># Matching file names from BPASS</span>
+                <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">_mass</span><span class="p">)[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;.0&quot;</span><span class="p">:</span>
+                    <span class="n">_mass</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">_mass</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">_mass</span> <span class="o">==</span> <span class="mi">120</span><span class="p">:</span>
+                    <span class="n">_mass</span> <span class="o">=</span> <span class="mi">125</span>  <span class="c1"># Correct manually; not same mass as the binary models</span>
+                <span class="n">fname</span> <span class="o">=</span> <span class="n">s_fname</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">_mass</span><span class="p">)</span>
+
+                <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_from_single_model</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Rsun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">K</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Lsun</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">9</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Set companion properties to 0</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="n">feedback</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+                <span class="c1"># Also set primary properties to 0 if remnant</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">):</span>
+                    <span class="c1"># Setting properties to 0 for now</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">7</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="n">feedback</span><span class="p">[</span><span class="mi">9</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">return</span> <span class="n">feedback</span></div>
+
+
+<div class="viewcode-block" id="BPASS_stellar_models.get_stellar_models">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.html#arsenal_gear.stellar_evolution.popsynth.BPASS_stellar_models.get_stellar_models">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_stellar_models</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tar_name</span><span class="o">=</span><span class="s2">&quot;bpass-v2.2-newmodels.tar.gz&quot;</span><span class="p">,</span>
+        <span class="n">zip_name</span><span class="o">=</span><span class="s2">&quot;bpass_v2.2.zip&quot;</span><span class="p">,</span>
+        <span class="n">url</span><span class="o">=</span><span class="n">bpass_url</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Look for the stellar models for the stellar population</span>
+<span class="sd">        and download/unzip/untar them if they are not available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;NEWBINMODS&quot;</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Reading BPASS data...&quot;</span><span class="p">)</span>
+            <span class="n">_tmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_bpass_data</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;BPASS data not available at&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;NEWBINMODS&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Looking for a tar file...&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="n">tar_name</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">untar</span><span class="p">(</span><span class="n">tar_name</span><span class="p">,</span> <span class="n">delete_tar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="n">_tmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_bpass_data</span><span class="p">()</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;tar file not available at&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Looking for a zip file...&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="n">zip_name</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">unzip</span><span class="p">(</span>
+                        <span class="n">zip_name</span><span class="p">,</span> <span class="n">target_file</span><span class="o">=</span><span class="n">tar_name</span><span class="p">,</span> <span class="n">delete_zip</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inspect</span><span class="o">=</span><span class="kc">False</span>
+                    <span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">untar</span><span class="p">(</span><span class="n">tar_name</span><span class="p">,</span> <span class="n">delete_tar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="n">_tmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_bpass_data</span><span class="p">()</span>
+
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;zip file not available at&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">downloader</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">unzip</span><span class="p">(</span>
+                            <span class="n">zip_name</span><span class="p">,</span>
+                            <span class="n">target_file</span><span class="o">=</span><span class="n">tar_name</span><span class="p">,</span>
+                            <span class="n">delete_zip</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">inspect</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">untar</span><span class="p">(</span><span class="n">tar_name</span><span class="p">,</span> <span class="n">delete_tar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                        <span class="n">_tmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_bpass_data</span><span class="p">()</span>
+
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Set force_download = True to download the files&quot;</span><span class="p">)</span>
+                        <span class="n">_tmp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Rsun</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Rsun</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">K</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">K</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Lsun</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Lsun</span><span class="p">,</span>
+            <span class="n">_tmp</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.popsynth</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

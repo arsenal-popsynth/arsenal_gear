@@ -1,0 +1,30 @@
+arsenal\_gear.stellar\_evolution.popsynth
+=========================================
+
+.. automodule:: arsenal_gear.stellar_evolution.popsynth
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      BPASS_stellar_models
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="arsenal_gear.stellar_evolution.data_reader.MISTReader" href="arsenal_gear.stellar_evolution.data_reader.MISTReader.html" />
+    <link rel="prev" title="arsenal_gear.stellar_evolution.data_reader" href="arsenal_gear.stellar_evolution.data_reader.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.data_reader.MISTReader.html" title="arsenal_gear.stellar_evolution.data_reader.MISTReader"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.data_reader.html" title="arsenal_gear.stellar_evolution.data_reader"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../api.html" >Arsenal Gear API</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="arsenal_gear.stellar_evolution.html" >arsenal_gear.stellar_evolution</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="arsenal_gear.stellar_evolution.data_reader.html" accesskey="U">arsenal_gear.stellar_evolution.data_reader</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="arsenal-gear-stellar-evolution-data-reader-isochronedatareader">
+<h1>arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader<a class="headerlink" href="#arsenal-gear-stellar-evolution-data-reader-isochronedatareader" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">arsenal_gear.stellar_evolution.data_reader.</span></span><span class="sig-name descname"><span class="pre">IsochroneDataReader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/data_reader.html#IsochroneDataReader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Abstract base class for reading isochrone data from various sources.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.read_iso_data">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">read_iso_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="arsenal_gear.stellar_evolution.se_data_structures.IsochroneSet.html#arsenal_gear.stellar_evolution.se_data_structures.IsochroneSet" title="arsenal_gear.stellar_evolution.se_data_structures.IsochroneSet"><span class="pre">IsochroneSet</span></a></span></span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/data_reader.html#IsochroneDataReader.read_iso_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.read_iso_data" title="Link to this definition">¶</a></dt>
+<dd><p>Abstract method for reading isochrone data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.read_track_data">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">read_track_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="arsenal_gear.stellar_evolution.se_data_structures.TrackSet.html#arsenal_gear.stellar_evolution.se_data_structures.TrackSet" title="arsenal_gear.stellar_evolution.se_data_structures.TrackSet"><span class="pre">TrackSet</span></a></span></span><a class="reference internal" href="../_modules/arsenal_gear/stellar_evolution/data_reader.html#IsochroneDataReader.read_track_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.read_track_data" title="Link to this definition">¶</a></dt>
+<dd><p>Abstract method for reading stellar track data.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">Arsenal Gear API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="arsenal_gear.dist_funcs.html">arsenal_gear.dist_funcs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arsenal_gear.feedbacks.html">arsenal_gear.feedbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arsenal_gear.population.html">arsenal_gear.population</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="arsenal_gear.stellar_evolution.html">arsenal_gear.stellar_evolution</a></li>
+</ul>
+</li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="arsenal_gear.stellar_evolution.data_reader.html"
+                          title="previous chapter">arsenal_gear.stellar_evolution.data_reader</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="arsenal_gear.stellar_evolution.data_reader.MISTReader.html"
+                          title="next chapter">arsenal_gear.stellar_evolution.data_reader.MISTReader</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/_autosummary/arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.data_reader.MISTReader.html" title="arsenal_gear.stellar_evolution.data_reader.MISTReader"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="arsenal_gear.stellar_evolution.data_reader.html" title="arsenal_gear.stellar_evolution.data_reader"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../api.html" >Arsenal Gear API</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="arsenal_gear.stellar_evolution.html" >arsenal_gear.stellar_evolution</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="arsenal_gear.stellar_evolution.data_reader.html" >arsenal_gear.stellar_evolution.data_reader</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.dist_funcs.binaries &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.dist_funcs.binaries</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.dist_funcs.binaries</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">binaries</span>
+<span class="sd">==========</span>
+
+<span class="sd">This submodule contains all the code required to sample from mass-dependent a</span>
+<span class="sd">binary fraction and distributions of orbital parameters.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">u</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">astropy.units</span> <span class="kn">import</span> <span class="n">Quantity</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">loguniform</span><span class="p">,</span> <span class="n">rv_continuous</span><span class="p">,</span> <span class="n">uniform</span>
+
+<span class="kn">from</span> <span class="nn">arsenal_gear.population</span> <span class="kn">import</span> <span class="n">StarPopulation</span>
+
+
+<div class="viewcode-block" id="BinaryDistribution">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.BinaryDistribution.html#arsenal_gear.dist_funcs.binaries.BinaryDistribution">[docs]</a>
+<span class="k">class</span> <span class="nc">BinaryDistribution</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is the superclass of all distributions of binary properties</span>
+<span class="sd">    in which the binary fraction and distributions of orbtial periods and</span>
+<span class="sd">    mass ratios are not independent. This samples from a 3D probability</span>
+<span class="sd">    distribution that incldues both binaries and single stars.</span>
+<span class="sd">    This can also include a user-specified mass limit above which all</span>
+<span class="sd">    binaries have orbital periods log(P/days) &lt;= 3.8, to account for the</span>
+<span class="sd">    inner companion in hierarchical systems.</span>
+
+<span class="sd">    :param model: BPASS model, see BPASS manual for details</span>
+<span class="sd">    :type model: str</span>
+<span class="sd">    :param m_inner: Mass above which log(P/days) &lt;= 3.8</span>
+<span class="sd">    :type m_inner: astropy mass unit</span>
+<span class="sd">    :param model: BPASS directory (likely on scratch, given the size)</span>
+<span class="sd">    :type model: str</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">m_inner</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">bpass_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">models</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;100_100&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;100_300&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;135_100&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;135_300&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;135all_100&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;170_100&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;170_300&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;chab100&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;chab300&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2"> does not exist.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">m_inner</span> <span class="o">&lt;</span> <span class="p">(</span><span class="mi">9</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">Warning</span><span class="p">(</span><span class="s2">&quot;Please select a value &gt;= 9 Msun.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">m_inner</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">m_inner</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">bpass_dir</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span>
+
+<div class="viewcode-block" id="BinaryDistribution.generate_probabilities">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.BinaryDistribution.html#arsenal_gear.dist_funcs.binaries.BinaryDistribution.generate_probabilities">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_probabilities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate the appropriate 3D grid of probabilities from the</span>
+<span class="sd">        BPASS input file.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">get_probability_matrix</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">m1_vals</span><span class="p">,</span> <span class="n">q_vals</span><span class="p">,</span> <span class="n">logp_vals</span><span class="p">):</span>
+
+            <span class="k">def</span> <span class="nf">get_prob_single</span><span class="p">(</span><span class="n">ln</span><span class="p">):</span>
+                <span class="n">m1</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ln</span><span class="p">[</span><span class="n">ln</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:])</span>
+                <span class="n">save_w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">m1_vals</span> <span class="o">-</span> <span class="n">m1</span><span class="p">)),</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">return</span> <span class="n">save_w</span>
+
+            <span class="k">def</span> <span class="nf">get_prob_binary</span><span class="p">(</span><span class="n">ln</span><span class="p">):</span>
+                <span class="n">ind_p</span> <span class="o">=</span> <span class="n">ln</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                <span class="n">ind_q</span> <span class="o">=</span> <span class="n">ln</span><span class="p">[:</span><span class="n">ind_p</span><span class="p">]</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                <span class="n">ind_m</span> <span class="o">=</span> <span class="n">ln</span><span class="p">[:</span><span class="n">ind_q</span><span class="p">]</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                <span class="n">logp</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ln</span><span class="p">[</span><span class="n">ind_p</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:])</span>
+                <span class="n">q</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ln</span><span class="p">[</span><span class="n">ind_q</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">ind_p</span><span class="p">])</span>
+                <span class="n">m1</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ln</span><span class="p">[</span><span class="n">ind_m</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">ind_q</span><span class="p">])</span>
+                <span class="n">save_w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">m1_vals</span> <span class="o">-</span> <span class="n">m1</span><span class="p">)),</span>
+                        <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">q_vals</span> <span class="o">-</span> <span class="n">q</span><span class="p">)),</span>
+                        <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">logp_vals</span> <span class="o">-</span> <span class="n">logp</span><span class="p">)),</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">save_w</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">prob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">m1_vals</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">q_vals</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">logp_vals</span><span class="p">)))</span>
+                <span class="n">save_n</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">save_w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">ln</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="s2">&quot;NEWSINMODS&quot;</span> <span class="ow">in</span> <span class="n">ln</span><span class="p">:</span>
+                        <span class="c1"># e.g. NEWSINMODS/z014/sneplot-z014-300</span>
+                        <span class="c1"># Read only mass</span>
+                        <span class="n">save_n</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="n">save_w</span> <span class="o">=</span> <span class="n">get_prob_single</span><span class="p">(</span><span class="n">ln</span><span class="p">)</span>
+
+                    <span class="k">elif</span> <span class="s2">&quot;NEWBINMODS/NEWBINMODS&quot;</span> <span class="ow">in</span> <span class="n">ln</span><span class="p">:</span>
+                        <span class="c1"># e.g. NEWBINMODS/NEWBINMODS/z014/sneplot-z014-300-0.1-0</span>
+                        <span class="c1"># Read period, mass ratio, and mass</span>
+                        <span class="n">save_n</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="n">save_w</span> <span class="o">=</span> <span class="n">get_prob_binary</span><span class="p">(</span><span class="n">ln</span><span class="p">)</span>
+
+                    <span class="k">elif</span> <span class="n">save_n</span><span class="p">:</span>
+                        <span class="n">save_n</span> <span class="o">=</span> <span class="kc">False</span>
+                        <span class="n">ln</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ln</span><span class="o">.</span><span class="n">split</span><span class="p">())</span>
+                        <span class="k">if</span> <span class="n">prob</span><span class="p">[</span><span class="n">save_w</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">save_w</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">save_w</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                            <span class="n">prob</span><span class="p">[</span><span class="n">save_w</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">save_w</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">save_w</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span> <span class="o">+=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ln</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">prob</span><span class="p">[</span><span class="n">save_w</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">save_w</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">save_w</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span> <span class="o">=</span> <span class="n">ln</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="n">prob</span>
+
+        <span class="k">def</span> <span class="nf">edit_probability_matrix</span><span class="p">(</span><span class="n">prob</span><span class="p">,</span> <span class="n">m_inner</span><span class="p">,</span> <span class="n">m1_vals</span><span class="p">,</span> <span class="n">q_vals</span><span class="p">,</span> <span class="n">logp_vals</span><span class="p">):</span>
+
+            <span class="c1"># If mass limit for inner companion</span>
+            <span class="c1"># Zero out probability above 3.8 if M &gt; m_inner</span>
+            <span class="n">_mask_m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">m1_vals</span> <span class="o">&gt;=</span> <span class="n">m_inner</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">_mask_q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q_vals</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">_mask_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">logp_vals</span> <span class="o">&gt;</span> <span class="mf">3.8</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">_mask_i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">logp_vals</span> <span class="o">&lt;=</span> <span class="mf">3.8</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">_norm_inner</span> <span class="o">=</span> <span class="p">(</span><span class="n">prob</span><span class="p">[</span><span class="n">_mask_m</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="n">_mask_q</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="p">:</span> <span class="n">_mask_i</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]])</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">_norm_outer</span> <span class="o">=</span> <span class="p">(</span><span class="n">prob</span><span class="p">[</span><span class="n">_mask_m</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="n">_mask_q</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="n">_mask_p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:])</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">prob</span><span class="p">[</span><span class="n">_mask_m</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="n">_mask_q</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="n">_mask_p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">_mask_m</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">_mask_q</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">_mask_p</span><span class="p">))</span>
+            <span class="p">)</span>
+            <span class="n">prob</span><span class="p">[</span><span class="n">_mask_m</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="n">_mask_q</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:,</span> <span class="p">:</span> <span class="n">_mask_i</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span> <span class="o">*=</span> <span class="p">(</span>
+                <span class="n">_norm_inner</span> <span class="o">+</span> <span class="n">_norm_outer</span>
+            <span class="p">)</span> <span class="o">/</span> <span class="n">_norm_inner</span>
+
+            <span class="k">return</span> <span class="n">prob</span>
+
+        <span class="n">m1_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">2.2</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.3</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mf">2.7</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mf">3.2</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">,</span> <span class="mf">3.7</span><span class="p">]),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">26</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">30</span><span class="p">,</span> <span class="mi">35</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">300</span><span class="p">]),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">q_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>  <span class="c1"># q = 0 for single</span>
+        <span class="n">logp_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">4.4</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>  <span class="c1"># 4.2 w/ q = 0 for single</span>
+
+        <span class="n">file_path</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dir</span>
+            <span class="o">+</span> <span class="s2">&quot;bpass_v2.2.1_imf&quot;</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
+            <span class="o">+</span> <span class="s2">&quot;/input_bpass_z014_bin_imf&quot;</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
+        <span class="p">)</span>
+
+        <span class="n">prob</span> <span class="o">=</span> <span class="n">get_probability_matrix</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">m1_vals</span><span class="p">,</span> <span class="n">q_vals</span><span class="p">,</span> <span class="n">logp_vals</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_inner</span> <span class="o">&lt;</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">:]):</span>
+
+            <span class="n">prob</span> <span class="o">=</span> <span class="n">edit_probability_matrix</span><span class="p">(</span>
+                <span class="n">prob</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_inner</span><span class="p">,</span> <span class="n">m1_vals</span><span class="p">,</span> <span class="n">q_vals</span><span class="p">,</span> <span class="n">logp_vals</span>
+            <span class="p">)</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;prob_bin_imf&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">+</span> <span class="s2">&quot;.npy&quot;</span><span class="p">,</span> <span class="n">prob</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;prob_bin_imf&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">+</span> <span class="s2">&quot;.npy&quot;</span><span class="p">,</span> <span class="n">prob</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BinaryDistribution.discrete_sampling">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.BinaryDistribution.html#arsenal_gear.dist_funcs.binaries.BinaryDistribution.discrete_sampling">[docs]</a>
+    <span class="k">def</span> <span class="nf">discrete_sampling</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">mtot</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Draw individual binaries and single stars from a BPASS input file</span>
+<span class="sd">        with a given IMF slope and upper mass cut-off, with a target total mass</span>
+
+<span class="sd">        :param mtot: Target total mass of the sample</span>
+<span class="sd">        :type mtot:  Quantity[&quot;mass&quot;]</span>
+<span class="sd">        :return:     Single stars&#39; masses</span>
+<span class="sd">        :rtype:      Quantity[&quot;mass&quot;]</span>
+<span class="sd">        :return:     Primary masses</span>
+<span class="sd">        :rtype:      Quantity[&quot;mass&quot;]</span>
+<span class="sd">        :return:     Orbital periods</span>
+<span class="sd">        :rtype:      Quantity[&quot;time&quot;]</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">sample_distribution</span><span class="p">(</span><span class="n">prob</span><span class="p">,</span> <span class="n">mtot</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">logp</span><span class="p">):</span>
+
+            <span class="c1"># Sample by flattening the array</span>
+            <span class="c1"># Assume that the average system mass is below 1.5 MSun</span>
+            <span class="n">num_samples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">1.5</span> <span class="o">*</span> <span class="n">mtot</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">prob_flat</span> <span class="o">=</span> <span class="n">prob</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+            <span class="n">samp_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+                <span class="n">a</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">prob</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">prob_flat</span>
+            <span class="p">)</span>
+            <span class="c1"># Convert flattened indices back to 3D coordinates</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unravel_index</span><span class="p">(</span><span class="n">samp_inds</span><span class="p">,</span> <span class="n">prob</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="n">samp_m</span> <span class="o">=</span> <span class="n">m</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">samp_q</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+            <span class="n">samp_p</span> <span class="o">=</span> <span class="n">logp</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+
+            <span class="k">return</span> <span class="n">samp_m</span><span class="p">,</span> <span class="n">samp_q</span><span class="p">,</span> <span class="n">samp_p</span>
+
+        <span class="k">def</span> <span class="nf">truncate_at_target_mass</span><span class="p">(</span><span class="n">mtot</span><span class="p">,</span> <span class="n">samp_m</span><span class="p">,</span> <span class="n">samp_q</span><span class="p">,</span> <span class="n">samp_p</span><span class="p">):</span>
+
+            <span class="n">_target_mass</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">mtot</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="o">-</span> <span class="p">(</span><span class="n">samp_m</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">samp_q</span><span class="p">))</span><span class="o">.</span><span class="n">cumsum</span><span class="p">())</span>
+            <span class="p">)</span>
+            <span class="n">_primary_masses</span> <span class="o">=</span> <span class="n">samp_m</span><span class="p">[:</span><span class="n">_target_mass</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+            <span class="n">_companion_masses</span> <span class="o">=</span> <span class="n">samp_q</span><span class="p">[:</span><span class="n">_target_mass</span><span class="p">]</span> <span class="o">*</span> <span class="n">samp_m</span><span class="p">[:</span><span class="n">_target_mass</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+            <span class="n">_orbital_periods</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">samp_p</span><span class="p">[:</span><span class="n">_target_mass</span><span class="p">]</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">d</span>
+
+            <span class="n">_mask_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">_companion_masses</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">_mask_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">_companion_masses</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="n">s_masses</span> <span class="o">=</span> <span class="n">_primary_masses</span><span class="p">[</span><span class="n">_mask_s</span><span class="p">]</span>
+            <span class="n">p_masses</span> <span class="o">=</span> <span class="n">_primary_masses</span><span class="p">[</span><span class="n">_mask_b</span><span class="p">]</span>
+            <span class="n">c_masses</span> <span class="o">=</span> <span class="n">_companion_masses</span><span class="p">[</span><span class="n">_mask_b</span><span class="p">]</span>
+            <span class="n">periods</span> <span class="o">=</span> <span class="n">_orbital_periods</span><span class="p">[</span><span class="n">_mask_b</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="n">s_masses</span><span class="p">,</span> <span class="n">p_masses</span><span class="p">,</span> <span class="n">c_masses</span><span class="p">,</span> <span class="n">periods</span>
+
+        <span class="n">prob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">+</span> <span class="s2">&quot;prob_bin_imf&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">+</span> <span class="s2">&quot;.npy&quot;</span><span class="p">)</span>
+        <span class="n">prob</span> <span class="o">=</span> <span class="n">prob</span> <span class="o">/</span> <span class="n">prob</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">2.2</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.3</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mf">2.7</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mf">3.2</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">,</span> <span class="mf">3.7</span><span class="p">]),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">26</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">30</span><span class="p">,</span> <span class="mi">35</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">300</span><span class="p">]),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>  <span class="c1"># q = 0 for single</span>
+        <span class="n">logp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">4.4</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>  <span class="c1"># 4.2 w/ q = 0 for single</span>
+
+        <span class="n">samp_m</span><span class="p">,</span> <span class="n">samp_q</span><span class="p">,</span> <span class="n">samp_p</span> <span class="o">=</span> <span class="n">sample_distribution</span><span class="p">(</span><span class="n">prob</span><span class="p">,</span> <span class="n">mtot</span><span class="p">,</span> <span class="n">m1</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">logp</span><span class="p">)</span>
+        <span class="n">s_masses</span><span class="p">,</span> <span class="n">p_masses</span><span class="p">,</span> <span class="n">c_masses</span><span class="p">,</span> <span class="n">periods</span> <span class="o">=</span> <span class="n">truncate_at_target_mass</span><span class="p">(</span>
+            <span class="n">mtot</span><span class="p">,</span> <span class="n">samp_m</span><span class="p">,</span> <span class="n">samp_q</span><span class="p">,</span> <span class="n">samp_p</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">s_masses</span><span class="p">,</span> <span class="n">p_masses</span><span class="p">,</span> <span class="n">c_masses</span><span class="p">,</span> <span class="n">periods</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Fraction">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.Fraction.html#arsenal_gear.dist_funcs.binaries.Fraction">[docs]</a>
+<span class="k">class</span> <span class="nc">Fraction</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is the superclass of all mass-dependent binary fraction</span>
+<span class="sd">    This assumes that the binary fraction is a step function</span>
+
+<span class="sd">    :param fraction: Binary fraction of the mass bins, of length k</span>
+<span class="sd">    :type fraction: float</span>
+<span class="sd">    :param mass_bins: Limit of the mass bins, of length k-1</span>
+<span class="sd">    :type mass_bins: astropy mass unit</span>
+<span class="sd">    :param stars: Potential primaries</span>
+<span class="sd">    :type stars: StarPopulation</span>
+<span class="sd">    :param name: Name of the binary fraction function</span>
+<span class="sd">    :type name: str</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fraction</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">mass_bins</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span>
+        <span class="n">stars</span><span class="p">:</span> <span class="n">StarPopulation</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">fraction</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mass_bins</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">mass_bins</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">stars</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fraction</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+        <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fraction</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+        <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mass_bins</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">fraction</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mass_bins</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="StepFraction">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.StepFraction.html#arsenal_gear.dist_funcs.binaries.StepFraction">[docs]</a>
+<span class="k">class</span> <span class="nc">StepFraction</span><span class="p">(</span><span class="n">Fraction</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A simple step function binary fraction, with a binary fraction</span>
+<span class="sd">    of 0 below the changeover mass and 1 above the changeover mass</span>
+
+<span class="sd">    :param mass: Changeover mass between binary fractions of 0 and 1</span>
+<span class="sd">    :type mass: astropy mass unit</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">fraction</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">mass_bins</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">stars</span><span class="p">:</span> <span class="n">StarPopulation</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;Step&quot;</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">fraction</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">fraction</span><span class="p">,</span> <span class="n">mass_bins</span><span class="p">,</span> <span class="n">stars</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="StepFraction.binary_fraction">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.StepFraction.html#arsenal_gear.dist_funcs.binaries.StepFraction.binary_fraction">[docs]</a>
+    <span class="k">def</span> <span class="nf">binary_fraction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Binary fraction as a function of stellar mass</span>
+<span class="sd">        for the step function binary fraction</span>
+<span class="sd">        Returns the probability to be in a binary</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">prob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">piecewise</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">,</span>
+            <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">stars</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">mass_bins</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">stars</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mass_bins</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fraction</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">prob</span></div>
+
+
+<div class="viewcode-block" id="StepFraction.sample">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.StepFraction.html#arsenal_gear.dist_funcs.binaries.StepFraction.sample">[docs]</a>
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Determine which stars are primaries</span>
+
+<span class="sd">        :return: Boolean array</span>
+<span class="sd">        :rtype: bool</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_sample</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">))</span>
+        <span class="n">_binary</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stars</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="n">_select</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">_sample</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">binary_fraction</span><span class="p">())</span>
+        <span class="n">_binary</span><span class="p">[</span><span class="n">_select</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">_select</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_binary</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MassRatio">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.MassRatio.html#arsenal_gear.dist_funcs.binaries.MassRatio">[docs]</a>
+<span class="k">class</span> <span class="nc">MassRatio</span><span class="p">(</span><span class="n">rv_continuous</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is the superclass of all mass ratio distributions</span>
+<span class="sd">    TODO (CCC, 04/02/2025): q is currently independent of M1 and a</span>
+
+<span class="sd">    :param min_q: Minimum mass ratio</span>
+<span class="sd">    :type min_q: float</span>
+<span class="sd">    :param max_q: Maximum mass ratio</span>
+<span class="sd">    :type max_q: float</span>
+<span class="sd">    :param stars: Primaries</span>
+<span class="sd">    :type stars: StarPopulation</span>
+<span class="sd">    :param name: Name for the scipy.stats rv_continuous instance</span>
+<span class="sd">    :type name: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">min_q</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">max_q</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_q</span> <span class="o">=</span> <span class="n">min_q</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_q</span> <span class="o">=</span> <span class="n">max_q</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_q</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_q</span> <span class="o">&gt;=</span> <span class="n">min_q</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_q</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">min_q</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_q</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MassRatio.sample">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.MassRatio.html#arsenal_gear.dist_funcs.binaries.MassRatio.sample">[docs]</a>
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param N: Number of stars to draw</span>
+<span class="sd">        :type N: int</span>
+<span class="sd">        :return: List of semi-major axes of stars</span>
+<span class="sd">        :rtype: Quantity[&quot;length&quot;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="UniformMassRatio">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.UniformMassRatio.html#arsenal_gear.dist_funcs.binaries.UniformMassRatio">[docs]</a>
+<span class="k">class</span> <span class="nc">UniformMassRatio</span><span class="p">(</span><span class="n">MassRatio</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A simple loguniform distribution of semi-major axes</span>
+<span class="sd">    with lower and upper bounds</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">min_q</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">max_q</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;uniform&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">min_q</span><span class="p">,</span> <span class="n">max_q</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">uniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_q</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_q</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_q</span><span class="p">)</span>
+        <span class="c1"># 2nd argument of scipy.stats.uniform is RANGE, not upper bound</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">uniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_q</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_q</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_q</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">q</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Period">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.Period.html#arsenal_gear.dist_funcs.binaries.Period">[docs]</a>
+<span class="k">class</span> <span class="nc">Period</span><span class="p">(</span><span class="n">rv_continuous</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is the superclass of all orbital period distributions</span>
+
+<span class="sd">    :param min_p: Minimum orbital period</span>
+<span class="sd">    :type min_p: astropy time unit</span>
+<span class="sd">    :param max_p: Maximum orbital period</span>
+<span class="sd">    :type max_p: astropy time unit</span>
+<span class="sd">    :param stars: Primaries</span>
+<span class="sd">    :type stars: StarPopulation</span>
+<span class="sd">    :param name: Name for the scipy.stats rv_continuous instance</span>
+<span class="sd">    :type name: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">min_p</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">max_p</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_p</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">min_p</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_p</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">max_p</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_p</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_p</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_p</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">min_p</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_p</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Period.sample">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.Period.html#arsenal_gear.dist_funcs.binaries.Period.sample">[docs]</a>
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param N: Number of stars to draw</span>
+<span class="sd">        :type N: int</span>
+<span class="sd">        :return: List of orbital periods</span>
+<span class="sd">        :rtype: Quantity[&quot;time&quot;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">)</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">d</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LogUniformPeriod">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.LogUniformPeriod.html#arsenal_gear.dist_funcs.binaries.LogUniformPeriod">[docs]</a>
+<span class="k">class</span> <span class="nc">LogUniformPeriod</span><span class="p">(</span><span class="n">Period</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A simple step function distribution of semi-major axes, with a log-uniform</span>
+<span class="sd">    distribution above and below the changeover semi-major axis</span>
+
+<span class="sd">    :param sma: Changeover semi-major axis</span>
+<span class="sd">    :type sma: astropy length unit</span>
+<span class="sd">    :param ratio: Ratio of probabilities for close and wide binaries</span>
+<span class="sd">    :type ratio: float</span>
+<span class="sd">    A simple loguniform distribution of semi-major axes</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">min_p</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">max_p</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;loguniform&quot;</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">min_p</span><span class="p">,</span> <span class="n">max_p</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">loguniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_p</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_p</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">loguniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_p</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_p</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">q</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Semimajor">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.Semimajor.html#arsenal_gear.dist_funcs.binaries.Semimajor">[docs]</a>
+<span class="k">class</span> <span class="nc">Semimajor</span><span class="p">(</span><span class="n">rv_continuous</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is the superclass of all semi-major axis distributions</span>
+
+<span class="sd">    :param min_a: Minimum semi-major axis</span>
+<span class="sd">    :type min_a: astropy length unit</span>
+<span class="sd">    :param max_a: Maximum semi-major axis</span>
+<span class="sd">    :type max_a: astropy length unit</span>
+<span class="sd">    :param stars: Primaries</span>
+<span class="sd">    :type stars: StarPopulation</span>
+<span class="sd">    :param name: Name for the scipy.stats rv_continuous instance</span>
+<span class="sd">    :type name: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">min_a</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">],</span> <span class="n">max_a</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_a</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">min_a</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">au</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_a</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">max_a</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">au</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_a</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_a</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_a</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">min_a</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_a</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Semimajor.sample">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.Semimajor.html#arsenal_gear.dist_funcs.binaries.Semimajor.sample">[docs]</a>
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param N: Number of stars to draw</span>
+<span class="sd">        :type N: int</span>
+<span class="sd">        :return: List of semi-major axes of stars</span>
+<span class="sd">        :rtype: Quantity[&quot;length&quot;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">)</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">au</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LogUniformSemimajor">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.dist_funcs.binaries.LogUniformSemimajor.html#arsenal_gear.dist_funcs.binaries.LogUniformSemimajor">[docs]</a>
+<span class="k">class</span> <span class="nc">LogUniformSemimajor</span><span class="p">(</span><span class="n">Semimajor</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A simple step function distribution of semi-major axes, with a log-uniform</span>
+<span class="sd">    distribution above and below the changeover semi-major axis</span>
+
+<span class="sd">    :param sma: Changeover semi-major axis</span>
+<span class="sd">    :type sma: astropy length unit</span>
+<span class="sd">    :param ratio: Ratio of probabilities for close and wide binaries</span>
+<span class="sd">    :type ratio: float</span>
+<span class="sd">    A simple loguniform distribution of semi-major axes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">min_a</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">],</span> <span class="n">max_a</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;loguniform&quot;</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">min_a</span><span class="p">,</span> <span class="n">max_a</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">loguniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_a</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_a</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">loguniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_a</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_a</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">q</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.dist_funcs.binaries</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

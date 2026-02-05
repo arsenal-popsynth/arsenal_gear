@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.Period
+=========================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: Period
+   :members:
+   :show-inheritance:

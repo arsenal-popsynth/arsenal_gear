@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.isochrone.IsochroneInterpolator
+================================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.isochrone
+
+.. autoclass:: IsochroneInterpolator
+   :members:
+   :show-inheritance:

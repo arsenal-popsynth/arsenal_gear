@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.StepFraction
+===============================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: StepFraction
+   :members:
+   :show-inheritance:

@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.LogUniformPeriod
+===================================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: LogUniformPeriod
+   :members:
+   :show-inheritance:

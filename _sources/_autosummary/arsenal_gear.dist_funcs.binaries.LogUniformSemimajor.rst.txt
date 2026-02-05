@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.LogUniformSemimajor
+======================================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: LogUniformSemimajor
+   :members:
+   :show-inheritance:

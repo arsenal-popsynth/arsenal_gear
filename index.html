@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Arsenal Gear Population Synthesis Code &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quickstart" href="quickstart.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             accesskey="N">next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">The Arsenal Gear Population Synthesis Code</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <p><img alt="image" src="_images/arsenal.jpg" /></p>
+<section class="tex2jax_ignore mathjax_ignore" id="the-arsenal-gear-population-synthesis-code">
+<h1>The Arsenal Gear Population Synthesis Code<a class="headerlink" href="#the-arsenal-gear-population-synthesis-code" title="Link to this heading">¶</a></h1>
+<p>Arsenal Gear is a Stellar Population Synthesis (SPS) code. The main
+driving goals of its development are:</p>
+<ol class="arabic simple">
+<li><p><strong>Flexibility</strong> of choices related to input physics</p></li>
+<li><p><strong>Ease of use</strong> from both the command line and within a python
+script</p></li>
+<li><p><strong>Stellar Feedback</strong> is our primary modeling goal</p></li>
+<li><p><strong>Binary Stars</strong> are easily modeled within the code</p></li>
+</ol>
+<p>Arsenal Gear is intended to work in modes where stars are both sampled
+from an IMF (stochastic mode) and when it is meant to be representative
+of a well-sampled population and therefore quantities are computed via
+integrals over the IMF (integrating mode). It is also intended to work
+both for calculations from within a piece of python code or iPython
+notebook as well as being able to be called from the command line or
+from within C++/Fortran code for compatability with large hydrodynamical
+simulations.</p>
+<p>This code has been a collaborative effort on the parts of Eric
+Andersson, Claude Cournoyer-Cloutier, Ben Keller, Lachlan Lancaster,
+Marta Reina-Campos, James Wadsley, and Zachary Wyatt.</p>
+<section id="contents">
+<h2>Contents<a class="headerlink" href="#contents" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#running-an-example-simulation">Running an Example Simulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#looking-at-the-output">Looking at the Output</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">The Arsenal Parameter File</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html#population-parameters">Population Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html#stellar-evolution">Stellar Evolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html#atmosphere-modeling">Atmosphere Modeling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html#mechanical-feedback">Mechanical Feedback</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="models.html#initial-mass-functions">Initial Mass Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#stellar-isochrones">Stellar Isochrones</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#supernova-mass-and-energy-yields">Supernova Mass and Energy Yields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#mass-loss-models">Mass Loss Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#chemical-evolution-and-metal-yields">Chemical Evolution and Metal Yields</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code-models.html#gasoline2-changa">gasoline2/ChaNGa</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Arsenal Gear Code Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#top-level-population-class">Top-Level Population Class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#abstract-stellar-population-classes">Abstract Stellar Population Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#abstract-stellar-evolution-classes">Abstract Stellar Evolution Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#abstract-atmosphere-classes">Abstract Atmosphere Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#abstract-mechanical-feedback-classes">Abstract Mechanical Feedback Classes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers.html">Developers Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="developers.html#recommended-development-environment">Recommended Development Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developers.html#linting-and-code-style">Linting and Code Style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developers.html#automated-tests">Automated Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developers.html#github-actions">GitHub Actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developers.html#extra-handy-tools">Extra Handy Tools</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="docs.html">Arsenal Sphinx Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="docs.html#testing-the-documentation-locally">Testing the Documentation Locally</a></li>
+<li class="toctree-l2"><a class="reference internal" href="docs.html#deploying-documentation-to-github-pages">Deploying Documentation to GitHub Pages</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_autosummary/arsenal_gear.dist_funcs.html">arsenal_gear.dist_funcs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_autosummary/arsenal_gear.feedbacks.html">arsenal_gear.feedbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_autosummary/arsenal_gear.population.html">arsenal_gear.population</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_autosummary/arsenal_gear.stellar_evolution.html">arsenal_gear.stellar_evolution</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="#">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a></li>
+</ul>
+
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="quickstart.html"
+                          title="next chapter">Quickstart</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             >next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">The Arsenal Gear Population Synthesis Code</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

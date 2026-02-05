@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.stellar_evolution.data_reader &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.data_reader</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.stellar_evolution.data_reader</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">data_reader.py</span>
+<span class="sd">==========</span>
+
+<span class="sd">This file defines classes for reading stellar evolution data from</span>
+<span class="sd">various sources into a uniform data structure format defined in</span>
+<span class="sd">se_data_structures.py</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">u</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">..utils</span> <span class="kn">import</span> <span class="n">downloader</span><span class="p">,</span> <span class="n">extract_one</span><span class="p">,</span> <span class="n">find_match</span><span class="p">,</span> <span class="n">is_valid_txz</span>
+<span class="kn">from</span> <span class="nn">.se_data_structures</span> <span class="kn">import</span> <span class="n">Isochrone</span><span class="p">,</span> <span class="n">IsochroneSet</span><span class="p">,</span> <span class="n">StellarTrack</span><span class="p">,</span> <span class="n">TrackSet</span>
+
+
+<div class="viewcode-block" id="IsochroneDataReader">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.html#arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader">[docs]</a>
+<span class="k">class</span> <span class="nc">IsochroneDataReader</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstract base class for reading isochrone data from various sources.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># log10(Z/Zsun)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">met</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;met&#39;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="c1"># decides on verbose output</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;verbose&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># decides whether or not to force a download of the isochrone data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">force_download</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;force_download&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="IsochroneDataReader.read_iso_data">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.html#arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.read_iso_data">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">read_iso_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IsochroneSet</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract method for reading isochrone data.</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="IsochroneDataReader.read_track_data">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.html#arsenal_gear.stellar_evolution.data_reader.IsochroneDataReader.read_track_data">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">read_track_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TrackSet</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract method for reading stellar track data.</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+</div>
+
+
+<div class="viewcode-block" id="MISTReader">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.MISTReader.html#arsenal_gear.stellar_evolution.data_reader.MISTReader">[docs]</a>
+<span class="k">class</span> <span class="nc">MISTReader</span><span class="p">(</span><span class="n">IsochroneDataReader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class for reading MIST isochrone and stellar track data.</span>
+<span class="sd">    makes heavy use of code provided by the MIST team for reading their models.</span>
+<span class="sd">    This is an instantiation of the IsochroneDataReader abstract base class.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># basic options for MIST isochrones</span>
+    <span class="n">mist_url</span> <span class="o">=</span> <span class="s2">&quot;https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/</span><span class="si">{}</span><span class="s2">&quot;</span>
+    <span class="n">vcrits</span>   <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;0.4&quot;</span><span class="p">]</span>
+    <span class="n">mets</span>     <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;m4.00&quot;</span><span class="p">,</span> <span class="s2">&quot;m3.50&quot;</span><span class="p">,</span> <span class="s2">&quot;m3.00&quot;</span><span class="p">,</span> <span class="s2">&quot;m2.50&quot;</span><span class="p">,</span> <span class="s2">&quot;m2.00&quot;</span><span class="p">,</span> <span class="s2">&quot;m1.75&quot;</span><span class="p">,</span> <span class="s2">&quot;m1.50&quot;</span><span class="p">,</span> <span class="s2">&quot;m1.25&quot;</span><span class="p">,</span>\
+                <span class="s2">&quot;m1.00&quot;</span><span class="p">,</span> <span class="s2">&quot;m0.75&quot;</span><span class="p">,</span> <span class="s2">&quot;m0.50&quot;</span><span class="p">,</span> <span class="s2">&quot;m0.25&quot;</span><span class="p">,</span> <span class="s2">&quot;p0.00&quot;</span><span class="p">,</span> <span class="s2">&quot;p0.25&quot;</span><span class="p">,</span> <span class="s2">&quot;p0.50&quot;</span><span class="p">]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            kwargs: Keyword arguments for the isochrone system.</span>
+
+<span class="sd">        Usage:</span>
+<span class="sd">            &gt;&gt; iso = MIST(met=0.0, vvcrit=&quot;0.0&quot;, interp_op=&quot;track&quot;)</span>
+<span class="sd">            &gt;&gt; mini = np.array([1.0, 5.0, 10.0])*u.Msun</span>
+<span class="sd">            &gt;&gt; lbol = iso.lbol(mini, 10*u.Myr)</span>
+<span class="sd">            &gt;&gt; teff = iso.teff(mini, 10*u.Myr)</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            version     Dictionary containing the MIST and MESA version numbers.</span>
+<span class="sd">            abun        Dictionary containing Yinit, Zinit, [Fe/H], and [a/Fe] values.</span>
+<span class="sd">            rot         Rotation in units of surface v/v_crit.</span>
+<span class="sd">            hdr_list    List of column headers.</span>
+
+<span class="sd">        Methods:</span>
+<span class="sd">            get_data        Retrieves the MIST data</span>
+<span class="sd">            read_iso_data   Processes isochrone data into an IsochroneSet data structure</span>
+<span class="sd">            read_track_data Processes stellar track data into a TrackSet data structure</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># set input parameters</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;vvcrit&quot;</span><span class="p">,</span> <span class="s2">&quot;0.0&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rootdir&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># Fill out dummy attributes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_ages</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rot</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">abun</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">met</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">metstr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;m</span><span class="si">{</span><span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">met</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">metstr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;p</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">met</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metstr</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mets</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Metallicity must be one of: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mets</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;0.4&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;vvcrit must be either 0.0 or 0.4 for MIST isochrones&quot;</span><span class="p">)</span>
+
+        <span class="c1"># decide whether to use EEPs or isochrones to interpolate</span>
+        <span class="c1"># creating between for new isochrones</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;interp_op&quot;</span><span class="p">,</span> <span class="s2">&quot;iso&quot;</span><span class="p">)</span>
+
+        <span class="c1"># set directories, download data if necessary</span>
+        <span class="n">data_acq_start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_data</span><span class="p">()</span>
+        <span class="n">data_acq_end</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Time to acquire data: &quot;</span><span class="p">,</span> <span class="n">data_acq_end</span> <span class="o">-</span> <span class="n">data_acq_start</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MISTReader.get_data">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.MISTReader.html#arsenal_gear.stellar_evolution.data_reader.MISTReader.get_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieves the MIST data from a local directory or downloads it if necessary.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># set model directory, tarfile, and filename</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">mod_temp</span> <span class="o">=</span> <span class="s2">&quot;MIST_v1.2_vvcrit</span><span class="si">{}</span><span class="s2">_basic_isos&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">modeldir</span> <span class="o">=</span> <span class="n">mod_temp</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span><span class="p">)</span>
+            <span class="n">tar_temp</span> <span class="o">=</span> <span class="s2">&quot;MIST_v1.2_vvcrit</span><span class="si">{}</span><span class="s2">_basic_isos.txz&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tarfile</span> <span class="o">=</span> <span class="n">tar_temp</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span><span class="p">)</span>
+            <span class="n">iso_fname_temp</span> <span class="o">=</span> <span class="s2">&quot;MIST_v1.2_feh_</span><span class="si">{}</span><span class="s2">_afe_p0.0_vvcrit</span><span class="si">{}</span><span class="s2">_basic.iso&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">isofile</span> <span class="o">=</span> <span class="n">iso_fname_temp</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">metstr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;track&quot;</span><span class="p">:</span>
+            <span class="n">mod_temp</span> <span class="o">=</span> <span class="s2">&quot;MIST_v1.2_feh_</span><span class="si">{}</span><span class="s2">_afe_p0.0_vvcrit</span><span class="si">{}</span><span class="s2">_EEPS&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">modeldir</span> <span class="o">=</span> <span class="n">mod_temp</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">metstr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span><span class="p">)</span>
+            <span class="n">tar_temp</span> <span class="o">=</span> <span class="s2">&quot;MIST_v1.2_feh_</span><span class="si">{}</span><span class="s2">_afe_p0.0_vvcrit</span><span class="si">{}</span><span class="s2">_EEPS.txz&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tarfile</span> <span class="o">=</span> <span class="n">tar_temp</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">metstr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vvcrit</span><span class="p">)</span>
+        <span class="c1"># make data storage directory if it doesn&#39;t exist</span>
+        <span class="n">rootdir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span>
+        <span class="k">if</span> <span class="n">rootdir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rootdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="o">/</span> <span class="s1">&#39;data/mist&#39;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">rootdir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                <span class="n">rootdir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">rootdir</span><span class="p">)</span>
+
+        <span class="c1"># check if the file exists and download otherwise</span>
+        <span class="n">force_download</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">force_download</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">force_download</span><span class="p">:</span>
+            <span class="n">modeldir_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeldir</span>
+            <span class="n">tarfile_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tarfile</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">modeldir_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                <span class="c1"># model directory doesn&#39;t exist -&gt; check for tarfile</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">tarfile_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+                    <span class="c1"># if it doesn&#39;t exist, download it</span>
+                    <span class="n">force_download</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="n">is_valid_txz</span><span class="p">(</span><span class="n">tarfile_path</span><span class="p">):</span>
+                    <span class="c1"># if it&#39;s not a valid tar file, download it again</span>
+                    <span class="n">force_download</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># tarfile exists and is valid -&gt; extract it</span>
+                    <span class="n">extract_one</span><span class="p">(</span><span class="n">tarfile_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span><span class="p">,</span> <span class="n">delete_txz</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">)</span> <span class="ow">and</span>
+                  <span class="p">(</span><span class="ow">not</span> <span class="p">(</span><span class="n">modeldir_path</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">isofile</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">())):</span>
+                <span class="c1"># model directory exists but isochrone file doesn&#39;t -&gt; force download</span>
+                <span class="n">force_download</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">force_download</span> <span class="o">=</span> <span class="n">force_download</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Force download: &quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">force_download</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">force_download</span><span class="p">:</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mist_url</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tarfile</span><span class="p">)</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Downloading MIST data&quot;</span>
+            <span class="c1"># download the tarfile</span>
+            <span class="n">downloader</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tarfile</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+            <span class="n">extract_one</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">tarfile</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span><span class="p">,</span> <span class="n">delete_txz</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MISTReader.read_iso_data">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.MISTReader.html#arsenal_gear.stellar_evolution.data_reader.MISTReader.read_iso_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_iso_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IsochroneSet</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads in isochrone data for MIST</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lages</span><span class="p">,</span> <span class="n">hdr_list</span><span class="p">,</span> <span class="n">isos_mist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_iso_file</span><span class="p">()</span>
+        <span class="n">isos</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">iso</span> <span class="ow">in</span> <span class="n">isos_mist</span><span class="p">:</span>
+            <span class="n">age</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">iso</span><span class="p">[</span><span class="s2">&quot;log10_isochrone_age_yr&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+            <span class="n">qs</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">hdr_list</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">label</span> <span class="o">!=</span> <span class="s2">&quot;log10_isochrone_age_yr&quot;</span><span class="p">:</span>
+                    <span class="n">qs</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="n">iso</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+            <span class="n">iso_data</span> <span class="o">=</span> <span class="n">Isochrone</span><span class="p">(</span><span class="n">age</span><span class="o">=</span><span class="n">age</span><span class="p">,</span>
+                                    <span class="n">eep_name</span><span class="o">=</span><span class="s1">&#39;EEP&#39;</span><span class="p">,</span>
+                                    <span class="n">mini_name</span><span class="o">=</span><span class="s1">&#39;initial_mass&#39;</span><span class="p">,</span>
+                                    <span class="n">lteff_name</span><span class="o">=</span><span class="s1">&#39;log_Teff&#39;</span><span class="p">,</span>
+                                    <span class="n">llbol_name</span><span class="o">=</span><span class="s1">&#39;log_L&#39;</span><span class="p">,</span>
+                                    <span class="n">qs</span><span class="o">=</span><span class="n">qs</span><span class="p">)</span>
+            <span class="n">isos</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iso_data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span> <span class="o">=</span> <span class="n">hdr_list</span>
+        <span class="c1"># get the maximum mass still alive for each isochrone</span>
+        <span class="n">max_mass</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">isos_mist</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;initial_mass&#39;</span><span class="p">])</span>
+        <span class="n">iset</span> <span class="o">=</span> <span class="n">IsochroneSet</span><span class="p">(</span><span class="n">lages</span><span class="o">=</span><span class="n">lages</span><span class="p">,</span>
+                            <span class="n">hdr_list</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span><span class="p">,</span>
+                            <span class="n">isos</span><span class="o">=</span><span class="n">isos</span><span class="p">,</span>
+                            <span class="n">max_mass</span><span class="o">=</span><span class="n">max_mass</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">iset</span></div>
+
+
+<div class="viewcode-block" id="MISTReader.read_track_data">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.MISTReader.html#arsenal_gear.stellar_evolution.data_reader.MISTReader.read_track_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_track_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TrackSet</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads in stellar track data for MIST</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">eep_file_pattern</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;?????M.track.eep&quot;</span><span class="p">,),]</span>
+        <span class="n">mass_file_list</span> <span class="o">=</span> <span class="n">find_match</span><span class="p">(</span><span class="n">eep_file_pattern</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeldir</span><span class="p">)</span>
+
+        <span class="n">masses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">tracks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">min_ages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">max_ages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">max_eep</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">mass_file_list</span><span class="p">:</span>
+            <span class="c1"># read in the EEP file</span>
+            <span class="n">minit</span><span class="p">,</span> <span class="n">eeps</span><span class="p">,</span> <span class="n">min_age</span><span class="p">,</span> <span class="n">max_age</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_eep_file</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="c1"># store the mass and EEP data</span>
+            <span class="n">max_eep</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">max_eep</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">eeps</span><span class="p">))</span>
+            <span class="n">masses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">minit</span><span class="p">)</span>
+            <span class="n">min_ages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">min_age</span><span class="p">)</span>
+            <span class="n">max_ages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">max_age</span><span class="p">)</span>
+            <span class="n">tracks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">StellarTrack</span><span class="p">(</span><span class="n">mass</span><span class="o">=</span><span class="n">minit</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+                                        <span class="n">eeps</span><span class="o">=</span><span class="n">eeps</span><span class="p">,</span>
+                                        <span class="n">age_name</span><span class="o">=</span><span class="s1">&#39;star_age&#39;</span><span class="p">,</span>
+                                        <span class="n">lteff_name</span><span class="o">=</span><span class="s1">&#39;log_Teff&#39;</span><span class="p">,</span>
+                                        <span class="n">llbol_name</span><span class="o">=</span><span class="s1">&#39;log_L&#39;</span><span class="p">,</span>
+                                        <span class="n">qs</span><span class="o">=</span><span class="n">data</span><span class="p">))</span>
+        <span class="n">masses</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">masses</span><span class="p">)</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="n">min_ages</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">min_ages</span><span class="p">)</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="n">max_ages</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">max_ages</span><span class="p">)</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="n">tset</span> <span class="o">=</span> <span class="n">TrackSet</span><span class="p">(</span><span class="n">masses</span><span class="o">=</span><span class="n">masses</span><span class="p">,</span>
+                                <span class="n">min_ages</span><span class="o">=</span><span class="n">min_ages</span><span class="p">,</span>
+                                <span class="n">max_ages</span><span class="o">=</span><span class="n">max_ages</span><span class="p">,</span>
+                                <span class="n">hdr_list</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span><span class="p">,</span>
+                                <span class="n">tracks</span><span class="o">=</span><span class="n">tracks</span><span class="p">,</span>
+                                <span class="n">max_eep</span><span class="o">=</span><span class="n">max_eep</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">tset</span></div>
+
+
+<div class="viewcode-block" id="MISTReader.read_iso_file">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.MISTReader.html#arsenal_gear.stellar_evolution.data_reader.MISTReader.read_iso_file">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_iso_file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads in the isochrone file.</span>
+
+<span class="sd">        This is essentially copied from read_mist_models.py in the MIST Github</span>
+<span class="sd">        https://github.com/jieunchoi/MIST_codes/blob/master/scripts/read_mist_models.py</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># open file and read it in</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeldir</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">isofile</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;version&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;MIST&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;MESA&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">abun</span> <span class="o">=</span> <span class="p">{</span><span class="n">content</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">i</span><span class="p">]:</span><span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">5</span><span class="p">)}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rot</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_ages</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">6</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="c1">#read one block for each isochrone</span>
+        <span class="n">iso_set</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">content</span><span class="p">[</span><span class="mi">8</span><span class="p">:]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_ages</span><span class="p">):</span>
+            <span class="c1"># grab info for each isochrone</span>
+            <span class="n">num_eeps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">counter</span><span class="p">][</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">num_cols</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">counter</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">hdr_list</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">counter</span><span class="o">+</span><span class="mi">2</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">formats</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">]</span><span class="o">+</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cols</span><span class="o">-</span><span class="mi">1</span><span class="p">)])</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_eeps</span><span class="p">),{</span><span class="s1">&#39;names&#39;</span><span class="p">:</span><span class="nb">tuple</span><span class="p">(</span><span class="n">hdr_list</span><span class="p">),</span><span class="s1">&#39;formats&#39;</span><span class="p">:</span><span class="nb">tuple</span><span class="p">(</span><span class="n">formats</span><span class="p">)})</span>
+            <span class="c1"># read through EEPs for each isochrone</span>
+            <span class="k">for</span> <span class="n">eep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_eeps</span><span class="p">):</span>
+                <span class="n">iso_chunk</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">3</span><span class="o">+</span><span class="n">counter</span><span class="o">+</span><span class="n">eep</span><span class="p">]</span>
+                <span class="n">iso</span><span class="p">[</span><span class="n">eep</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">iso_chunk</span><span class="p">)</span>
+            <span class="n">iso_set</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iso</span><span class="p">)</span>
+            <span class="n">ages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iso</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">counter</span><span class="o">+=</span> <span class="mi">3</span><span class="o">+</span><span class="n">num_eeps</span><span class="o">+</span><span class="mi">2</span>
+        <span class="k">return</span> <span class="n">ages</span><span class="p">,</span> <span class="n">hdr_list</span><span class="p">,</span> <span class="n">iso_set</span></div>
+
+
+<div class="viewcode-block" id="MISTReader.read_eep_file">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.data_reader.MISTReader.html#arsenal_gear.stellar_evolution.data_reader.MISTReader.read_eep_file">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_eep_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fname</span><span class="p">):</span>
+
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads in an EEP file.</span>
+
+<span class="sd">        This is essentially copied from read_mist_models.py in the MIST Github</span>
+<span class="sd">        https://github.com/jieunchoi/MIST_codes/blob/master/scripts/read_mist_models.py</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">evol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">loadtxt</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">skiprows</span><span class="o">=</span><span class="mi">11</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;version&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;MIST&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;MESA&#39;</span><span class="p">:</span> <span class="n">content</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">abun</span> <span class="o">=</span> <span class="p">{</span><span class="n">content</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">i</span><span class="p">]:</span><span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">5</span><span class="p">)}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rot</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">4</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hdr_list</span> <span class="o">=</span> <span class="n">content</span><span class="p">[</span><span class="mi">11</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">minit</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="mi">7</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">hdr_list</span> <span class="o">=</span> <span class="n">content</span><span class="p">[</span><span class="mi">11</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">eeps</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">content</span><span class="p">[</span><span class="mi">8</span><span class="p">][</span><span class="mi">2</span><span class="p">:]]</span>
+
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="n">hdr_list</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span><span class="n">evol</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hdr_list</span><span class="p">))}</span>
+        <span class="n">min_age</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;star_age&quot;</span><span class="p">])</span>
+        <span class="n">max_age</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;star_age&quot;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">minit</span><span class="p">,</span> <span class="n">eeps</span><span class="p">,</span> <span class="n">min_age</span><span class="p">,</span> <span class="n">max_age</span><span class="p">,</span> <span class="n">data</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.data_reader</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.Fraction
+===========================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: Fraction
+   :members:
+   :show-inheritance:

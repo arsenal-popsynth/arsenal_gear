@@ -1,0 +1,8 @@
+arsenal\_gear.feedbacks.FBMechanism
+===================================
+
+.. currentmodule:: arsenal_gear.feedbacks
+
+.. autoclass:: FBMechanism
+   :members:
+   :show-inheritance:

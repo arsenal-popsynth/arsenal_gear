@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.stellar_evolution.isochrone &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.isochrone</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.stellar_evolution.isochrone</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">isochrone</span>
+<span class="sd">==========</span>
+
+<span class="sd">This submodule defines the interface to various stellar evolution codes</span>
+<span class="sd">through interpreting and processing their isochrones</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">reduce</span>
+
+<span class="kn">import</span> <span class="nn">astropy.units</span> <span class="k">as</span> <span class="nn">u</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">astropy.units</span> <span class="kn">import</span> <span class="n">Quantity</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">pchip_interpolate</span>
+
+<span class="c1"># local imports</span>
+<span class="kn">from</span> <span class="nn">..utils</span> <span class="kn">import</span> <span class="n">array_utils</span><span class="p">,</span> <span class="n">masked_power</span>
+<span class="kn">from</span> <span class="nn">.se_data_structures</span> <span class="kn">import</span> <span class="n">Isochrone</span>
+<span class="kn">from</span> <span class="nn">.data_reader</span> <span class="kn">import</span> <span class="n">MISTReader</span>
+
+<div class="viewcode-block" id="IsochroneInterpolator">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator">[docs]</a>
+<span class="k">class</span> <span class="nc">IsochroneInterpolator</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is used to interpolate isochrones from various sources</span>
+<span class="sd">    It can be used to interpolate stellar tracks or isochrones from any </span>
+<span class="sd">    stellar evolution code, provided there is a IsochroneDataReader class</span>
+<span class="sd">    implemented in order to read the data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># log10(Z/Zsun)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">met</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;met&#39;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="c1"># determines whether or not the isochrone instance</span>
+        <span class="c1"># is being used for testing or not. This changes the </span>
+        <span class="c1"># selection of the isochrone data to leave out the </span>
+        <span class="c1"># data being compared against.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;test&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># decides whether or not to force a download of the isochrone data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;interp_op&quot;</span><span class="p">,</span> <span class="s2">&quot;iso&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;iso&quot;</span><span class="p">,</span> <span class="s2">&quot;track&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;interp_op must be either iso or track&quot;</span><span class="p">)</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">isochrone_opt</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;isochrone_opt&quot;</span><span class="p">,</span> <span class="s2">&quot;mist&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">isochrone_opt</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mist&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reader</span> <span class="o">=</span> <span class="n">MISTReader</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;isochrone_opt must be mist for now&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">iset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">read_iso_data</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">llbol_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lteff_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reader</span><span class="o">.</span><span class="n">read_track_data</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">llbol_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lteff_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_interpolator</span><span class="p">(</span><span class="n">method</span><span class="p">:</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the appropriate interpolation function based on the method string</span>
+<span class="sd">        Args:</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            interp: the interpolation function</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;pchip&quot;</span><span class="p">:</span>
+            <span class="k">def</span> <span class="nf">interp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">x0</span><span class="p">,</span><span class="n">y0</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">pchip_interpolate</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span><span class="n">y0</span><span class="p">,</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;linear&quot;</span><span class="p">:</span>
+            <span class="k">def</span> <span class="nf">interp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">x0</span><span class="p">,</span><span class="n">y0</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">x0</span><span class="p">,</span><span class="n">y0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;method must be either pchip or linear&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">interp</span>
+
+<div class="viewcode-block" id="IsochroneInterpolator.supplement_labels">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.supplement_labels">[docs]</a>
+    <span class="k">def</span> <span class="nf">supplement_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">labels</span><span class="p">:</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds basic labels to the list of isochrone quantities to be interpolated.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            labels: The list of labels to be interpolated.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            labels: The supplemented list of labels including basic quantities.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">necessary_labels</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mini_name</span><span class="p">,</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span><span class="p">,</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">necessary_labels</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span><span class="p">,</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">nl</span> <span class="ow">in</span> <span class="n">necessary_labels</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">nl</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">:</span>
+                <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nl</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">labels</span></div>
+
+
+    <span class="c1">######## ISOCHRONE INTERPOLATION FUNCTIONS ########</span>
+    <span class="k">def</span> <span class="nf">_age_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">age</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">        Returns the index of the isochrone closest to the requested age</span>
+<span class="sd">        that is also younger than the requested age.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            age: the age of the isochrone.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            ai: the index of the isochrone in the isochrone set</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">age</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">ages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">lages</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">lage</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ages</span><span class="p">))</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">lage</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">min</span><span class="p">(</span><span class="n">ages</span><span class="p">)):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The requested age is outside the range. Try between &#39;</span>
+                  <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">ages</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39; and &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">ages</span><span class="p">)))</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Age is outside the range of the isochrones&quot;</span><span class="p">)</span>
+
+        <span class="n">ais</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ages</span><span class="p">)</span> <span class="o">-</span> <span class="n">la</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">la</span> <span class="ow">in</span> <span class="n">lage</span><span class="p">]</span>
+        <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ais</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">ais</span>
+
+    <span class="k">def</span> <span class="nf">_get_ai_range</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ai</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets the range of age indices to use for isochrone interpolation</span>
+<span class="sd">        on n nearby points around age index ai. Leaves out the nearest</span>
+<span class="sd">        isochrone if in testing mode.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            ai: the index of the isochrone.</span>
+<span class="sd">            n: the number of nearby points to use for interpolation.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            ais: the indices of the isochrones to use for interpolation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">nages</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">lages</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">test</span> <span class="ow">and</span> <span class="p">(</span><span class="n">ai</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">nages</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Test Isochrone must be in middle of isochrone range&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must Request more than one point for interpolation&quot;</span><span class="p">)</span>
+
+        <span class="c1"># decide on right range of isochrone indices</span>
+        <span class="k">if</span> <span class="n">ai</span> <span class="o">-</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="p">:</span>
+                <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ai</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ai</span> <span class="o">+</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&gt;=</span> <span class="n">nages</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="p">:</span>
+                <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nages</span> <span class="o">-</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">ai</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">nages</span><span class="p">))</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nages</span> <span class="o">-</span> <span class="n">n</span><span class="p">,</span> <span class="n">nages</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">n</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="p">:</span>
+                    <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">-</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">ai</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">ai</span> <span class="o">+</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">-</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">ai</span> <span class="o">+</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="p">:</span>
+                    <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">-</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">ai</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">ai</span> <span class="o">+</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span><span class="p">))</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">ais</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">ai</span> <span class="o">-</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">ai</span> <span class="o">+</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ais</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_fixed_eep_q</span><span class="p">(</span><span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">eeps</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">qs</span><span class="p">:</span> <span class="nb">list</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the value of a isochrone quantity at a fixed EEP</span>
+<span class="sd">        across several isochrones at different times.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            j: the index of the EEP to get values for</span>
+<span class="sd">            eeps: the list of EEPs for each isochrone.</span>
+<span class="sd">            qs: the list of quantities for each isochrone.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            qj: the quantity at the fixed EEP.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">q</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">eep</span> <span class="o">==</span> <span class="n">j</span><span class="p">)[</span><span class="mi">0</span><span class="p">]][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">eep</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">qs</span><span class="p">,</span> <span class="n">eeps</span><span class="p">)]</span>
+
+    <span class="k">def</span> <span class="nf">_construct_iso_isochrone</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">labels</span><span class="p">:</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+                                 <span class="n">method</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">&quot;pchip&quot;</span><span class="p">,</span>
+                                 <span class="n">supplement</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Isochrone</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Interpolates between isochrones using the EEP values to create an</span>
+<span class="sd">        intermediate age isochrone</span>
+<span class="sd">        Args:</span>
+<span class="sd">            t: The age of the isochrone to be generated, should be a single value.</span>
+<span class="sd">            labels: The labels of the quantities to be interpolated.</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">            supplement: Whether to supplement the labels with basic quantities</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            iso: the isochrone at the requested age t with the requested quantities</span>
+<span class="sd">                 given by the labels list. </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">supplement</span><span class="p">:</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">supplement_labels</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">ai</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_age_index</span><span class="p">(</span><span class="n">Quantity</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">],</span> <span class="n">t</span><span class="o">.</span><span class="n">unit</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;t must be a single value for now&quot;</span><span class="p">)</span>
+            <span class="n">ai</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_age_index</span><span class="p">(</span><span class="n">Quantity</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">t</span><span class="o">.</span><span class="n">unit</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># get nearby isochrones and interpolate between them</span>
+        <span class="n">ais</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_ai_range</span><span class="p">(</span><span class="n">ai</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="n">lages</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">lages</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ais</span><span class="p">])</span>
+        <span class="n">lt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">qs</span> <span class="o">=</span> <span class="p">[[</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ais</span><span class="p">]</span> <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">]</span>
+        <span class="n">eep_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">eep_name</span>
+        <span class="n">eeps</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">eep_str</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ais</span><span class="p">]</span>
+
+        <span class="c1"># eeps present in all isochrones</span>
+        <span class="n">eepi</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intersect1d</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">eeps</span><span class="p">))</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_interpolator</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+
+        <span class="c1"># interpolate in log(age) at each eep</span>
+        <span class="n">qis</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">f</span><span class="p">(</span><span class="n">lt</span><span class="p">,</span> <span class="n">lages</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixed_eep_q</span><span class="p">(</span><span class="n">j</span><span class="p">,</span><span class="n">eeps</span><span class="p">,</span><span class="n">q</span><span class="p">))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">eepi</span><span class="p">])</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">qs</span><span class="p">]</span>
+
+        <span class="c1"># make sure initial mass is monotonic in interpolation</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">label</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">labels</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">label</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mini_name</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">qis</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="n">qis</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">make_monotonic_increasing</span><span class="p">(</span><span class="n">eepi</span><span class="p">,</span><span class="n">qis</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="n">iso_qs</span> <span class="o">=</span> <span class="p">{</span><span class="n">labels</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span> <span class="n">qis</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">))}</span>
+        <span class="n">iso_qs</span><span class="p">[</span><span class="s2">&quot;EEP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">eepi</span>
+        <span class="k">if</span> <span class="n">supplement</span><span class="p">:</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="n">Isochrone</span><span class="p">(</span><span class="n">age</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                            <span class="n">eep_name</span><span class="o">=</span><span class="s1">&#39;EEP&#39;</span><span class="p">,</span>
+                            <span class="n">mini_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mini_name</span><span class="p">,</span>
+                            <span class="n">lteff_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span><span class="p">,</span>
+                            <span class="n">llbol_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span><span class="p">,</span>
+                            <span class="n">qs</span><span class="o">=</span><span class="n">iso_qs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="n">Isochrone</span><span class="p">(</span><span class="n">age</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                            <span class="n">eep_name</span><span class="o">=</span><span class="s1">&#39;EEP&#39;</span><span class="p">,</span>
+                            <span class="n">mini_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">lteff_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">llbol_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">qs</span><span class="o">=</span><span class="n">iso_qs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">iso</span>
+
+    <span class="k">def</span> <span class="nf">_interp_iso_quantity_mass</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mini</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+        <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pchip&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Uses _construct_iso_isochrone to interpolate a provided quantity in both</span>
+<span class="sd">        that quantity and in initial mass as a funciton of EEP and then returns the</span>
+<span class="sd">        value of the quantity at the requested initial mass</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mini: the initial mass of the star.</span>
+<span class="sd">            t: the age of the isochrone.</span>
+<span class="sd">            label: the label of the quantity to be interpolated.</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            q_res: the specified quantity at the requested initial mass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># construct isochrone for mass/luminosity relationship</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mini_name</span><span class="p">,</span> <span class="n">label</span><span class="p">]</span>
+        <span class="n">iso</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_iso_isochrone</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span><span class="n">supplement</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">qi</span> <span class="o">=</span> <span class="n">iso</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+        <span class="n">massi</span> <span class="o">=</span> <span class="n">iso</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mini_name</span><span class="p">]</span>
+
+        <span class="n">mini</span> <span class="o">=</span> <span class="n">mini</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="n">q_res</span> <span class="o">=</span> <span class="n">pchip_interpolate</span><span class="p">(</span><span class="n">massi</span><span class="p">,</span> <span class="n">qi</span><span class="p">,</span> <span class="n">mini</span><span class="p">)</span>
+        <span class="c1"># make sure values are zero outside the range of masses used</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_or</span><span class="p">(</span><span class="n">mini</span> <span class="o">&lt;</span> <span class="nb">min</span><span class="p">(</span><span class="n">massi</span><span class="p">),</span> <span class="n">mini</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">massi</span><span class="p">))</span>
+        <span class="n">q_res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">masked_array</span><span class="p">(</span><span class="n">q_res</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">q_res</span>
+
+    <span class="c1">######## EEP INTERPOLATION FUNCTIONS ########</span>
+    <span class="k">def</span> <span class="nf">_get_eep_relation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eep</span><span class="p">:</span><span class="nb">int</span><span class="p">,</span> <span class="n">labels</span><span class="p">:</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        For a given EEP, returns the age, mass and a list of quantities varying</span>
+<span class="sd">        across all mass tracks at that EEP.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            eep: the equivalent evolutionary phase number</span>
+<span class="sd">            labels: the list of quantity labels to get values for</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            age_set: the ages at the given EEP across all tracks</span>
+<span class="sd">            mass_set: the initial masses at the given EEP across all tracks</span>
+<span class="sd">            q_set: the list of quantities at the given EEP across all tracks</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">nq</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">age_set</span><span class="p">,</span> <span class="n">mass_set</span><span class="p">,</span> <span class="n">q_set</span><span class="p">)</span> <span class="o">=</span> <span class="p">([],</span> <span class="p">[],</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nq</span><span class="p">)])</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">j</span><span class="p">,</span><span class="n">track</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">):</span>
+            <span class="n">ages</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">track</span><span class="o">.</span><span class="n">age_name</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">eep</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ages</span><span class="p">):</span>
+                <span class="c1"># get the age at the given EEP</span>
+                <span class="n">age_set</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ages</span><span class="p">[</span><span class="n">eep</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">mass_set</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">masses</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">label</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">labels</span><span class="p">):</span>
+                    <span class="n">q_set</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">label</span><span class="p">][</span><span class="n">eep</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">age_set</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">age_set</span><span class="p">)</span>
+        <span class="n">mass_set</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mass_set</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">masses</span><span class="o">.</span><span class="n">unit</span>
+        <span class="n">q_set</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">q_set</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">age_set</span><span class="p">,</span> <span class="n">mass_set</span><span class="p">,</span> <span class="n">q_set</span>
+
+    <span class="k">def</span> <span class="nf">_construct_eep_isochrone</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">labels</span><span class="p">:</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+                                 <span class="n">method</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">&quot;pchip&quot;</span><span class="p">,</span><span class="n">supplement</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Isochrone</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Follows the instructions of the MIST0 and MIST1 papers by looping over</span>
+<span class="sd">        all EEPs and</span>
+<span class="sd">            1. Looping over all Mass tracks and getting the age at the given EEP</span>
+<span class="sd">               This then constitutes an age vs. mass relationship which is enforced to be</span>
+<span class="sd">               monotonic (decreasing as a function of mass)</span>
+<span class="sd">            2. We interpolate this relationship to find M(t) for the given EEP</span>
+<span class="sd">            3. We then interpolate the requested quantity, given by &quot;label&quot; in mass for</span>
+<span class="sd">               the given EEP.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            t: The age of the isochrone to be generated, should be a single value.</span>
+<span class="sd">            labels: The labels of the quantities to be interpolated.</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">            supplement: Whether to supplement the labels with basic quantities</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Isochrone: an isochrone data structure at the requested age t</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># pre-process list of labels to include teff and lbol if wanted</span>
+        <span class="k">if</span> <span class="n">supplement</span><span class="p">:</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">supplement_labels</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+
+        <span class="n">nq</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+        <span class="n">interp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_interpolator</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+        <span class="n">age</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">make_scalar_quantity</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="p">(</span><span class="n">eeps_</span><span class="p">,</span><span class="n">ms_</span><span class="p">,</span><span class="n">qs_</span><span class="p">)</span> <span class="o">=</span> <span class="p">([],[],[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nq</span><span class="p">)])</span>
+        <span class="k">for</span> <span class="n">eep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">max_eep</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="p">(</span><span class="n">age_set</span><span class="p">,</span> <span class="n">mass_set</span><span class="p">,</span> <span class="n">q_set</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_eep_relation</span><span class="p">(</span><span class="n">eep</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+            <span class="n">age_test</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">age_set</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">age</span> <span class="o">&lt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">age_set</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">age_set</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="n">age_test</span><span class="p">):</span>
+                <span class="n">eeps_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">eep</span><span class="p">)</span>
+                <span class="n">age_set</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">make_monotonic_decreasing</span><span class="p">(</span><span class="n">mass_set</span><span class="p">,</span> <span class="n">age_set</span><span class="p">)</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="n">age</span><span class="p">,</span> <span class="n">age_set</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">mass_set</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">ms_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nq</span><span class="p">):</span>
+                    <span class="n">qs_</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">interp</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">mass_set</span><span class="p">,</span> <span class="n">q_set</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+        <span class="c1"># this is the constructed isochrone for property qs given by &quot;labels&quot;</span>
+        <span class="n">iso_qs</span> <span class="o">=</span> <span class="p">{</span><span class="n">labels</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">qs_</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nq</span><span class="p">)}</span>
+        <span class="n">iso_qs</span><span class="p">[</span><span class="s2">&quot;EEP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">eeps_</span><span class="p">)</span>
+        <span class="n">iso_qs</span><span class="p">[</span><span class="s2">&quot;initial_mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ms_</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">supplement</span><span class="p">:</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="n">Isochrone</span><span class="p">(</span><span class="n">age</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                            <span class="n">eep_name</span><span class="o">=</span><span class="s1">&#39;EEP&#39;</span><span class="p">,</span>
+                            <span class="n">mini_name</span><span class="o">=</span><span class="s1">&#39;initial_mass&#39;</span><span class="p">,</span>
+                            <span class="n">lteff_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span><span class="p">,</span>
+                            <span class="n">llbol_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span><span class="p">,</span>
+                            <span class="n">qs</span><span class="o">=</span><span class="n">iso_qs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="n">Isochrone</span><span class="p">(</span><span class="n">age</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                            <span class="n">eep_name</span><span class="o">=</span><span class="s1">&#39;EEP&#39;</span><span class="p">,</span>
+                            <span class="n">mini_name</span><span class="o">=</span><span class="s1">&#39;initial_mass&#39;</span><span class="p">,</span>
+                            <span class="n">lteff_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">llbol_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">qs</span><span class="o">=</span><span class="n">iso_qs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">iso</span>
+
+    <span class="k">def</span> <span class="nf">_interp_eep_quantity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mini</span><span class="p">:</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">t</span><span class="p">:</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+                             <span class="n">label</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">&quot;pchip&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Uses _construct_eep_isochrone to construct an isochrone at the requested age</span>
+<span class="sd">        processes the isochrones to insure monotonicity and then interpolates to the</span>
+<span class="sd">        requested input masses</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mini: the initial mass of the star.</span>
+<span class="sd">            t: the age of the isochrone.</span>
+<span class="sd">            label: the label of the quantity to be interpolated.</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            qi: the specified quantity at the requested age (t) and range of initial</span>
+<span class="sd">                masses (mini)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">interp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_interpolator</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+        <span class="n">iso</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_eep_isochrone</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="p">[</span><span class="n">label</span><span class="p">],</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">supplement</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">eeps_</span> <span class="o">=</span> <span class="n">iso</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">iso</span><span class="o">.</span><span class="n">eep_name</span><span class="p">]</span>
+        <span class="n">ms_</span> <span class="o">=</span> <span class="n">iso</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">iso</span><span class="o">.</span><span class="n">mini_name</span><span class="p">]</span>
+        <span class="n">qs_</span> <span class="o">=</span> <span class="n">iso</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+        <span class="c1"># make sure masses are monotonically increasing (not guaranteed by above interp)</span>
+        <span class="n">ms_</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">make_monotonic_increasing</span><span class="p">(</span><span class="n">eeps_</span><span class="p">,</span> <span class="n">ms_</span><span class="p">)</span>
+        <span class="c1"># finally we interpolate the requested quantity to the requested masses</span>
+        <span class="n">mini</span> <span class="o">=</span> <span class="n">mini</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="n">qi</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="n">mini</span><span class="p">,</span> <span class="n">ms_</span><span class="p">,</span> <span class="n">qs_</span><span class="p">)</span>
+        <span class="c1"># make sure values are zero outside the range of masses used</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_or</span><span class="p">(</span><span class="n">mini</span> <span class="o">&lt;</span> <span class="nb">min</span><span class="p">(</span><span class="n">ms_</span><span class="p">),</span> <span class="n">mini</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">ms_</span><span class="p">))</span>
+        <span class="n">qi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">masked_array</span><span class="p">(</span><span class="n">qi</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">qi</span>
+
+    <span class="c1">######## OTHER HELPER FUNCTIONS ########</span>
+    <span class="k">def</span> <span class="nf">_get_mmax_age_interp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the maximum mass as a function of age,</span>
+<span class="sd">        properly interpreted from either the isochrone or EEP/track data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">lages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">lages</span>
+            <span class="n">mmax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">iso</span><span class="o">.</span><span class="n">qs</span><span class="p">[</span><span class="n">iso</span><span class="o">.</span><span class="n">mini_name</span><span class="p">])</span> <span class="k">for</span> <span class="n">iso</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># interpolating from EEPs</span>
+            <span class="n">lages</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">max_ages</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">mmax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">masses</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">sel</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">index_monotonic</span><span class="p">(</span><span class="n">lages</span><span class="p">)</span>
+            <span class="n">lages</span> <span class="o">=</span> <span class="n">lages</span><span class="p">[</span><span class="n">sel</span><span class="p">]</span>
+            <span class="n">mmax</span> <span class="o">=</span> <span class="n">mmax</span><span class="p">[</span><span class="n">sel</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">lages</span><span class="p">,</span> <span class="n">mmax</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_interp_quantity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mini</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span>
+        <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+        <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pchip&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Helper function to decide between which inerpolation method to use</span>
+<span class="sd">        and properly format the arguments</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mini: the initial mass of the star.</span>
+<span class="sd">            t: the age of the isochrone. Should be a single time (for now...)</span>
+<span class="sd">            label: the label of the quantity to be interpolated.</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            q_res: The quantity specified by label at the requested initial mass.</span>
+<span class="sd">                   This is masked based on the range of initial masses available</span>
+<span class="sd">                   at the specified age.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">mini</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">mini</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">mini</span><span class="o">.</span><span class="n">value</span><span class="p">])</span> <span class="o">*</span> <span class="n">mini</span><span class="o">.</span><span class="n">unit</span>
+
+        <span class="n">t</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">make_scalar_quantity</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">min_age</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">lages</span><span class="p">))</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+            <span class="n">max_age</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">lages</span><span class="p">))</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">min_age</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">min_ages</span><span class="p">)</span>
+            <span class="n">max_age</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">max_ages</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">t</span> <span class="o">&lt;</span> <span class="n">min_age</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">t</span> <span class="o">&gt;</span> <span class="n">max_age</span><span class="p">):</span>
+            <span class="n">emsg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;t = </span><span class="si">{</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> yrs is outside the range of applicability: &quot;</span> <span class="o">+</span> \
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">min_age</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">max_age</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> yrs&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">emsg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="c1"># interpolate from isochrones</span>
+            <span class="n">q_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interp_iso_quantity_mass</span><span class="p">(</span><span class="n">mini</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># interpolate from EEPs</span>
+            <span class="n">q_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interp_eep_quantity</span><span class="p">(</span><span class="n">mini</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">q_res</span>
+
+    <span class="c1">######## MAIN PUBLIC OUTPUT FUNCTIONS ########</span>
+<div class="viewcode-block" id="IsochroneInterpolator.mmax">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.mmax">[docs]</a>
+    <span class="k">def</span> <span class="nf">mmax</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the maximum mass of the stellar population that hasn&#39;t</span>
+<span class="sd">        died yet (in e.g. a SN) as a funciton of age, using a cubic spline</span>
+<span class="sd">        based on maximum mass reported in the isochrone data</span>
+<span class="sd">        Args:</span>
+<span class="sd">            t: the time at which to evaluate the derivative, can be an array</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            mmax: the initial mass of the most massive star still alive at time t</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">])</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">unit</span>
+
+        <span class="n">lt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="p">(</span><span class="n">lages</span><span class="p">,</span> <span class="n">mmax</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_mmax_age_interp</span><span class="p">()</span>
+        <span class="c1"># cubic spline interpolation in log(age)</span>
+        <span class="n">interp</span> <span class="o">=</span> <span class="n">pchip_interpolate</span><span class="p">(</span><span class="n">lages</span><span class="p">,</span><span class="n">mmax</span><span class="p">,</span> <span class="n">lt</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">max_mass</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">max_mass</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">max_mass</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">masses</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">interp</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">lt</span> <span class="o">&lt;</span> <span class="nb">min</span><span class="p">(</span><span class="n">lages</span><span class="p">))]</span> <span class="o">=</span> <span class="n">max_mass</span>
+        <span class="n">interp</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">lt</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">lages</span><span class="p">))]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">return</span> <span class="n">interp</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span></div>
+
+
+<div class="viewcode-block" id="IsochroneInterpolator.mmaxdot">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.mmaxdot">[docs]</a>
+    <span class="k">def</span> <span class="nf">mmaxdot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the rate of change of the maximum mass of the stellar population</span>
+<span class="sd">        with respect to time. Uses a cubic spline and takes the derivative</span>
+<span class="sd">        Args:</span>
+<span class="sd">            t: the time at which to evaluate the derivative, can be an array</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            mmaxdot: the rate at which the maximum mass is changing with respect to time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">])</span> <span class="o">*</span> <span class="n">t</span><span class="o">.</span><span class="n">unit</span>
+
+        <span class="n">lt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">yr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="p">(</span><span class="n">lages</span><span class="p">,</span> <span class="n">mmax</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_mmax_age_interp</span><span class="p">()</span>
+        <span class="c1"># return the first derivative of the cubic spline</span>
+        <span class="n">unitfac</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span> <span class="o">/</span> <span class="n">t</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Myr</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">interp</span> <span class="o">=</span> <span class="n">pchip_interpolate</span><span class="p">(</span><span class="n">lages</span><span class="p">,</span> <span class="n">mmax</span><span class="p">,</span> <span class="n">lt</span><span class="p">,</span> <span class="n">der</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">unitfac</span>
+        <span class="n">interp</span> <span class="o">*=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">lt</span> <span class="o">&gt;</span> <span class="nb">min</span><span class="p">(</span><span class="n">lages</span><span class="p">),</span> <span class="n">lt</span> <span class="o">&lt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">lages</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">interp</span></div>
+
+
+<div class="viewcode-block" id="IsochroneInterpolator.lbol">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.lbol">[docs]</a>
+    <span class="k">def</span> <span class="nf">lbol</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">mini</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pchip&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;power&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the bolometric luminosity of a star of initial mass mini at age t</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mini: the initial mass of the star. Can be an array</span>
+<span class="sd">            t: the age of the isochrone. Should be a single time (for now...)</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Quantity[&quot;power&quot;]: the bolometric luminosity of the star.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">llbol_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">llbol_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">llbol_name</span>
+        <span class="n">logLbol_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interp_quantity</span><span class="p">(</span><span class="n">mini</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">llbol_label</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">masked_power</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">logLbol_res</span><span class="p">)</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">Lsun</span></div>
+
+
+<div class="viewcode-block" id="IsochroneInterpolator.teff">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.teff">[docs]</a>
+    <span class="k">def</span> <span class="nf">teff</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">mini</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pchip&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the atmospheric effective temperature of a star of initial mass mini</span>
+<span class="sd">        at age t</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mini: the initial mass of the star. Can be an array</span>
+<span class="sd">            t: the age of the isochrone. Should be a single time (for now...)</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Quantity[&quot;temperature&quot;]: the effective surface temperature of the star.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">lteff_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iset</span><span class="o">.</span><span class="n">isos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">lteff_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tset</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lteff_name</span>
+        <span class="c1"># interpolating from EEPs</span>
+        <span class="n">logTeff_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interp_quantity</span><span class="p">(</span><span class="n">mini</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">lteff_label</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">masked_power</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">logTeff_res</span><span class="p">)</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">K</span></div>
+
+    
+<div class="viewcode-block" id="IsochroneInterpolator.construct_isochrone">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.html#arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator.construct_isochrone">[docs]</a>
+    <span class="k">def</span> <span class="nf">construct_isochrone</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+                            <span class="n">method</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">&quot;pchip&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Isochrone</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Constructs an isochrone at age t with the requested labels</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            t: the age of the isochrone. Should be a single time</span>
+<span class="sd">            method: the interpolation method to use, either pchip or linear</span>
+<span class="sd">                    default is pchip (a monotonicity-preserving cubic spline)</span>
+<span class="sd">            labels: The labels of the quantities to be calcaulated for the isochrone</span>
+<span class="sd">                    default is an empty list which will return initial mass, log(teff),</span>
+<span class="sd">                    and log(lbol) only.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Isochrone: The isochrone object containing initial masses,</span>
+<span class="sd">                effective temperatures, and bolometric luminosities</span>
+<span class="sd">                of the stars in the isochrone, along with any other requested quantities.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">array_utils</span><span class="o">.</span><span class="n">make_scalar_quantity</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">labels</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_op</span> <span class="o">==</span> <span class="s2">&quot;iso&quot;</span><span class="p">:</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_iso_isochrone</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">iso</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_eep_isochrone</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">iso</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.stellar_evolution.isochrone</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

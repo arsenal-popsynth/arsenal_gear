@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.BinaryDistribution
+=====================================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: BinaryDistribution
+   :members:
+   :show-inheritance:

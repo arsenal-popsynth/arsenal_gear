@@ -1,0 +1,8 @@
+arsenal\_gear.dist\_funcs.binaries.UniformMassRatio
+===================================================
+
+.. currentmodule:: arsenal_gear.dist_funcs.binaries
+
+.. autoclass:: UniformMassRatio
+   :members:
+   :show-inheritance:

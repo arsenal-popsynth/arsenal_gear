@@ -1,0 +1,34 @@
+﻿arsenal\_gear.stellar\_evolution
+================================
+
+.. automodule:: arsenal_gear.stellar_evolution
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   data_reader
+   isochrone
+   popsynth
+   se_data_structures
+

@@ -1,0 +1,8 @@
+arsenal\_gear.population.BinaryPopulation
+=========================================
+
+.. currentmodule:: arsenal_gear.population
+
+.. autoclass:: BinaryPopulation
+   :members:
+   :show-inheritance:
