@@ -138,19 +138,19 @@ class Source:
             Interpolation points for RegularGridInterpolator
 
         """
-        max_length = max(
-            len(param) if isinstance(param, (list, np.ndarray)) else 1
-            for param in params
-        )
+        plens = np.array([len(param) if isinstance(param, (list, np.ndarray))
+                         else 1 for param in params])
+        max_length = max(plens)
 
         # Ensure all arguments are lists or arrays of the same length
+        if np.any((plens != 1) & (plens != max_length)):
+            raise ValueError(
+                "All lists of parameters must have the same length."
+            )
+
         args = []
         for param in params:
             if isinstance(param, (list, np.ndarray)):
-                if len(param) != max_length:
-                    raise ValueError(
-                        "All list of parameters must have the same length."
-                    )
                 args.append(np.array(param))
             else:
                 # Fill with the same value
