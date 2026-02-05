@@ -1,15 +1,9 @@
 """
-This script converts the downloaded BPASS output into an
-Arsenal-readable output. We may decide to make either the script
-or its output part of the Arsenal distribution.
-"""
-
-"""
-output from population synthesis
+data_converter.py
 ================================
 
-This submodule defines the interface to various binary population
-synthesis codes through interpreting and processing their outputs
+This file defines the interface to various binary evolution models
+through downloading, reorganzing and interpreting their outputs.
 """
 
 import os
@@ -193,7 +187,7 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
                             M2_closest = str(int(M2_closest))
 
                         # Set current time for the rejuvenated star
-                        if accretion_time:
+                        if rejuvenated:
                             effective_time = _times[t] - accretion_time
                         else:
                             effective_time = _times[t]
@@ -279,7 +273,7 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
             _sort = np.argsort(models)
             data_to_save = data[_sort, :, :]
 
-            ds = xr.DataArray(data, coords=[("Model", models[_sort]), ("Property", ["Mass 1 (MSun)", "log L_bol 1 (LSun)", "log T_eff 1 (K)",
+            ds = xr.DataArray(data_to_save, coords=[("Model", models[_sort]), ("Property", ["Mass 1 (MSun)", "log L_bol 1 (LSun)", "log T_eff 1 (K)",
                                             "Mass 2 (MSun)", "log L_bol 2 (LSun)", "log T_eff 2 (K)", "P (yr)"]), ("Time (log t/yr)", times)])
             ds.to_netcdf(output_directory + '/binaries_' + metals + '.h5')
 
