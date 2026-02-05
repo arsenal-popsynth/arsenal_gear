@@ -121,7 +121,7 @@ class LimongiChieffi2018(YieldTables):
 
         """
         args = [
-            starPop.metals.value,
+            starPop.metals,
             starPop.to(u.M_sun).value,
         ]
         yld_array = (
@@ -132,6 +132,33 @@ class LimongiChieffi2018(YieldTables):
         )
 
         return {el: yld_array[i] for i, el in enumerate(elements)}
+
+    def ccsn_mass(
+        self,
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> dict[str, Quantity["mass"]]:
+        """Interpolate yields from core-collapse supernovae for the total mass.
+        Stellar parameters can be provided as single value, array + single value, or arrays.
+
+        Args:
+            starPop: SSP object
+            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
+        Returns:
+            Dict of [str, Quantity["mass"]] of yields matching provided element list
+
+        """
+        args = [
+            np.zeros_like(starPop),
+            starPop.metals * np.ones_like(starPop),
+            starPop.to(u.M_sun).value,
+        ]
+        return (
+            self.ccsn.get_mloss(args, interpolate=interpolate, extrapolate=extrapolate)
+            * u.M_sun
+        )
 
     def wind_yields(
         self,
@@ -153,7 +180,7 @@ class LimongiChieffi2018(YieldTables):
 
         """
         args = [
-            starPop.metals.value,
+            starPop.metals,
             starPop.to(u.M_sun).value,
         ]
         yld_array = (
