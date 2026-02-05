@@ -20,9 +20,11 @@ dependencies = [
     "sphinx>=7",
     "scipy>=1.10",
     "astropy",
+    "pandas",
     "pyyaml",
     "tqdm",
     "myst-parser",
+    "pandas",
     ]
 dynamic = ["version"]
 

@@ -7,6 +7,7 @@ relevant for stellar feedback from massive stars.
 """
 
 import time
+import warnings
 from abc import ABC, abstractmethod
 
 import astropy.units as u

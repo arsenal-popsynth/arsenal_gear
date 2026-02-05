@@ -2,185 +2,29 @@
 yields
 ==========
 
-This module contains the header classes used for different
-yield tables available in the litterature.
+This module contains the abstract class used define a set
+chemical yields that will interact with stellar feedback.
 """
 
-import os
-import warnings
+from abc import ABC, abstractmethod
 from typing import List
 
-import numpy as np
 from astropy.units import Quantity
-from scipy.interpolate import RegularGridInterpolator
 
 from ..population import SSP
 
 
-class Source:
-    """
-    Class used to store interpolators of yields from a given
-    source (e.g., winds or core-collapse SNe). Makes use of
-    scipy.interpolate.RegularGridInterpolator for flexibility
-    and efficiency.
-
-    Includes functions:
-    get_yield - returns yields of given elements
-    get_mloss - return sum of all yields in table.
-    """
-
-    def __init__(self, elements, params, yields) -> None:
-
-        self.params = params
-        self.yields = {
-            element: RegularGridInterpolator(
-                self.params, yields[i], fill_value=None, bounds_error=False
-            )
-            for i, element in enumerate(elements)
-        }
-        self.mloss = RegularGridInterpolator(
-            self.params, np.sum(yields, axis=0), fill_value=None, bounds_error=False
-        )
-
-    def get_yld(self, elements, params, interpolate="nearest", extrapolate=False):
-        """Interpolate yields from class.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then params are set to limits if outside bound.
-        Returns:
-            List of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
-
-        if len(params) != len(self.params):
-            raise ValueError("Supplied parameters do not match yield set parameters.")
-
-        points = self._convert2array(params)
-
-        if extrapolate:
-            warnings.warn(
-                """Extrapolating yields might lead to problematic behaviour (e.g., negative yields).
-                   Ensure that yields behave as expected."""
-            )
-        else:
-            for ip in range(len(params)):
-                points[:, ip][(points[:, ip] < np.min(self.params[ip]))] = np.min(
-                    self.params[ip]
-                )
-                points[:, ip][(points[:, ip] > np.max(self.params[ip]))] = np.max(
-                    self.params[ip]
-                )
-
-        if len(elements) == 1:
-            try:
-                return self.yields[elements[0]](points, method=interpolate)
-            except KeyError:
-                warnings.warn("Element {elements[0]} is not part of yield set.")
-                return np.nan
-        else:
-            if all(element in list(self.yields.keys()) for element in elements):
-                return np.array(
-                    [
-                        self.yields[element](points, method=interpolate)
-                        for element in elements
-                    ]
-                )
-
-            yld = []
-            shape = self.yields["H"](points, method=interpolate).shape
-            for element in elements:
-                try:
-                    yld.append(self.yields[element](points, method=interpolate))
-                except KeyError:
-                    warnings.warn("Element {elements[0]} is not part of yield set.")
-                    yld.append(np.ones(shape) * np.nan)
-            return yld
-
-    def get_mloss(self, params, interpolate="nearest", extrapolate=False):
-        """Interpolate sum of all yields (total mass) from class.
-
-        Args:
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then params are set to limits if outside bound.
-        Returns:
-            Total mass ejected by source (i.e., sum of all elements)
-
-        """
-        if len(params) != len(self.params):
-            raise ValueError("Supplied parameters do not match yield set parameters.")
-
-        points = self._convert2array(params)
-
-        if extrapolate:
-            warnings.warn(
-                """Extrapolating yields might lead to problematic behaviour (e.g., negative yields).
-                   Ensure that yields behave as expected."""
-            )
-        else:
-            for ip in range(len(params)):
-                points[:, ip][(points[:, ip] < np.min(self.params[ip]))] = np.min(
-                    self.params[ip]
-                )
-                points[:, ip][(points[:, ip] > np.max(self.params[ip]))] = np.max(
-                    self.params[ip]
-                )
-
-        return self.mloss(points, method=interpolate)
-
-    @staticmethod
-    def _convert2array(params):
-        """Internal function to convert list of parameters to a format
-        that RegularGridInterpolator can handle.
-
-        Args:
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
-        Returns:
-            Interpolation points for RegularGridInterpolator
-
-        """
-        max_length = max(
-            len(param) if isinstance(param, (list, np.ndarray)) else 1
-            for param in params
-        )
-
-        # Ensure all arguments are lists or arrays of the same length
-        args = []
-        for param in params:
-            if isinstance(param, (list, np.ndarray)):
-                if len(param) != max_length:
-                    raise ValueError(
-                        "All list of parameters must have the same length."
-                    )
-                args.append(np.array(param))
-            else:
-                # Fill with the same value
-                args.append(np.full(max_length, param))
-
-        # Combine arguments into points for interpolation
-        return np.stack(args, axis=-1)
-
-
-class Yields:
-    """Header class for yield tables."""
+class Yields(ABC):
+    """Abstract base class for yield tables."""
 
     def __init__(self) -> None:
 
-        if self.__class__ is Yields:
-            raise NotImplementedError(
-                "This is a header class for inheritance and should not be used by itself"
-            )
+        self.ccsn_choice = None
+        self.snia_choice = None
+        self.wind_choice = None
+        self.agb_choice = None
 
-        self.filedir = os.path.dirname(os.path.realpath(__file__))
-        self.yield_tablefile = self.filedir + "<yield file name>"
-
-        self.elements = None
-        self.atomic_num = None
-
+    @abstractmethod
     def ccsn_yields(
         self,
         elements: List[str],
@@ -188,13 +32,19 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for core-collapse SNe.
+        """Abstract method for core-collapse SNe yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
 
-        raise ValueError("Core-collapse SNe is not part of this yield set.")
-
+    @abstractmethod
     def snia_yields(
         self,
         elements: List[str],
@@ -202,12 +52,19 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for SNe type Ia.
+        """Abstract method for SNe type Ia yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
-        raise ValueError("Type Ia SNe is not part of this yield set.")
 
+    @abstractmethod
     def wind_yields(
         self,
         elements: List[str],
@@ -215,12 +72,19 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for stellar winds.
+        """Abstract method for stellar wind yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
-        raise ValueError("Stellar winds (main sequence) is not part of this yield set.")
 
+    @abstractmethod
     def agb_yields(
         self,
         elements: List[str],
@@ -228,10 +92,173 @@ class Yields:
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
-        """Header function for AGB mass loss.
+        """Abstract method for AGB mass loss yields.
 
-        Use: Rewrite for a given yields
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
         """
-        raise ValueError(
-            "Stellar wind (asymptotic giant branch) is not part of this yield set."
-        )
+
+    @abstractmethod
+    def ccsn_mloss(
+        self,
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for core-collapse SNe mloss.
+
+        Args:
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Total mass loss from core-collapse SNe
+        """
+
+    @abstractmethod
+    def snia_mloss(
+        self,
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for SNe type Ia mloss.
+
+        Args:
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Total mass loss from SNeIa
+        """
+
+    @abstractmethod
+    def wind_mloss(
+        self,
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for stellar wind mloss.
+
+        Args:
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Total mass loss from stellar winds
+        """
+
+    @abstractmethod
+    def agb_mloss(
+        self,
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for AGB mass loss mloss.
+
+        Args:
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Total mass loss from AGB
+        """
+
+    @abstractmethod
+    def ccsn_relative(
+        self,
+        elements: List[str],
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for core-collapse SNe yields relative to
+           total mass loss.
+
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Fractional yields for the specified elements
+        """
+
+    @abstractmethod
+    def snia_relative(
+        self,
+        elements: List[str],
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for SNe type Ia yields relative to
+           total mass loss.
+
+
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Fractional yields for the specified elements
+        """
+
+    @abstractmethod
+    def wind_relative(
+        self,
+        elements: List[str],
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for stellar wind yields relative to
+           total mass loss.
+
+
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Fractional yields for the specified elements
+        """
+
+    @abstractmethod
+    def agb_relative(
+        self,
+        elements: List[str],
+        starPop: SSP,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for AGB mass loss yields relative to
+           total mass loss.
+
+
+        Args:
+            elements: list of elements to get yields for
+            starPop: SSP object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Fractional yields for the specified elements
+        """

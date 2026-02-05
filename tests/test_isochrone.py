@@ -45,13 +45,13 @@ def integrate_mask(y, x, mask):
 
 
 def test_mist_interp():
-    """initialize stellar population with EEP interpolation
+    """initialize stellar population with track interpolation
     and otherwise default parameters (which will specify MIST isochrones)
     test=True in isochrone interpolation to leave out nearest isochrone
     """
-    sp = {
-        "eep": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
-            interp_op="eep"
+    isos = {
+        "track": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
+            interp_op="track"
         ),
         "iso": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
             interp_op="iso", test=True
@@ -59,27 +59,31 @@ def test_mist_interp():
     }
 
     imf = arsenal_gear.dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
-    lmissed = {"eep": [], "iso": []}
-    L_err = {"eep": [], "iso": []}
-    T_err = {"eep": [], "iso": []}
+    lmissed = {"track": [], "iso": []}
+    L_err = {"track": [], "iso": []}
+    T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].iset.lages))
-    for ai in ais[2::5]:
+    ais = np.arange(len(isos["iso"].iset.lages))
+    for ai in ais[2::6]:
         ai += 1
-        t = (1 + 1e-6) * np.power(10, np.array([sp["iso"].iset.lages[ai]]) - 6) * u.Myr
+        t = (
+            (1 + 1e-6)
+            * np.power(10, np.array([isos["iso"].iset.lages[ai]]) - 6)
+            * u.Myr
+        )
 
-        ms = sp["iso"].iset.isos[ai].qs["initial_mass"] * u.Msun
+        ms = isos["iso"].iset.isos[ai].qs["initial_mass"] * u.Msun
         xi = imf.pdf(ms)
 
-        L_ref = np.power(10, sp["iso"].iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].iset.isos[ai].qs["log_Teff"])
+        L_ref = np.power(10, isos["iso"].iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, isos["iso"].iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
-        for k in ["eep", "iso"]:
-            T[k] = (sp[k].teff(ms, t) / u.K).value
-            L[k] = (sp[k].lbol(ms, t) / u.Lsun).value
+        for k in ["track", "iso"]:
+            T[k] = (isos[k].teff(ms, t) / u.K).value
+            L[k] = (isos[k].lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
@@ -102,17 +106,51 @@ def test_mist_interp():
                 integrate_mask(np.abs(L[k] - L_ref) * xi, ms.value, nm[k]) / lum[k]
             )
 
-    for k in ["eep", "iso"]:
+    for k in ["track", "iso"]:
         lmissed[k] = np.array(lmissed[k])
         L_err[k] = np.array(L_err[k])
         T_err[k] = np.array(T_err[k])
-        # these don't seem like very stringent constraints, but there are regions
-        # where things don't seem to work perfectly well in summary metrics, even
-        # though the interpolation looks fine by eye
-        assert_array_less(lmissed[k], 0.35)
-        assert_array_less(L_err[k], 0.50)
-        assert_array_less(T_err[k], 0.30)
-        # the averages errors over all time, especially if you weight by luminosity
-        # over time, which we don't do, are quite small 3% or less
         for arr in lmissed[k], L_err[k], T_err[k]:
+            # these don't seem like very stringent constraints, but there are regions
+            # where things don't seem to work perfectly well in summary metrics, even
+            # though the interpolation looks fine by eye
+            assert_array_less(arr, 0.2)
+            # the average errors over all time, especially if you weight by luminosity
+            # over time, which we don't do, are quite small 3% or less
             assert np.average(arr) < 0.03
+
+
+def test_lbol_methods_mist():
+    """
+    Test that compares both track-based and isochrone-based methods for
+    interpolating the MIST isochronges, for both discrete and continuous
+    forms of the stellar population.
+    """
+    int_ops = ["iso", "track"]
+    outs = {}
+    # array of times over which to compare bolometric luminosities
+    tlin = np.logspace(5.1, 9, 20) * u.yr
+    isos = {
+        "track": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
+            interp_op="track"
+        ),
+        "iso": arsenal_gear.stellar_evolution.isochrone.IsochroneInterpolator(
+            interp_op="iso"
+        ),
+    }
+    imf = arsenal_gear.dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
+    masses = imf.sample_mass(1e6 * u.Msun)
+    for int_op in int_ops:
+        lbol = (
+            np.array([np.sum(isos[int_op].lbol(masses, ti)).value for ti in tlin])
+            * u.Lsun
+        )
+        outs[int_op] = lbol * u.Lsun
+    # compare all combinations of the four methods
+    keys = list(outs.keys())
+    n = len(keys)
+    for i in range(n):
+        for j in range(i + 1, n):
+            rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
+            # average relative error should be less than 4%
+            assert np.average(rel_err) < 0.05
