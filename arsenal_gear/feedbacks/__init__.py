@@ -17,7 +17,7 @@ from . import sn
 __all__ = ["SNFeedbackMechanism", "sn"]
 
 
-class MechanicalFBMechanism:
+class MechanicalFBMechanism(ABC):
     """
     Abstract Base Class for Mechanical Feedback Mechanisms (SN, Winds, etc.)
     """
@@ -39,6 +39,26 @@ class MechanicalFBMechanism:
         :type t1: Quantity["time"]
         :return: mass yield from this mechanism
         """
+        return 0 * u.Msun
+
+    @abstractmethod
+    def energy(
+        self,
+        stars: Type["SSP"],
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> Quantity["energy"]:
+        """
+        Get the total energy yield from this mechanism between time t0 and t1.
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: energy yield from this mechanism
+        """
+        return 0 * u.erg
 
     @abstractmethod
     def metals_total(
@@ -57,6 +77,7 @@ class MechanicalFBMechanism:
         :type t1: Quantity["time"]
         :return: metal yield from this mechanism
         """
+        return 0 * u.Msun
 
     @abstractmethod
     def metals_species(
@@ -76,11 +97,32 @@ class MechanicalFBMechanism:
         :type t1: Quantity["time"]
         :return: species metal yield from this mechanism
         """
+        return 0 * u.Msun
+
+    @abstractmethod
+    def count(
+        self,
+        stars: Type["SSP"],
+        t0: Quantity["time"],
+        t1: Quantity["time"],
+    ) -> int:
+        """
+        Get the number of events (for a discrete mechanism)
+        :param stars: Stellar Population
+        :type stars: SSP
+        :param t0: Start time
+        :type t0: Quantity["time"]
+        :param t1: End time
+        :type t1: Quantity["time"]
+        :return: number of events from this mechanism
+        :rtype: int
+        """
+        return 0
 
 
 class SNFeedbackMechanism(MechanicalFBMechanism):
     """
-    Supernova feedback mechanism
+    Supernova feedback mechanism.
     """
 
     def __init__(
@@ -89,9 +131,23 @@ class SNFeedbackMechanism(MechanicalFBMechanism):
         mass_func: Callable[[Type["SSP"]], Quantity["mass"]],
         metals_func: Callable[[Type["SSP"]], dict],
         explodability_func: Callable[
-            [Type["SSP"], Quantity["time"], Quantity["time"]], Quantity["energy"]
+            [Type["SSP"], Quantity["time"], Quantity["time"]], bool
         ],
     ) -> None:
+        """
+        Initialize the SN feedback mechanism.  The explodability function is used
+        to select which stars from the SSP explode between times t0 and t1, and then the
+        energy, mass, and metals functions are used to get the yields from those stars.
+
+        :param energy_func: Function to get energy yield from an SSP
+        :type energy_func: Callable[[SSP], Quantity["energy"]]
+        :param mass_func: Function to get mass yield from an SSP
+        :type mass_func: Callable[[SSP], Quantity["mass"]]
+        :param metals_func: Function to get total and per-species metal yields from an SSP
+        :type metals_func: Callable[[SSP], dict]
+        :param explodability_func: Function to determine which stars explode between t0 and t1
+        :type explodability_func: Callable[[SSP, Quantity["time"], Quantity["time"]], bool]
+        """
         self.energy_ = energy_func
         self.mass_ = mass_func
         self.metals_ = metals_func

@@ -43,10 +43,10 @@ class IMF(rv_continuous):
         :return: List of masses of stars
         :rtype: Quantity["mass"]
         """
-        N_samp = round((mtot / self.mean()).value)
-        return self.sample(N_samp)
+        num_samp = round((mtot / self.mean()).value)
+        return self.sample(num_samp)
 
-    def sample(self, N: int) -> Quantity["mass"]:
+    def sample(self, num: int) -> Quantity["mass"]:
         """
         Draw a sample from the IMF with a specific number of stars
 
@@ -55,7 +55,7 @@ class IMF(rv_continuous):
         :return: List of masses of stars
         :rtype: Quantity["mass"]
         """
-        return self.rvs(size=N) * u.Msun
+        return self.rvs(size=num) * u.Msun
 
 
 class Salpeter(IMF):

@@ -13,25 +13,30 @@ __all__ = ["SSP", "BSP"]
 
 
 class SSP(Quantity):
+    """
+    The simple stellar population (SSP) class.
+    It inherits from :class:`astropy.units.Quantity`, as the basic
+    property of the population is the mass of each star.  This lets you
+    slice like a numpy array.
+    """
+
     _unit = None
     metals = 0
     tform = 0 * u.yr
-    """This class is used to instantiate populations of individual stars.  This
-    "simple stellar population" has every star with equal metallicities and
-    formation times.
 
-    :param mass: the masses of the stars in the population
-    :type mass: astropy mass unit
-    :param metals: the metallicities of the stars in the population
-    :type metals: float
-    :param tform: the formation times of the stars in the population
-    :type tform: astropy time unit
-    """
+    def __new__(cls, mass: Quantity["mass"], metals=np.float64, tform=Quantity["time"]):
+        """This class is used to instantiate populations of individual stars.  This
+        "simple stellar population" has every star with equal metallicities and
+        formation times.
 
-    def __new__(
-        subtype, mass: Quantity["mass"], metals=np.float64, tform=Quantity["time"]
-    ):
-        obj = Quantity(mass).view(subtype)
+        :param mass: the masses of the stars in the population
+        :type mass: astropy mass unit
+        :param metals: the metallicities of the stars in the population
+        :type metals: float
+        :param tform: the formation times of the stars in the population
+        :type tform: astropy time unit
+        """
+        obj = Quantity(mass).view(cls)
         obj._unit = mass.unit
         obj.metals = metals
         obj.tform = tform
