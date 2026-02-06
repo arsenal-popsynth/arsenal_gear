@@ -10,62 +10,63 @@ from dataclasses import dataclass
 from astropy.units import Quantity
 import numpy as np
 
-
 @dataclass
-class SingleStarTrack:
+class SingleStarTable:
     """
     Data class for storing evolutionary data for single stars evolved
-    with binary evolution codes. Note that this is not the same as the
-    StellarTrack class implemented in se_data_structures.py
+    with binary evolution codes. 
     
     Attributes:
-        model_name: model name, based on the mass of the star
-        age_name: variable name for age (in years by default)
-        lteff_name: variable name for log_10(effective temperature/K)
-        llbol_name: variable name for log_10(bolometric luminosities/Lsun)
+        masses: list of initial masses of the stars
+        logA_name: variable name for log_10(age/yr)
+        mass_name: variable name for stellar mass/Msun
+        logT_name: variable name for log_10(effective temperature/K)
+        logL_name: variable name for log_10(bolometric luminosities/Lsun)
+        logR_name: variable name for log_10(stelalr radius/Rsun)
         qs: Dictionary of stellar track quantities. These should minimally include
-            log_Teff and log_L but can include others.
+            logA, mass, logT, logL, and logR but can include others.
     """
-    mass: Quantity["mass"] # convert from mass?
-    age_name: str
-    lteff_name: str
-    llbol_name: str
+    masses: np.ndarray[Quantity["mass"]]
+    logA_name: str
+    mass_name: str
+    logT_name: str
+    logL_name: str
+    logR_name: str
     qs: dict
 
 @dataclass
-class BinaryStarTrack:
+class BinaryStarTable:
     """
     Data class for storing evolutionary data for binary stars evolved
     with binary evolution codes. 
     
     Attributes:
-        model_name: model name, based on primary mass, period, and mass ratio
-        lteff_name: variable name for log_10(effective temperature/K)
-        llbol_name: variable name for log_10(bolometric luminosities/Lsun)
+        masses: list of initial masses of the primaries
+        mass_ratios: list of initial mass ratios companion mass/primary mass
+        periods: list of initial orbital periods
+        logA_name: variable name for log_10(age/yr)
+        mass1_name: variable name for stellar mass/Msun for the primary
+        logT1_name: variable name for log_10(effective temperature/K) for the primary
+        logL1_name: variable name for log_10(bolometric luminosities/Lsun) for the primary
+        logR1_name: variable name for log_10(stelalr radius/Rsun) for the primary
+        mass2_name: variable name for stellar mass/Msun for the companion
+        logT2_name: variable name for log_10(effective temperature/K) for the companion
+        logL2_name: variable name for log_10(bolometric luminosities/Lsun) for the companion
+        logR2_name: variable name for log_10(stelalr radius/Rsun) for the companion
         qs: Dictionary of stellar track quantities. These should minimally include
-            log_Teff and log_L but can include others.
-    """
-    mass: Quantity["mass"]
-    age_name: str
-    lteff_name: str
-    llbol_name: str
-    qs: dict
-
-
-@dataclass
-class TrackSet:
-    """
-    Data class for storing a set of stellar evolution tracks.
-    
-    Attributes:
-        masses: List of initial masses of the tracks
-        hdr_list: List of column headers for the track data
-        tracks: List of Track objects
-        max_eep: Maximum equivalent evolutionary phase number across all tracks
+            logA, mass1, logT1, logL1, logR1, mass2, logT2, logL2, and logR2 
+            but can include others.
     """
     masses: np.ndarray[Quantity["mass"]]
-    min_ages: np.ndarray[Quantity["time"]]
-    max_ages: np.ndarray[Quantity["time"]]
-    hdr_list: list[str]
-    tracks: list[StellarTrack]
-    max_eep: int
+    mass_ratios: np.ndarray[np.float64]
+    periods: np.ndarray[Quantity["time"]]
+    logA_name: str
+    mass1_name: str
+    logT1_name: str
+    logL1_name: str
+    logR1_name: str
+    mass2_name: str
+    logT2_name: str
+    logL2_name: str
+    logR2_name: str
+    qs: dict
