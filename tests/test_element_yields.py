@@ -21,6 +21,14 @@ class TestLimongiChieffi2018:
     """Tests for yields from Limongi & Chieffi (2018)"""
 
     lc18 = arsenal_gear.element_yields.LimongiChieffi2018()
+    # Parameter/argument space where model has been tested
+    mmin = 8.0
+    mmax = 300.0
+    Zmin = 0.00001
+    Zmax = 0.03
+    rotmin = 0.0
+    rotmax = 300
+    interp_methods = ["nearest", "linear"]
 
     def test_monotinically_increasing_params(self):
         """Ensure monotonically increasing parameter grid"""
@@ -32,6 +40,73 @@ class TestLimongiChieffi2018:
             assert np.all(
                 param[1:] >= param[:-1]
             ), f"Parameter {param} for ccsn in {self.lc18.name} is not stricktly increasing."
+
+    def test_check_positive_tables(self):
+
+        for element in self.lc18.elements:
+            assert np.all(
+                self.lc18.wind.yields[element].values >= 0
+            ), f"{self.lc18.name} contains negative values in wind for {element}: {self.lc18.wind.yields[element].values}"
+            assert np.all(
+                self.lc18.ccsn.yields[element].values >= 0
+            ), f"{self.lc18.name} contains negative values in ccsn for {element}: {self.lc18.ccsn.yields[element].values}"
+
+    def test_ensure_positive_remnant_mass(self):
+
+        rot = np.linspace(self.rotmin, self.rotmax, 1000)
+        mass = np.linspace(self.mmin, self.mmax, 1000)
+        metal = np.linspace(self.Zmin, self.Zmax, 1000)
+        params = [rot, metal, mass]
+
+        for interp_method in self.interp_methods:
+            mloss = self.lc18.wind.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=False
+            )
+            index = np.argwhere(mass - mloss >= 0)[0]
+            assert np.all(
+                mass - mloss >= 0
+            ), f"Negative remnant mass in {self.lc18.name} for wind interpolated using {interp_method} without extrapolation: mass = {mass[index]}"
+            index = np.argwhere(mass - mloss >= 0)[0]
+            mloss = self.lc18.wind.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=True
+            )
+            assert np.all(
+                mass - mloss >= 0
+            ), f"Negative remnant mass in {self.lc18.name} for wind interpolated using {interp_method} with extrapolation: mass = {mass[index]}"
+
+            mloss = self.lc18.ccsn.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=False
+            )
+            index = np.argwhere(mass - mloss >= 0)[0]
+            assert np.all(
+                mass - mloss >= 0
+            ), f"Negative remnant mass in {self.lc18.name} for ccsn interpolated using {interp_method} without extrapolation: mass = {mass[index]}"
+            mloss = self.lc18.ccsn.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=True
+            )
+            index = np.argwhere(mass - mloss >= 0)[0]
+            assert np.all(
+                mass - mloss >= 0
+            ), f"Negative remnant mass in {self.lc18.name} for ccsn interpolated using {interp_method} with extrapolation: mass = {mass[index]}"
+
+            mloss = self.lc18.wind.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=False
+            ) + self.lc18.ccsn.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=False
+            )
+            index = np.argwhere(mass - mloss >= 0)[0]
+            assert np.all(
+                mass - mloss >= 0
+            ), f"Negative remnant mass in {self.lc18.name} for wind+ccsn interpolated using {interp_method} without extrapolation: mass = {mass[index]}"
+            mloss = self.lc18.wind.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=True
+            ) + self.lc18.ccsn.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=True
+            )
+            index = np.argwhere(mass - mloss >= 0)[0]
+            assert np.all(
+                mass - mloss >= 0
+            ), f"Negative remnant mass in {self.lc18.name} for wind+ccsn interpolated using {interp_method} with extrapolation: mass = {mass[index]}"
 
     def test_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -75,6 +150,14 @@ class TestNuGrid:
     p16 = arsenal_gear.element_yields.Pignatari2016()
     r18 = arsenal_gear.element_yields.Ritter2018()
     bat = arsenal_gear.element_yields.Battino20192021()
+    # Parameter/argument space where model has been tested
+    lo_mmin = 0.1
+    lo_mmax = 8.0
+    hi_mmin = 8.0
+    hi_mmax = 300.0
+    Zmin = 0.00001
+    Zmax = 0.03
+    interp_methods = ["nearest", "linear"]
 
     def test_monotinically_increasing_params(self):
         """Ensure monotonically increasing parameter grid"""
@@ -96,6 +179,101 @@ class TestNuGrid:
             assert np.all(
                 param[1:] >= param[:-1]
             ), f"Parameter {param} for agb in {self.bat.name} is not stricktly increasing."
+
+    def test_check_positive_tables(self):
+
+        for yld_set in [self.p16, self.r18, self.nugrid]:
+            for element in yld_set.elements:
+                assert np.all(
+                    yld_set.agb.yields[element].values >= 0
+                ), f"{yld_set.name} contains negative values in agb for {element}: {yld_set.agb.yields[element].values}"
+                assert np.all(
+                    yld_set.wind.yields[element].values >= 0
+                ), f"{yld_set.name} contains negative values in wind for {element}: {yld_set.wind.yields[element].values}"
+                assert np.all(
+                    yld_set.ccsn.yields[element].values >= 0
+                ), f"{yld_set.name} contains negative values in ccsn for {element}: {yld_set.ccsn.yields[element].values}"
+
+        for element in self.bat.elements:
+            assert np.all(
+                self.bat.agb.yields[element].values > 0
+            ), f"{self.bat.name} contains negative values in agb for {element}: {self.bat.agb.yields[element].values}"
+
+    def test_ensure_positive_remnant_mass(self):
+
+        lo_mass = np.linspace(self.lo_mmin, self.lo_mmax, 100)
+        hi_mass = np.linspace(self.hi_mmin, self.hi_mmax, 100)
+        metal = np.linspace(self.Zmin, self.Zmax, 100)
+
+        params = [metal, lo_mass]
+        for yld_set in [self.p16, self.r18, self.bat, self.nugrid]:
+            for interp_method in self.interp_methods:
+                mloss = yld_set.agb.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=False
+                )
+                index = np.argwhere(lo_mass - mloss >= 0)[0]
+                assert np.all(
+                    lo_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for agb interpolated using {interp_method} without extrapolation: mass = {lo_mass[index]}"
+                mloss = yld_set.wind.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=True
+                )
+                index = np.argwhere(lo_mass - mloss >= 0)[0]
+                assert np.all(
+                    lo_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for agb interpolated using {interp_method} with extrapolation: mass = {lo_mass[index]}"
+
+        params = [metal, hi_mass]
+        for yld_set in [self.p16, self.r18, self.nugrid]:
+            for interp_method in self.interp_methods:
+                mloss = yld_set.wind.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=False
+                )
+                index = np.argwhere(hi_mass - mloss >= 0)[0]
+                assert np.all(
+                    hi_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for wind interpolated using {interp_method} without extrapolation: mass = {hi_mass[index]}"
+                mloss = yld_set.wind.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=True
+                )
+                index = np.argwhere(hi_mass - mloss >= 0)[0]
+                assert np.all(
+                    hi_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for wind interpolated using {interp_method} with extrapolation: mass = {hi_mass[index]}"
+
+                mloss = yld_set.ccsn.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=False
+                )
+                index = np.argwhere(hi_mass - mloss >= 0)[0]
+                assert np.all(
+                    hi_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for ccsn interpolated using {interp_method} without extrapolation: mass = {hi_mass[index]}"
+                mloss = yld_set.ccsn.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=True
+                )
+                index = np.argwhere(hi_mass - mloss >= 0)[0]
+                assert np.all(
+                    hi_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for ccsn interpolated using {interp_method} with extrapolation: mass = {hi_mass[index]}"
+
+                mloss = yld_set.wind.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=False
+                ) + yld_set.ccsn.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=False
+                )
+                index = np.argwhere(hi_mass - mloss >= 0)[0]
+                assert np.all(
+                    hi_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for wind+ccsn interpolated using {interp_method} without extrapolation: mass = {hi_mass[index]}"
+                mloss = yld_set.wind.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=True
+                ) + yld_set.ccsn.get_mloss(
+                    params=params, interpolate=interp_method, extrapolate=True
+                )
+                index = np.argwhere(hi_mass - mloss >= 0)[0]
+                assert np.all(
+                    hi_mass - mloss >= 0
+                ), f"Negative remnant mass in {yld_set.name} for wind+ccsn interpolated using {interp_method} with extrapolation: mass = {hi_mass[index]}"
 
     def test_p16_tables(self):
         """Make sure that online tables did not change by checking random yields."""
