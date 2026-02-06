@@ -1,5 +1,5 @@
 """
-data_converter.py
+data_downloader.py
 ================================
 
 This file defines the interface to download output from various binary
@@ -9,7 +9,6 @@ evolution models.
 import os
 import tarfile
 from zipfile import ZipFile
-from pathlib import Path
 import requests
 from tqdm import tqdm
 
