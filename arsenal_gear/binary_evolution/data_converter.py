@@ -14,7 +14,6 @@ import astropy.units as u
 import numpy as np
 import xarray as xr
 
-from astropy.units import Quantity
 from .be_data_structures import SingleStarTable, BinaryStarTable
 
 
@@ -26,6 +25,9 @@ class BinaryEvolutionConverter(ABC):
     def __init__(self, **kwargs) -> None:
         # [Fe/H]
         self.met = kwargs.get('met', 0.014)
+        # Directories to read and write data
+        self.input_dir = kwargs.get('input_dir', '.')
+        self.output_dir = kwargs.get('output_dir', '.')
 
     @abstractmethod
     def convert_single_data(self) -> SingleStarTable:
@@ -35,7 +37,7 @@ class BinaryEvolutionConverter(ABC):
         """
 
     @abstractmethod
-    def read_track_data(self) -> BinaryStarTable:
+    def convert_binary_data(self) -> BinaryStarTable:
         """
         Abstract method for converting binary evolutionart tracks into
         an Arsenal binary evolution table.
@@ -49,51 +51,35 @@ class BPASSConverter(BinaryEvolutionConverter):
     mets = ["zem5", "zem4", "z001", "z002", "z003", "z004", "z006",
             "z008", "z010", "z014", "z020", "z030", "z040"]
 
-    def __init__(
-        self,
-        metal: str,
-        bpass_dir: str,
-        force_download: bool = False,
-    ) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         Args:
-            metal:     the metallicity of the stellar population
-            bpass_dir: the directory for the BPASS models
+            kwargs: Keyword arguments for the binary evolution table.
 
+        Methods:
+            convert_single_data Processes single stellar track data into a SingleStarTable
+            convert_binary_data Processes binary stellar track data into a BinaryStarTable
         """
+        # set input parameters
+        super().__init__(**kwargs)
 
-        self.download = force_download
-
-        self.metals = [
-            "zem5",
-            "zem4",
-            "z001",
-            "z002",
-            "z003",
-            "z004",
-            "z006",
-            "z008",
-            "z010",
-            "z014",
-            "z020",
-            "z030",
-            "z040",
-        ]
-        if metal not in self.metals:
-            raise ValueError(f"Metallicity {metal} does not exist.")
-
-        self.metal: str = metal
-        if bpass_dir[-1] == "/":
-            self.dir: str = bpass_dir
+        if self.met>=1e-3:
+            self.metstr = "z" + str(int(self.met * 1000)).zfill(3)
         else:
-            self.dir: str = bpass_dir + "/"
+            self.metstr = "zem" + str(-1*int(np.log10(self.met)))
+        if self.metstr not in self.mets:
+            raise ValueError("Metallicity must be one of: " + str(self.mets))
 
-        self.time: Quantity["time"] = time
+        # Consistent format for directories
+        if self.input_dir[-1] == "/":
+            self.input_dir: str = self.input_dir
+        else:
+            self.intput_dir: str = self.input_dir + "/"
+        if self.output_dir[-1] == "/":
+            self.output_dir: str = self.output_dir
+        else:
+            self.output_dir: str = self.output_dir + "/"
 
-        self.s_mass: list = singles["mass"].to(u.Msun).value
-        self.b_mass: list = binaries.primary["mass"].to(u.Msun).value
-        self.mratio: list = binaries.secondary["mass"] / binaries.primary["mass"]
-        self.logp: list = np.log10(binaries["period"].to(u.d).value)
         super().__init__()
     
 
