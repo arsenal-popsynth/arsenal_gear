@@ -25,8 +25,9 @@ class BinaryEvolutionConverter(ABC):
         # [Fe/H]
         self.met = kwargs.get('met', 0.014)
         # Directories to read and write data
-        self.input_dir = kwargs.get('input_dir', '.')
-        self.output_dir = kwargs.get('output_dir', '.')
+        self.input_dir = kwargs.get('input_dir', None)
+        self.output_dir = kwargs.get('output_dir', None)
+        self.overwrite = kwargs.get('overwrite', False)
 
     @abstractmethod
     def convert_single_data(self) -> SingleStarTable:
@@ -38,7 +39,7 @@ class BinaryEvolutionConverter(ABC):
     @abstractmethod
     def convert_binary_data(self) -> BinaryStarTable:
         """
-        Abstract method for converting binary evolutionart tracks into
+        Abstract method for converting binary evolutionary tracks into
         an Arsenal binary evolution table.
         """
 
@@ -78,38 +79,36 @@ class BPASSConverter(BinaryEvolutionConverter):
             self.output_dir: str = self.output_dir
         else:
             self.output_dir: str = self.output_dir + "/"
-
-        super().__init__()
-    
-
-def convert_singles(BPASS_directory, output_directory='./arsenal_BPASS', metals='z014', overwrite=False):
-
-    # Create directory if it does not already exists
-    Path(output_directory).mkdir(parents=True, exist_ok=True)
-
-    model_directory = BPASS_directory + '/singles/'
-
-    for metal_directory in os.listdir(model_directory):
         
-        if not metal_directory.startswith("z"):
-            continue
+
+    def convert_single_data(self):
+        """
+        Converts BPASS data for single stars into an Arsenal-readable 
+        SingleStarTable. 
+        TODO (06.02.2026): Make the number of time outputs and the 
+        returned properties user parameters.
+        """
+
+        # Create directory if it does not already exists
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+
+        model_directory = self.input_dir + '/singles/' + self.metstr
 
         # Create the zero array
         # Number of files depends on the choice of mass limits for the IMF
-        num_files = len(os.listdir(model_directory + '/' + metal_directory)) # -1 for directory itself
+        num_files = len(os.listdir(model_directory)) 
         # Times for time array
-        num_times = 502 # from log(age/yr) = 6 to 9, with 10 times more models than the public models and a 0
+        num_times = 502 # from log(age/yr) = 4 to 9
         times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
         # Save 4 properties: mass, luminosity, temperature, radius
         data = np.zeros((num_files, 3, num_times))
 
         i = 0
-        for model in os.listdir(model_directory + '/' + metal_directory):
+        for model in os.listdir(model_directory):
 
             if model.startswith("sneplot"):
 
-                _data = np.genfromtxt(model_directory + '/' + metal_directory 
-                                  + '/' + model)
+                _data = np.genfromtxt(model_directory + '/' + model)
 
                 # Replace NaNs by 0s --> What about files without a companion?
                 _data = np.nan_to_num(_data)
@@ -125,11 +124,11 @@ def convert_singles(BPASS_directory, output_directory='./arsenal_BPASS', metals=
                         _mask = np.where((_times[t] >= times) & (_times[t-1] < times))[0]
 
                     for m in _mask:
-
-                        data[i, 0, m] = _data[t, 5]     # mass in MSun
+                        
+                        data[i, 0, m] = _data[t, 5] # mass in MSun
                         data[i, 1, m] = _data[t, 4] # Lsun
                         if t == (len(_times) - 1):
-                            data[i, 1, m] *= 0 # must set to 0 after SN
+                            data[i, 1, m] *= 0      # must set to 0 after SN
                         data[i, 2, m] = _data[t, 3] # K
 
                 i += 1
@@ -139,8 +138,8 @@ def convert_singles(BPASS_directory, output_directory='./arsenal_BPASS', metals=
         data = data[_sort, :, :]
 
 
-        if ('singles_' + metals + '.h5') not in os.listdir(output_directory) or overwrite:
-            print("Saving processed data to", output_directory)
+        if ('singles_' + self.metstr + '.h5') not in os.listdir(self.output_dir) or self.overwrite:
+            print("Saving processed data to", self.output_dir)
 
             # Times
             times = np.round(times, 2).astype('str')
@@ -152,36 +151,40 @@ def convert_singles(BPASS_directory, output_directory='./arsenal_BPASS', metals=
             for m in range(len(masses)):
                 masses[m] = masses[m].ljust(4, '0')
 
-            ds = xr.DataArray(data, coords=[("Model", masses), ("Property", ["Mass (MSun)", "log L_bol (LSun)", "log T_eff (K)"]), ("Time (log t/yr)", times)])
-            ds.to_netcdf(output_directory + '/singles_' + metals + '.h5')
+            ds = xr.DataArray(data, coords=[("Model", masses), 
+                                            ("Property", ["Mass (MSun)", "log L_bol (LSun)", 
+                                                          "log T_eff (K)"]), 
+                                            ("Time (log t/yr)", times)])
+            ds.to_netcdf(self.output_dir + '/singles_' + self.metstr + '.h5')
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
 
-    return
+        return
 
-def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals='z014', overwrite=False):
+    def convert_binary_data(self):
+        """
+        Converts BPASS data for binary stars into an Arsenal-readable 
+        BinaryStarTable. 
+        TODO (06.02.2026): Make the number of time outputs and the 
+        returned properties user parameters.
+        """
 
-    # Create directory if it does not already exists
-    Path(output_directory).mkdir(parents=True, exist_ok=True)
+        # Create directory if it does not already exists
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
-    model_directory = BPASS_directory + '/binaries/'
+        model_directory = self.input_dir + '/binaries/' + self.metstr
 
-    # Values for disrupted or modified systems, when looking for new systems
-    M_single = np.concatenate((np.arange(0.1, 10., 0.1) , 
-                               np.arange(10, 100, 1),
-                               np.arange(100, 325, 25)))
-
-    for metal_directory in os.listdir(model_directory):
-        
-        if not metal_directory.startswith("z"):
-            continue
+        # Values for disrupted or modified systems, when looking for new systems
+        M_single = np.concatenate((np.arange(0.1, 10., 0.1) , 
+                                   np.arange(10, 100, 1),
+                                   np.arange(100, 325, 25)))
 
         # Create the zero array
         # Number of files depends on the choice of IMF
-        num_files = len(os.listdir(model_directory + '/' + metal_directory)) # -1 for directory itself
+        num_files = len(os.listdir(model_directory))
         # Times for time array
-        num_times = 502 # from log(age/yr) = 4 to 9, with 10 times more models than the public models and a 0
+        num_times = 502 # from log(age/yr) = 4 to 9
         times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
         # Save 7 properties: masses, luminosities, temperatures, period
         data = np.zeros((num_files, 7, num_times))
@@ -189,7 +192,7 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
         M2_for_models = np.zeros(num_files)
 
         i = 0
-        for model in os.listdir(model_directory + '/' + metal_directory):
+        for model in os.listdir(model_directory):
 
             if model.startswith("sneplot"):
 
@@ -201,8 +204,7 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
                 effective_time = None
                 rejuvenated_file = None
 
-                _data = np.genfromtxt(model_directory + metal_directory 
-                                  + '/' + model)
+                _data = np.genfromtxt(model_directory + '/' + model)
 
                 # Replace NaNs by 0s --> What about files without a companion?
                 _data = np.nan_to_num(_data)
@@ -254,21 +256,21 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
                         else:
                             effective_time = _times[t]
 
-                        rejuvenated_file = BPASS_directory + '/singles/' + metal_directory + '/sneplot-' + metal_directory + '-' + M2_closest
+                        rejuvenated_file = self.input_dir + '/singles/' + self.metstr + '/sneplot-' + self.metstr + '-' + M2_closest
 
 
                     else:
                         
                         for m in _mask:
 
-                            data[i, 0, m] = _data[t, 5]      # mass in MSun
+                            data[i, 0, m] = _data[t, 5]  # mass in MSun
                             data[i, 1, m] = _data[t, 4]  # Lsun
                             if t == (len(_times) - 1):
                                 data[i, 1, m] *= 0 # must set to 0 after SN
                             data[i, 2, m] = _data[t, 3]  # K 
                             # Companion
                             if not merger:
-                                data[i, 3, m] = _data[t, 37]     # companion mass in MSun
+                                data[i, 3, m] = _data[t, 37] # companion mass in MSun
                                 data[i, 4, m] = _data[t, 48] # Lsun, companion
                                 data[i, 5, m] = _data[t, 47] # K, companion
                             if merger: 
@@ -311,36 +313,42 @@ def convert_binaries(BPASS_directory, output_directory='./arsenal_BPASS', metals
                 i += 1
         
 
-        if ('binaries_' + metals + '.h5') not in os.listdir(output_directory) or overwrite:
-            print("Saving processed data to", output_directory)
+            if ('binaries_' + self.metstr + '.h5') not in os.listdir(self.output_dir) or self.overwrite:
+                print("Saving processed data to", self.output_dir)
 
-            # Times
-            times = np.round(times, 2).astype('str')
-            for t in range(len(times)):
-                times[t] = times[t].ljust(4, '0')
+                # Times
+                times = np.round(times, 2).astype('str')
+                for t in range(len(times)):
+                    times[t] = times[t].ljust(4, '0')
 
-            # Masses as strings
-            masses = data[:, 0, 0].astype('str')
-            for m in range(len(masses)):
-                masses[m] = masses[m].ljust(4, '0')
+                # Masses as strings
+                masses = data[:, 0, 0].astype('str')
+                for m in range(len(masses)):
+                    masses[m] = masses[m].ljust(4, '0')
 
-            mass_ratios = np.round(M2_for_models/data[:, 0, 0], 1).astype('str')
+                mass_ratios = np.round(M2_for_models/data[:, 0, 0], 1).astype('str')
 
-            periods = np.round(np.log10(data[:, 6, 0]*365.25), 1).astype('str')
+                periods = np.round(np.log10(data[:, 6, 0]*365.25), 1).astype('str')
 
-            models = np.zeros(len(masses)).astype('str')
-            for i in range(len(masses)):
-                models[i] = masses[i] + '-' + mass_ratios[i] + '-' + periods[i]
+                models = np.zeros(len(masses)).astype('str')
+                for i in range(len(masses)):
+                    models[i] = masses[i] + '-' + mass_ratios[i] + '-' + periods[i]
 
-            _sort = np.argsort(models)
-            data_to_save = data[_sort, :, :]
+                _sort = np.argsort(models)
+                data_to_save = data[_sort, :, :]
 
-            ds = xr.DataArray(data_to_save, coords=[("Model", models[_sort]), ("Property", ["Mass 1 (MSun)", "log L_bol 1 (LSun)", "log T_eff 1 (K)",
-                                            "Mass 2 (MSun)", "log L_bol 2 (LSun)", "log T_eff 2 (K)", "P (yr)"]), ("Time (log t/yr)", times)])
-            ds.to_netcdf(output_directory + '/binaries_' + metals + '.h5')
+                ds = xr.DataArray(data_to_save, coords=[("Model", models[_sort]), 
+                                                        ("Property", ["Mass 1 (MSun)", 
+                                                                      "log L_bol 1 (LSun)", 
+                                                                      "log T_eff 1 (K)",
+                                                                      "Mass 2 (MSun)", 
+                                                                      "log L_bol 2 (LSun)", 
+                                                                      "log T_eff 2 (K)", "P (yr)"]), 
+                                                        ("Time (log t/yr)", times)])
+                ds.to_netcdf(self.output_dir + '/binaries_' + self.metstr + '.h5')
 
-        else:
-            print("Cannot save model. Try setting overwrite=True...")
+            else:
+                print("Cannot save model. Try setting overwrite=True...")
 
-    return
+        return
         
