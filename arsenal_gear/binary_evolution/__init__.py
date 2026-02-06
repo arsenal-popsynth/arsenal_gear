@@ -1,10 +1,10 @@
 """
-stellar_evolution
+binary_evolution
 =================
 
-Submodule to handle stellar evolution codes and their isochrones
+Submodule to handle binary evolution codes and their output
 """
 
-from . import isochrone
+from . import data_converter
 
-__all__ = ["isochrone"]
+__all__ = ["data_converter"]
