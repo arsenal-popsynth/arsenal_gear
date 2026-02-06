@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-import astropy.units as u
 import numpy as np
 import xarray as xr
 
