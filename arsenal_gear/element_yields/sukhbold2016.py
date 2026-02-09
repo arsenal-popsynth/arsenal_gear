@@ -152,7 +152,7 @@ class Sukhbold2016(YieldTables):
             )
             interpolate = "nearest"
 
-        if any(starPop["metals"] != 0.02):
+        if any(np.atleast_1d(starPop["metals"] != 0.02)):
             raise ValueError(f"{self.name} only include yields at Z = 0.02")
 
         elements = np.atleast_1d(elements)
