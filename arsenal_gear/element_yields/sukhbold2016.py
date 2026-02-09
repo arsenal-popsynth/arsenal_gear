@@ -9,7 +9,6 @@ import os
 import re
 import tarfile
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -24,7 +23,11 @@ from .yieldtables import YieldTables
 
 class Sukhbold2016(YieldTables):
     """
-    Sukhbold et al. (2016) CCSN + wind yields for masses varying from 9 to 120 Msun.
+    Sukhbold et al. (2016) CCSN + wind yields for masses varying from 9 to 120 Msun
+    at metallicity Z=0.02. Includes two different models for explosion engine, see
+    Sukhbold et al. (2016).
+    Z9.6 covers low mass (low high-mass (?)) of 9 - 12 Msun and is automatically
+    used alongside.
 
     Upon first initializtion of this class, the yield tables are
     downloaded. If this fails, the user may download the .tar.gz files
@@ -35,42 +38,154 @@ class Sukhbold2016(YieldTables):
 
     """
 
-    base_url = "https://wwwmpa.mpa-garching.mpg.de/ccsnarchive/data/SEWBJ_2015/data/"
-    nucleosynthesis_file = "nucleosynthesis_yields.tar.gz"
-    energy_file = "explosion_results_PHOTB.tar.gz"
+    s16_url = "https://wwwmpa.mpa-garching.mpg.de/ccsnarchive/data/SEWBJ_2015/data/"
+    models = ["W18", "N20"]
+    files = ["nucleosynthesis_yields.tar.gz", "explosion_results_PHOTB.tar.gz"]
+    mass = None  # Loaded later
+    metal = 0.02
 
-    def __init__(self, engine="N20"):
+    def __init__(self, model="N20"):
+        """
+        Args:
+            model: choise of model to load, see Sukhbold et al. (2016) for details
+
+        Usage:
+            >> s16 = arsenal_gear.element_yields.Sukhbold()
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
+            >> metals = u.dimensionless_unscaled * 0.02
+            >> tform = u.Myr * np.zeros(100)
+            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> plt.plot(mass, s16.ccsn_yields('H', stars, interpolate='nearest'), '-')
+
+        Attributes:
+            s16_url          Yield source website
+            models           Available models (explosion engine)
+            mass             Tabulated masses
+            metal            Available metallicity (0.02)
+            filedir          Directory of yield tables
+            files            Files that are downloaded
+            name             Name of yields tables
+            model            Engine used to drive explosion
+            elements         Elements available in table
+            atomic_num       Not available in this model
+            wind             Source object for stellar winds (massive stars)
+            ccsn             Source object for core-collapse SNe
+            df_energy        Distribution of energies
+            _energy_interp   Interpolator for energies
+            has_energies     Flag for energies
+        """
+        if model not in self.models:
+            raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-
-        # Valid engines per Sukhbold et al. (2016)
-        # only these engines have nucleosynthesis yields
-        # Z9.6 covers low mass (low high-mass (?)) of 9 - 12 Msun
-        # and is automatically used alongside
-        self.valid_engines = ["W18", "N20"]
-        if engine not in self.valid_engines:
-            raise ValueError(f"Engine must be one of {self.valid_engines}")
-        self.engine = engine
-
-        self.filedir = Path(__file__).resolve().parent / "Sukhbold2016"
+        self.filedir = self.filedir / "data" / "NuGrid" / "Sukhbold2016"
         self.name = "Sukhbold et al. (2016)"
+        self.model = model
 
         if not self.filedir.exists():
             os.mkdir(self.filedir)
 
-        for table in [self.nucleosynthesis_file, self.energy_file]:
+        for table in self.files:
             if not (self.filedir / table).exists():
                 self.download_sukhbold_table(table)
 
-        # Parse nucleosynthesis yields and explosion energies
+        self.ccsn = None
+        self.wind = None
+        # Sets nucleosynthesis yields and explosion energies
         self.load_from_archives()
 
+    def wind_yields(
+        self,
+        elements,
+        starPop: StarPopulation,
+        interpolate="nearest",
+        extrapolate=False,
+    ) -> dict[str, Quantity["mass"]]:
+        """Interpolate yields from massive stars ejected as winds for specified elements.
+        Stellar parameters can be provided as single value, array + single value, or arrays.
+
+        Args:
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
+            starPop: StarPopulation object
+            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
+        Returns:
+            Dictionary of yields matching provided element list
+        """
+        if any(starPop["metals"] != 0.02):
+            raise ValueError(f"{self.name} only include yields at Z = 0.02")
+
+        elements = np.atleast_1d(elements)
+        args = [
+            starPop["mass"].to(u.Msun).value,
+        ]
+        yld_array = self.wind.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
+        )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+
+    def ccsn_yields(
+        self,
+        elements,
+        starPop: StarPopulation,
+        interpolate="nearest",
+        extrapolate=False,
+    ) -> dict[str, Quantity["mass"]]:
+        """Interpolate yields from core-collapse supernovae for specified elements.
+        Stellar parameters can be provided as single value, array + single value, or arrays.
+
+        Args:
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
+            starPop: StarPopulation object
+            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
+        Returns:
+            Dictionary of yields matching provided element list
+
+        """
+        if interpolate != "nearest":
+            warnings.warn(
+                "Sukhbold2016: forcing nearest-neighbor due to explodability islands"
+            )
+            interpolate = "nearest"
+
+        if any(starPop["metals"] != 0.02):
+            raise ValueError(f"{self.name} only include yields at Z = 0.02")
+
+        elements = np.atleast_1d(elements)
+        args = [
+            starPop["mass"].to(u.Msun).value,
+        ]
+        yld_array = self.ccsn.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
+        )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+
+    def get_explosion_energy(self, mass):
+        """Function that returns explosion energy interpolated from mass
+        Args:
+            mass: Array/list of masses
+
+        Returns:
+            energy: Explosion energy
+        """
+        if not self.has_energies:
+            return np.full_like(np.atleast_1d(mass), np.nan, dtype=float)
+        return self._energy_interp(np.atleast_1d(mass))
+
     def download_sukhbold_table(self, filename):
+        """Downloader for tabulated yield files."""
         from ..utils.scraper import downloader
 
         downloader(
             str(self.filedir / filename),
-            f"{self.base_url}/{filename}",
+            f"{self.s16_url}/{filename}",
             message=f"Downloading Sukhbold 2016 table: {filename}...",
         )
 
@@ -82,12 +197,12 @@ class Sukhbold2016(YieldTables):
         all_ejecta = []
         all_wind = []
 
-        with tarfile.open(self.filedir / self.nucleosynthesis_file, "r:gz") as tar:
+        with tarfile.open(self.filedir / self.files[0], "r:gz") as tar:
             for member in tar.getmembers():
                 if not member.name.endswith(".yield_table"):
                     continue
                 is_base = "Z9.6" in member.name
-                is_engine = self.engine in member.name
+                is_engine = self.model in member.name
                 is_implosion = "implosions" in member.name
 
                 if is_base or is_engine or is_implosion:
@@ -115,7 +230,7 @@ class Sukhbold2016(YieldTables):
         df_ccsn = df_ccsn.sort_values("mass_Msun")
         df_wind = df_wind.sort_values("mass_Msun")
 
-        self.masses = df_ccsn["mass_Msun"].values
+        self.mass = df_ccsn["mass_Msun"].values
 
         all_cols = [c for c in df_ccsn.columns if c != "mass_Msun"]
         self.elements = [el for el in all_cols if el[0].isupper()]
@@ -124,24 +239,24 @@ class Sukhbold2016(YieldTables):
             if col not in df_wind.columns:
                 df_wind[col] = 0.0
 
-        ccsn_grid = np.zeros((len(self.elements), 1, 1, len(self.masses)))
-        wind_grid = np.zeros((len(self.elements), 1, 1, len(self.masses)))
+        ccsn_grid = np.zeros((len(self.elements), len(self.mass)))
+        wind_grid = np.zeros((len(self.elements), len(self.mass)))
 
         for i, el in enumerate(self.elements):
-            ccsn_grid[i, 0, 0, :] = df_ccsn[el].values
-            wind_grid[i, 0, 0, :] = df_wind[el].values
+            ccsn_grid[i, :] = df_ccsn[el].values
+            wind_grid[i, :] = df_wind[el].values
 
         # Sukhbold et al. (2016) is solar metallicity (0.02) and non-rotating (0)
-        self.ccsn = Source(self.elements, [[0.0], [0.02], self.masses], ccsn_grid)
-        self.wind = Source(self.elements, [[0.0], [0.02], self.masses], wind_grid)
+        self.ccsn = Source(self.elements, [self.mass], ccsn_grid)
+        self.wind = Source(self.elements, [self.mass], wind_grid)
 
         # This archive contains: explosion_results_PHOTB/results_{engine}
         all_energies = []
-        with tarfile.open(self.filedir / self.energy_file, "r:gz") as tar:
+        with tarfile.open(self.filedir / self.files[1], "r:gz") as tar:
             for member in tar.getmembers():
                 if member.isfile() and (
                     "results_Z9.6" in member.name
-                    or f"results_{self.engine}" in member.name
+                    or f"results_{self.model}" in member.name
                 ):
                     f = tar.extractfile(member)
                     if f is not None:
@@ -234,6 +349,7 @@ class Sukhbold2016(YieldTables):
         return pd.DataFrame(data)
 
     def add_elemental_sums(self, df):
+        """ """
         elemental = {}
         for col in df.columns:
             if col == "mass_Msun" or "_" in col:
@@ -252,55 +368,3 @@ class Sukhbold2016(YieldTables):
                 df[elem] = df[cols].sum(axis=1, skipna=True)
 
         return df
-
-    def get_explosion_energy(self, mass):
-        if not self.has_energies:
-            return np.full_like(np.atleast_1d(mass), np.nan, dtype=float)
-        return self._energy_interp(np.atleast_1d(mass))
-
-    def wind_yields(
-        self,
-        elements,
-        starPop: StarPopulation,
-        interpolate="nearest",
-        extrapolate=False,
-    ) -> dict[str, Quantity["mass"]]:
-        args = [
-            np.zeros(len(starPop["mass"])),
-            np.full(len(starPop["mass"]), 0.02),
-            starPop["mass"].to(u.Msun).value,
-        ]
-        yld_array = (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
-        return {el: yld_array[i] for i, el in enumerate(elements)}
-
-    def ccsn_yields(
-        self,
-        elements,
-        starPop: StarPopulation,
-        interpolate="nearest",
-        extrapolate=False,
-    ) -> dict[str, Quantity["mass"]]:
-        if interpolate != "nearest":
-            warnings.warn(
-                "Sukhbold2016: forcing nearest-neighbor due to explodability islands"
-            )
-            interpolate = "nearest"
-
-        args = [
-            np.zeros(len(starPop["mass"])),
-            np.full(len(starPop["mass"]), 0.02),
-            starPop["mass"].to(u.Msun).value,
-        ]
-        yld_array = (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
-
-        return {el: yld_array[i] for i, el in enumerate(elements)}
