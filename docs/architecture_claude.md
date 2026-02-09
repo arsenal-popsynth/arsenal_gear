@@ -2,17 +2,18 @@
 
 ## Overview
 
-Arsenal Gear's architecture is built around three primary classes that work together through composition:
+Arsenal Gear's architecture is built around four primary classes that work together through composition:
 
-- **`SynthPop`**: Main user-facing API that coordinates formation and evolution
+- **`SynthPop`**: Main user-facing API that coordinates formation, evolution, and stellar products
 - **`FormationContext`**: Encapsulates initial conditions and properties at birth
-- **`EvolutionContext`**: Encapsulates time-dependent evolution and physical processes
+- **`EvolutionContext`**: Encapsulates time-dependent stellar evolution (stellar properties at time t)
+- **`StellarProductsContext`**: Maps stellar properties to outputs (yields, mass-loss, spectra)
 
 ## Design Principles
 
 ### Composition Over Inheritance
 
-The `SynthPop` class uses composition to integrate `FormationContext` and `EvolutionContext` instances, rather than inheriting from them. This provides:
+The `SynthPop` class uses composition to integrate `FormationContext`, `EvolutionContext`, and `StellarProductsContext` instances, rather than inheriting from them. This provides:
 
 - Flexibility to swap contexts independently
 - Clear separation of concerns
@@ -22,20 +23,22 @@ The `SynthPop` class uses composition to integrate `FormationContext` and `Evolu
 ### Single Responsibility
 
 - **`FormationContext`**: Knows about birth properties (mass, metallicity, IMF sampling)
-- **`EvolutionContext`**: Knows about physical processes (stellar evolution, yields, feedback)
+- **`EvolutionContext`**: Knows about stellar evolution (stellar properties at time t via Isochrone)
+- **`StellarProductsContext`**: Knows about mapping stellar properties to outputs (yields, feedback, spectra)
 - **`SynthPop`**: Coordinates interactions and handles population-level integrations
 
 ## Class Structure
 
 ### SynthPop
 
-**Purpose**: User-facing API that coordinates formation and evolution contexts.
+**Purpose**: User-facing API that coordinates formation, evolution, and stellar products contexts.
 
 **Key Responsibilities**:
-- Create and manage `FormationContext` and `EvolutionContext` instances
+- Create and manage `FormationContext`, `EvolutionContext`, and `StellarProductsContext` instances
 - Provide polymorphic initialization (multiple ways to construct)
-- Interface between the two contexts
+- Interface between the three contexts
 - Handle population-level integrations (e.g., integrate stellar properties over IMF)
+- Handle time integrations (cumulative yields, mass loss)
 - Expose high-level methods for common queries
 
 **Polymorphic Initialization**:
@@ -49,9 +52,11 @@ pop = SynthPop(Mtot=1e6, metallicity=0.0, ...)
 # Option 2: Explicit contexts (power users)
 formation = FormationContext(...)
 evolution = EvolutionContext(...)
-pop = SynthPop(formation_context=formation, evolution_context=evolution)
+products = StellarProductsContext(source_config={...})
+pop = SynthPop(formation_context=formation, evolution_context=evolution,
+               products_context=products)
 
-# Option 3: Mix of both (provide one context, auto-construct the other)
+# Option 3: Mix of both (provide some contexts, auto-construct others)
 formation = FormationContext(...)
 pop = SynthPop(formation_context=formation, metallicity=0.0, ...)
 ```
@@ -447,133 +452,272 @@ def _lbol_atomic(self, formation: FormationContext, t: Quantity["time"]):
 
 ### EvolutionContext
 
-**Purpose**: Encapsulates all time-dependent physical processes and evolution models for both simple and binary populations.
+**Purpose**: Encapsulates stellar evolution models and provides time-dependent stellar properties.
 
 **Design Pattern**: Single class with type dispatch - dispatches to appropriate evolution model based on `FormationContext` type.
 
 **Key Responsibilities**:
 - Dispatch to appropriate evolution model (simple or binary) based on formation context type
-- Provide time-dependent stellar properties (isochrone interpolation for simple, binary evolution for binaries)
-- Handle feedback mechanisms (supernovae, winds, radiation) for both population types
-- Compute elemental yields for both population types
+- Provide time-dependent stellar properties via `Isochrone` objects
+- Provide stellar lifetimes and maximum living mass calculations
 
 **Composed Components**:
-
-The `EvolutionContext` contains instances of specialized modules:
 
 ```python
 class EvolutionContext:
     # Evolution models (type-specific)
     simple_evolution: IsochroneInterpolator     # For SimpleFormationContext
     binary_evolution: BinaryEvolutionModel      # For BinaryFormationContext (future)
-
-    # Shared modules (work for both simple and binary)
-    yields: Yields                              # Chemical enrichment
-    feedback: FBMechanism                       # Energy and momentum feedback
 ```
-
-**Module Integration**:
-
-| Module | Location | Population Type | Purpose |
-|--------|----------|-----------------|---------|
-| `IsochroneInterpolator` | `stellar_evolution/` | Simple | Single star evolution (L_bol, T_eff, lifetimes) |
-| `BinaryEvolutionModel` | `stellar_evolution/` (future) | Binary | Binary evolution (mass transfer, mergers, etc.) |
-| `Yields` | `element_yields/` | Both | Chemical enrichment (CCSN, SNIa, AGB, winds) |
-| `FBMechanism` | `feedbacks/` | Both | Energy and momentum feedback |
 
 **Public Interface**:
 
-Methods accept a `FormationContext` and dispatch internally:
-
 ```python
-def lbol(self, formation: FormationContext, t: Quantity["time"]) -> Quantity["power"]:
-    """Compute bolometric luminosity for given formation context at time t."""
-    if isinstance(formation, SimpleFormationContext):
-        return self._lbol_simple(formation, t)
-    elif isinstance(formation, BinaryFormationContext):
-        return self._lbol_binary(formation, t)
-    else:
-        raise TypeError(f"Unknown formation context type: {type(formation)}")
+class EvolutionContext:
+    def __init__(self, metallicity: float, ...):
+        """Initialize with metallicity and load appropriate stellar models."""
 
-def teff(self, formation: FormationContext, t: Quantity["time"]) -> Quantity["temperature"]:
-    """Compute effective temperature for given formation context at time t."""
-    # Similar dispatch pattern
+    def get_isochrone(self, t: Quantity["time"]) -> Isochrone:
+        """
+        Returns Isochrone with arrays of stellar properties at time t.
 
-def yields_at_time(self, formation: FormationContext, element: str, t: Quantity["time"]) -> Quantity["mass"]:
-    """Compute cumulative elemental yields for given formation context."""
-    # Uses yields module (shared for both types)
+        The Isochrone.qs dict contains arrays:
+        - initial_mass, current_mass
+        - log_Teff, log_L, log_g
+        - EEP (Equivalent Evolutionary Phase)
+        - surface_abundances (if available)
+        - mdot (track-based mass-loss, if available)
+        """
+
+    def get_lifetime(self, mass: Quantity["mass"]) -> Quantity["time"]:
+        """Returns lifetime for a star of given initial mass."""
+
+    def get_mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
+        """Returns maximum initial mass still alive at time t."""
+
+    def get_mmaxdot(self, t: Quantity["time"]) -> Quantity["mass/time"]:
+        """Returns rate of change of maximum living mass."""
 ```
 
-**Internal Implementation** (Simple Populations):
+**Isochrone Structure** (from `stellar_evolution/se_data_structures.py`):
+
+The `Isochrone` dataclass stores arrays of stellar properties, enabling vectorized operations:
 
 ```python
-def _lbol_simple(self, formation: SimpleFormationContext, t: Quantity["time"]):
-    """Compute Lbol for simple stellar population."""
-    masses = formation.get_masses()
-    metallicity = formation.metallicity
-    age = formation.age
+@dataclass
+class Isochrone:
+    age: Quantity["time"]
+    eep_name: str       # Column name for EEP
+    mini_name: str      # Column name for initial mass
+    lteff_name: str     # Column name for log(Teff)
+    llbol_name: str     # Column name for log(Lbol)
+    qs: dict            # Dictionary of property arrays
 
-    # Use IsochroneInterpolator
-    stellar_lbol = self.simple_evolution.lbol(masses, metallicity, t)
-    return stellar_lbol
-
-def _teff_simple(self, formation: SimpleFormationContext, t: Quantity["time"]):
-    """Compute Teff for simple stellar population."""
-    masses = formation.get_masses()
-    metallicity = formation.metallicity
-
-    stellar_teff = self.simple_evolution.teff(masses, metallicity, t)
-    return stellar_teff
-```
-
-**Internal Implementation** (Binary Populations - Future):
-
-```python
-def _lbol_binary(self, formation: BinaryFormationContext, t: Quantity["time"]):
-    """Compute Lbol for binary stellar population."""
-    primaries = formation.get_primary_masses()
-    secondaries = formation.get_secondary_masses()
-    periods = formation.periods
-    metallicity = formation.metallicity
-    age = formation.age
-
-    # Use BinaryEvolutionModel
-    # Accounts for mass transfer, mergers, etc.
-    binary_lbol = self.binary_evolution.lbol(primaries, secondaries, periods, metallicity, t)
-    return binary_lbol
-```
-
-**Yields and Feedback** (Shared Logic):
-
-The yields and feedback modules work for both simple and binary populations:
-
-```python
-def compute_yields(self, formation: FormationContext, element: str, t: Quantity["time"]):
-    """Compute yields - works for both simple and binary."""
-    # Get appropriate masses based on formation type
-    if isinstance(formation, SimpleFormationContext):
-        masses = formation.get_masses()
-    elif isinstance(formation, BinaryFormationContext):
-        # For binaries, consider both components
-        masses = self._get_all_binary_masses(formation)
-
-    # Use shared yields module
-    return self.yields.compute(masses, formation.metallicity, element, t)
+    # qs contains arrays like:
+    # - qs['initial_mass']: array of initial masses
+    # - qs['log_Teff']: array of effective temperatures
+    # - qs['log_L']: array of bolometric luminosities
+    # - qs['EEP']: array of evolutionary phases
+    # - qs['log_g']: surface gravity (if available)
+    # - qs['mdot']: track-based mass-loss rates (if available)
 ```
 
 **Design Rationale**:
 
-1. **Single EvolutionContext**: Users create one context that handles all population types
+1. **Returns Isochrone objects**: Enables vectorized operations downstream
 2. **Type dispatch**: `EvolutionContext` internally routes to appropriate evolution model
-3. **Shared modules**: Yields and feedback logic reused for both simple and binary
-4. **Matches FormationContext pattern**: Consistent with how `SynthPop` dispatches on atomic vs composite
-5. **Works with CompositeFormationContext**: Since composite contains mixed simple/binary populations, a single `EvolutionContext` handles all
+3. **Separation from outputs**: Yields, feedback, and atmospheres handled by `StellarProductsContext`
+4. **Track data included**: If tracks provide mass-loss rates or surface abundances, these are included in the Isochrone
 
 **Data Dependencies**:
-- Receives `FormationContext` (atomic only) from `SynthPop`
-- Extracts masses, metallicity, age from formation context
-- Evolution models are metallicity-dependent
-- Binary evolution additionally depends on orbital parameters
+- Metallicity set at initialization
+- Evolution models loaded based on metallicity
+- Binary evolution additionally depends on orbital parameters (future)
+
+---
+
+### StellarProductsContext
+
+**Purpose**: Maps stellar properties to physical outputs (yields, mass-loss rates, spectra) using configurable prescriptions.
+
+**Design Pattern**: Configurable routing via `source_config` with phase-based mask functions for vectorized operations.
+
+**Key Responsibilities**:
+- Apply yield prescriptions (CCSN, AGB, wind yields)
+- Apply mass-loss rate prescriptions (MS, RGB, WR winds)
+- Apply atmosphere models for spectral synthesis (future)
+- Route to track-based values or external prescriptions based on configuration
+
+**Composed Components**:
+
+```python
+class StellarProductsContext:
+    # Configuration for routing to sources
+    source_config: Dict[str, OutputTypeConfig]
+
+    # Prescription instances (initialized based on source_config)
+    yield_tables: Dict[str, Yields]
+    mdot_prescriptions: Dict[str, MdotPrescription]
+    atmosphere_models: Dict[str, Atmosphere]  # Future
+```
+
+**source_config Structure**:
+
+The `source_config` dictionary specifies which prescription to use for each output type and evolutionary phase:
+
+```python
+source_config = {
+    'winds': {
+        'phase_func': classify_wind_phase,  # (Isochrone, phase: str) -> np.ndarray[bool]
+        'phases': {
+            'MS': 'track',              # Use track-based mass-loss
+            'RGB': 'deJager1988',        # Use de Jager prescription
+            'WR': 'NugisLamers2000',     # Use Nugis & Lamers prescription
+        }
+    },
+    'yields': {
+        'phase_func': classify_yield_phase,
+        'phases': {
+            'CCSN': 'LC18',              # Limongi & Chieffi 2018
+            'AGB': 'Karakas2010',        # Karakas 2010
+        }
+    },
+    'atmosphere': {
+        'phase_func': classify_atm_phase,
+        'phases': {
+            'hot': 'Kurucz',
+            'cool': 'MARCS',
+        }
+    }
+}
+```
+
+**Phase Functions Return Masks**:
+
+Phase functions take an `Isochrone` and phase name, returning a boolean mask for vectorized operations:
+
+```python
+def classify_wind_phase(iso: Isochrone, phase: str) -> np.ndarray:
+    """Returns boolean mask for stars in given wind phase."""
+    EEP = iso.qs[iso.eep_name]
+    log_Teff = iso.qs[iso.lteff_name]
+    log_L = iso.qs[iso.llbol_name]
+
+    if phase == 'MS':
+        return (EEP >= 202) & (EEP < 454)
+    elif phase == 'RGB':
+        return (EEP >= 454) & (EEP < 605) & (log_Teff < 3.7)
+    elif phase == 'WR':
+        return (log_Teff > 4.5) & (log_L > 5.0)
+    else:
+        return np.zeros(len(EEP), dtype=bool)
+```
+
+**Public Interface**:
+
+All methods operate on `Isochrone` objects and return arrays:
+
+```python
+class StellarProductsContext:
+    def __init__(self, source_config: dict):
+        """Initialize and create prescription instances from config."""
+
+    # --- Phase Masks ---
+    def get_phase_mask(self, iso: Isochrone, output_type: str, phase: str) -> np.ndarray:
+        """Returns boolean mask for stars in given phase."""
+        phase_func = self.source_config[output_type]['phase_func']
+        return phase_func(iso, phase)
+
+    # --- Mass-Loss Rates (Vectorized) ---
+    def get_mdot(self, iso: Isochrone) -> Quantity["mass/time"]:
+        """
+        Returns array of mass-loss rates for all stars in isochrone.
+        Routes to track or prescription based on phase config.
+        """
+        mdot = np.zeros(len(iso.qs[iso.mini_name])) * u.Msun/u.yr
+
+        for phase, source in self.source_config['winds']['phases'].items():
+            mask = self.get_phase_mask(iso, 'winds', phase)
+            if source == 'track':
+                mdot[mask] = iso.qs['mdot'][mask]
+            else:
+                mdot[mask] = self.mdot_prescriptions[source].compute(iso, mask)
+
+        return mdot
+
+    def get_edot_wind(self, iso: Isochrone) -> Quantity["power"]:
+        """Returns array of wind mechanical energy rates."""
+
+    # --- Yields (Vectorized) ---
+    def get_sn_yields(self, iso: Isochrone, element: str) -> Quantity["mass"]:
+        """
+        Returns array of SN yields for given element.
+        Non-zero only for stars that will explode as SNe.
+        """
+
+    def get_agb_yields(self, iso: Isochrone, element: str) -> Quantity["mass"]:
+        """Returns array of AGB yields for given element."""
+
+    def get_wind_yields(self, iso: Isochrone, element: str) -> Quantity["mass/time"]:
+        """Returns array of wind yield rates for given element."""
+
+    # --- Atmosphere/Spectra (Future) ---
+    def get_spectrum(self, iso: Isochrone) -> np.ndarray:
+        """Returns spectra for all stars in isochrone."""
+
+    def get_ionizing_luminosity(self, iso: Isochrone) -> Quantity["photons/time"]:
+        """Returns ionizing photon rates for all stars."""
+```
+
+**Internal Routing Logic**:
+
+```python
+def get_mdot(self, iso: Isochrone) -> Quantity["mass/time"]:
+    """Vectorized mass-loss rate computation with phase routing."""
+    n_stars = len(iso.qs[iso.mini_name])
+    mdot = np.zeros(n_stars) * u.Msun/u.yr
+
+    for phase, source in self.source_config['winds']['phases'].items():
+        # Get mask for this phase
+        mask = self.get_phase_mask(iso, 'winds', phase)
+
+        if not np.any(mask):
+            continue
+
+        # Route to appropriate source
+        if source == 'track':
+            # Use track-based mass-loss from isochrone
+            mdot[mask] = iso.qs['mdot'][mask]
+        else:
+            # Use external prescription
+            mdot[mask] = self.mdot_prescriptions[source].compute(iso, mask)
+
+    return mdot
+```
+
+**Design Rationale**:
+
+1. **Vectorized operations**: All methods operate on arrays via `Isochrone`, not individual stars
+2. **Mask-based phase selection**: Efficient boolean indexing for phase-specific calculations
+3. **Configurable routing**: `source_config` allows flexible choice between track data and prescriptions
+4. **`'track'` as special source**: Indicates data should come from the `Isochrone.qs` dict
+5. **Separation from evolution**: Cleanly separates "what is the stellar state" from "what does the star produce"
+
+**Prompt vs. Continuous Feedback**:
+
+The `StellarProductsContext` provides **instantaneous** quantities:
+- **Continuous** (winds): `get_mdot()`, `get_edot_wind()`, `get_wind_yields()` - rates at time t
+- **Prompt** (SNe, AGB): `get_sn_yields()`, `get_agb_yields()` - yields from SN up to this time
+
+Time integration (cumulative yields, total mass loss) is handled by `SynthPop`.
+
+**Module Integration**:
+
+| Module | Location | Purpose |
+|--------|----------|---------|
+| `Yields` implementations | `element_yields/` | CCSN, AGB, wind yield tables |
+| `MdotPrescription` implementations | `feedbacks/` (new) | Mass-loss rate prescriptions |
+| `Atmosphere` implementations | `atmospheres/` (future) | Spectral synthesis |
 
 ---
 
@@ -587,11 +731,13 @@ User Input → SynthPop.__init__()
              ├→ Create/receive atomic FormationContext
              │  ├→ Initialize IMF
              │  └→ Sample masses (if discrete)
-             └→ Create/receive EvolutionContext
-                ├→ Initialize IsochroneInterpolator (simple_evolution)
-                ├→ Initialize BinaryEvolutionModel (binary_evolution) - future
-                ├→ Initialize Yields
-                └→ Initialize FBMechanism
+             ├→ Create/receive EvolutionContext
+             │  └→ Initialize IsochroneInterpolator (or BinaryEvolutionModel)
+             └→ Create/receive StellarProductsContext
+                ├→ Parse source_config
+                ├→ Initialize yield tables (e.g., LimongiChieffi2018)
+                ├→ Initialize mdot prescriptions (e.g., VinkMdot)
+                └→ Initialize atmosphere models (future)
 ```
 
 #### For Composite Population:
@@ -601,15 +747,12 @@ User Input → SynthPop.__init__()
              │  └→ Contains multiple atomic FormationContext instances
              │     ├→ Each has its own IMF, metallicity, age
              │     └→ Each has sampled masses (if discrete)
-             └→ Create/receive EvolutionContext
-                ├→ Initialize IsochroneInterpolator (simple_evolution)
-                ├→ Initialize BinaryEvolutionModel (binary_evolution) - future
-                ├→ Initialize Yields (shared)
-                └→ Initialize FBMechanism (shared)
+             ├→ Create/receive EvolutionContext
+             │  └→ Initialize stellar evolution models
+             └→ Create/receive StellarProductsContext
+                └→ Shared across all sub-populations
 
-Note: EvolutionContext is shared across all sub-populations.
-      It dispatches to appropriate evolution model based on each sub-population's type.
-      Yields and feedback are shared modules that work for both simple and binary.
+Note: EvolutionContext and StellarProductsContext are shared across all sub-populations.
 ```
 
 ### Query Flow (Example: `SynthPop.lbol(t)`)
@@ -620,20 +763,14 @@ User calls: pop.lbol(t)
     ↓
 SynthPop.lbol(t):
     ├→ Check: isinstance(formation, CompositeFormationContext)? No
-    ├→ Call: _lbol_atomic(formation, t)
-    │   ├→ Call EvolutionContext.lbol(formation, t)
-    │   │   ├→ Check formation type: SimpleFormationContext or BinaryFormationContext?
-    │   │   ├→ If Simple:
-    │   │   │   ├→ Get masses from formation.get_masses()
-    │   │   │   ├→ Get metallicity, age from formation
-    │   │   │   └→ Call simple_evolution.lbol(masses, metallicity, t)
-    │   │   │       └→ IsochroneInterpolator.lbol(masses, t)
-    │   │   └→ If Binary:
-    │   │       ├→ Get primary/secondary masses, periods from formation
-    │   │       ├→ Get metallicity, age from formation
-    │   │       └→ Call binary_evolution.lbol(primaries, secondaries, periods, metallicity, t)
-    │   └→ Integrate over mass distribution (if continuous mode)
-    └→ Return total luminosity
+    ├→ Get isochrone: iso = evolution.get_isochrone(t)
+    │   ├→ If Simple: IsochroneInterpolator returns Isochrone
+    │   └→ If Binary: BinaryEvolutionModel returns Isochrone (accounts for mass transfer, mergers)
+    ├→ Extract L_bol array: lbol_array = 10**iso.qs['log_L']
+    ├→ If discrete mode:
+    │   └→ Interpolate to sampled masses and sum
+    └→ If continuous mode:
+        └→ Integrate over IMF: ∫ L_bol(m) × IMF(m) dm
 ```
 
 #### For CompositeFormationContext:
@@ -644,31 +781,85 @@ SynthPop.lbol(t):
     ├→ Check: isinstance(formation, CompositeFormationContext)? Yes
     ├→ Initialize: total_lbol = 0
     ├→ For each subpop in formation.sub_populations:
-    │   ├→ Call: _lbol_atomic(subpop, t)
-    │   │   ├→ Call EvolutionContext.lbol(subpop, t)
-    │   │   │   ├→ Check subpop type: Simple or Binary?
-    │   │   │   ├→ If Simple: use simple_evolution.lbol()
-    │   │   │   └→ If Binary: use binary_evolution.lbol()
-    │   │   └→ Return subpop luminosity
+    │   ├→ Get isochrone for subpop's age relative to t
+    │   │   ├→ If Simple: IsochroneInterpolator returns Isochrone
+    │   │   └→ If Binary: BinaryEvolutionModel returns Isochrone
+    │   ├→ Compute subpop luminosity (discrete sum or IMF integral)
     │   └→ Add to total_lbol
     └→ Return total_lbol
 
-Note: EvolutionContext automatically handles mixed populations
+Note: EvolutionContext handles mixed populations
       (e.g., burst1 = SimpleFormationContext, burst2 = BinaryFormationContext)
+```
+
+### Query Flow (Example: `SynthPop.mdot_wind(t)`)
+
+```
+User calls: pop.mdot_wind(t)
+    ↓
+SynthPop.mdot_wind(t):
+    ├→ Get isochrone: iso = evolution.get_isochrone(t)
+    ├→ Get mass-loss rates: mdot_array = products.get_mdot(iso)
+    │   ↓
+    │   StellarProductsContext.get_mdot(iso):
+    │       ├→ For each phase in source_config['winds']['phases']:
+    │       │   ├→ Get mask: mask = phase_func(iso, phase)
+    │       │   ├→ If source == 'track':
+    │       │   │   └→ mdot[mask] = iso.qs['mdot'][mask]
+    │       │   └→ Else:
+    │       │       └→ mdot[mask] = prescription.compute(iso, mask)
+    │       └→ Return mdot array
+    │   ↓
+    ├→ If discrete mode:
+    │   └→ Interpolate to sampled masses and sum
+    └→ If continuous mode:
+        └→ Integrate over IMF: ∫ ṁ(m) × IMF(m) dm
+```
+
+### Query Flow (Example: `SynthPop.yields('O', t)`)
+
+```
+User calls: pop.yields('O', t)
+    ↓
+SynthPop.yields('O', t):
+    ├→ Compute cumulative SN yields (prompt):
+    │   ├→ Find stars that have died by time t (mass > mmax(t))
+    │   ├→ For dead stars: yields_sn = products.get_sn_yields(iso, 'O')
+    │   └→ Sum over dead stars
+    │
+    ├→ Compute cumulative wind yields (continuous):
+    │   ├→ For each time step t' from 0 to t:
+    │   │   ├→ iso = evolution.get_isochrone(t')
+    │   │   └→ wind_yield_rate = products.get_wind_yields(iso, 'O')
+    │   └→ Integrate: ∫₀ᵗ wind_yield_rate(t') dt'
+    │
+    └→ Return total = sn_yields + wind_yields
 ```
 
 ### Integration Pattern
 
-For population-level properties:
+For population-level properties, `SynthPop` handles integration:
 
-1. **Discrete Mode**: Sum over individual stars
+1. **Discrete Mode**: Interpolate isochrone to sampled masses and sum
    ```python
-   total_lbol = sum(evolution.lbol(m, t) for m in formation.masses)
+   # Get isochrone arrays
+   iso = evolution.get_isochrone(t)
+   lbol_grid = 10**iso.qs['log_L']
+   mass_grid = iso.qs['initial_mass']
+
+   # Interpolate to sampled masses
+   lbol_sampled = np.interp(formation.masses, mass_grid, lbol_grid)
+   total_lbol = np.sum(lbol_sampled)
    ```
 
-2. **Continuous Mode**: Integrate using IMF
+2. **Continuous Mode**: Integrate over IMF
    ```python
-   total_lbol = integrate(evolution.lbol(m, t) * formation.imf.pdf(m), m_min, m_max)
+   iso = evolution.get_isochrone(t)
+   lbol_grid = 10**iso.qs['log_L']
+   mass_grid = iso.qs['initial_mass']
+
+   # Integrate L_bol(m) × IMF(m) dm
+   total_lbol = integrate(lbol_grid * formation.imf.pdf(mass_grid), mass_grid)
    ```
 
 ---
@@ -686,6 +877,7 @@ arsenal_gear/
 │   ├── binary.py                 # BinaryFormationContext (future)
 │   └── composite.py              # CompositeFormationContext (future)
 ├── evolution_context.py           # EvolutionContext class (NEW)
+├── stellar_products_context.py    # StellarProductsContext class (NEW)
 ├── population.py                  # StarPopulation, BinaryPopulation (data containers)
 ├── dist_funcs/                    # IMF and binary distributions
 │   ├── imf.py                    # Used by FormationContext
@@ -695,13 +887,16 @@ arsenal_gear/
 │   ├── se_data_structures.py
 │   ├── data_reader.py
 │   └── popsynth.py
-├── feedbacks/                    # Used by EvolutionContext
+├── feedbacks/                    # Used by StellarProductsContext
 │   ├── __init__.py
-│   └── sn.py
-├── element_yields/               # Used by EvolutionContext
+│   ├── sn.py
+│   └── mdot_prescriptions.py     # Mass-loss rate prescriptions (NEW)
+├── element_yields/               # Used by StellarProductsContext
 │   ├── yields.py
 │   ├── yieldtables.py
 │   └── [various implementations]
+├── atmospheres/                  # Used by StellarProductsContext (future)
+│   └── [atmosphere model implementations]
 └── utils/                        # Shared utilities
 ```
 
@@ -709,7 +904,7 @@ arsenal_gear/
 
 ```
 SynthPop
-├── Formation (one of):
+├── FormationContext (one of):
 │   ├── Atomic FormationContext (abstract base):
 │   │   ├── SimpleFormationContext
 │   │   │   └── IMF (from dist_funcs/)
@@ -720,13 +915,22 @@ SynthPop
 │   └── CompositeFormationContext (container, future)
 │       └── List[FormationContext] (atomic contexts only)
 │
-└── EvolutionContext
-    ├── Evolution Models:
-    │   ├── simple_evolution: IsochroneInterpolator (from stellar_evolution/)
-    │   └── binary_evolution: BinaryEvolutionModel (from stellar_evolution/) - future
-    └── Shared Modules:
-        ├── yields: Yields (from element_yields/)
-        └── feedback: FBMechanism (from feedbacks/)
+├── EvolutionContext
+│   └── Evolution Models:
+│       ├── simple_evolution: IsochroneInterpolator (from stellar_evolution/)
+│       └── binary_evolution: BinaryEvolutionModel (from stellar_evolution/) - future
+│
+└── StellarProductsContext
+    ├── source_config: Dict[str, OutputTypeConfig]
+    ├── yield_tables: Dict[str, Yields] (from element_yields/)
+    ├── mdot_prescriptions: Dict[str, MdotPrescription] (from feedbacks/)
+    └── atmosphere_models: Dict[str, Atmosphere] (from atmospheres/) - future
+
+Data Flow:
+  FormationContext → provides masses, metallicity
+  EvolutionContext → provides Isochrone (stellar properties at time t)
+  StellarProductsContext → maps Isochrone to outputs (yields, mass-loss, spectra)
+  SynthPop → integrates over population and time
 
 Note: CompositeFormationContext does NOT inherit from FormationContext.
       It's a separate container class that holds atomic FormationContext instances.
@@ -742,12 +946,33 @@ Note: CompositeFormationContext does NOT inherit from FormationContext.
 - **Reusability**: Same formation context can be used with different evolution models
 - **Extensibility**: New context types (e.g., `BinaryFormationContext`) can be added without modifying core classes
 
+### Why Separate EvolutionContext and StellarProductsContext?
+
+The separation reflects a fundamental distinction in the physics:
+
+1. **EvolutionContext**: "What is the stellar state at time t?"
+   - Time-dependent stellar structure (L_bol, T_eff, log_g, mass, etc.)
+   - Comes from stellar evolution models (isochrones, tracks)
+   - Returns `Isochrone` objects with arrays of stellar properties
+
+2. **StellarProductsContext**: "Given those properties, what does the star produce?"
+   - Maps stellar properties to outputs (yields, mass-loss, spectra)
+   - Configurable prescriptions per evolutionary phase
+   - Can use track data OR external prescriptions
+
+**Benefits of this separation**:
+- **Swappable components**: Use different yield tables with same stellar evolution
+- **Configurable routing**: Choose track-based or prescription-based outputs per phase
+- **Vectorized operations**: All methods operate on `Isochrone` arrays
+- **Clear data flow**: Evolution → Properties → Products
+
 ### Why Keep SynthPop as Coordinator?
 
 - **User Convenience**: Simple, high-level API for common use cases
 - **Backward Compatibility**: Existing code using `SynthPop` can continue to work
-- **Integration Logic**: Population-level calculations naturally belong at this level
-- **Context Isolation**: Keeps `FormationContext` and `EvolutionContext` decoupled
+- **Integration Logic**: Population-level calculations (sums, integrals) naturally belong at this level
+- **Time Integration**: Handles prompt (SN) vs. continuous (winds) feedback integration
+- **Context Isolation**: Keeps `FormationContext`, `EvolutionContext`, and `StellarProductsContext` decoupled
 
 ### Polymorphic Initialization Benefits
 
@@ -769,10 +994,12 @@ Note: CompositeFormationContext does NOT inherit from FormationContext.
 
 ### Extensibility Points
 
-- Add new `FBMechanism` subclasses for additional feedback types
-- Add new `Yields` implementations for different yield tables
-- Add new `IMF` classes for different mass functions
-- Create custom `EvolutionContext` subclasses for specialized physics
+- Add new `Yields` implementations for different yield tables (in `element_yields/`)
+- Add new `MdotPrescription` implementations for different mass-loss prescriptions (in `feedbacks/`)
+- Add new `Atmosphere` implementations for different spectral models (in `atmospheres/`)
+- Add new `IMF` classes for different mass functions (in `dist_funcs/`)
+- Add new phase classification functions for different evolutionary phase schemes
+- Create custom `EvolutionContext` subclasses for different stellar evolution codes
 
 ---
 
@@ -781,8 +1008,10 @@ Note: CompositeFormationContext does NOT inherit from FormationContext.
 ### Phase 1: Simple Stellar Populations (Current Priority)
 - [ ] Create abstract `FormationContext` base class
 - [ ] Create `SimpleFormationContext` implementation
-- [ ] Create `EvolutionContext` class
-- [ ] Refactor `SynthPop` to use composition with `SimpleFormationContext`
+- [ ] Create `EvolutionContext` class (stellar evolution only)
+- [ ] Create `StellarProductsContext` class with `source_config` structure
+- [ ] Implement phase mask functions for wind/yield/atmosphere routing
+- [ ] Refactor `SynthPop` to use composition with all three contexts
 - [ ] Implement polymorphic initialization
 - [ ] Update tests for new architecture
 - [ ] Update documentation and examples
@@ -790,16 +1019,24 @@ Note: CompositeFormationContext does NOT inherit from FormationContext.
 
 ### Phase 2: Binary Populations (Future)
 - [ ] Create `BinaryFormationContext` class
-- [ ] Extend `EvolutionContext` for binary evolution
+- [ ] Add `BinaryEvolutionModel` to `EvolutionContext`
+- [ ] Ensure `StellarProductsContext` works with binary isochrones
 - [ ] Add binary-specific methods to `SynthPop`
 - [ ] Integrate binary evolution tracks
 - [ ] Add tests for binary populations
 
 ### Phase 3: Composite Populations (Future)
 - [ ] Create `CompositeFormationContext` class
-- [ ] Handle multiple metallicities and ages in `EvolutionContext`
+- [ ] Handle multiple metallicities and ages in `SynthPop`
 - [ ] Support complex star formation histories
 - [ ] Add tests for composite populations
+
+### Phase 4: Atmosphere Models (Future)
+- [ ] Create `Atmosphere` base class
+- [ ] Implement Kurucz atmosphere model
+- [ ] Implement MARCS atmosphere model
+- [ ] Add spectral synthesis methods to `StellarProductsContext`
+- [ ] Add `get_spectrum()`, `get_ionizing_luminosity()` to `SynthPop`
 
 ---
 
