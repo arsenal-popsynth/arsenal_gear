@@ -117,22 +117,22 @@ class LimongiChieffi2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
-            Dict of [str, Quantity["mass"]] of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop["rot"].to(u.km / u.s).value,
             starPop["metals"].value,
             starPop["mass"].to(u.M_sun).value,
         ]
-        yld_array = (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.ccsn.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
 
-        return {el: yld_array[i] for i, el in enumerate(elements)}
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def wind_yields(
         self,
@@ -150,21 +150,22 @@ class LimongiChieffi2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop["rot"].to(u.km / u.s).value,
             starPop["metals"].value,
             starPop["mass"].to(u.M_sun).value,
         ]
-        yld_array = (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.wind.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
-        return {el: yld_array[i] for i, el in enumerate(elements)}
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     ## Internal functions for loading data
     def get_element_list(self) -> None:

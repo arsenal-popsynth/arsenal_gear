@@ -6,32 +6,125 @@ This file contains unit tests for the yield interpolation methods
 which are contained in element_yields
 """
 
+import inspect
+
 import numpy as np
+import pytest
 from numpy.testing import assert_approx_equal
 
 import arsenal_gear
 
 
-def assert_array_approx_equal(actual_arr, desired_arr, significant=7):
+def _assert_array_approx_equal(actual_arr, desired_arr, significant=7):
     for actual, desired in zip(actual_arr, desired_arr):
         assert_approx_equal(actual, desired, significant=significant)
+
+
+class TestElementYieldModels:
+    """
+    Common interface and consistency tests for all element-yield models.
+
+    This test suite is automatically applied to every model exported
+    in ``arsenal_gear.element_yields.__all__``.
+    """
+
+    MODEL_CLASSES = [
+        getattr(arsenal_gear.element_yields, name)
+        for name in arsenal_gear.element_yields.__all__
+        if inspect.isclass(getattr(arsenal_gear.element_yields, name))
+    ]
+
+    @pytest.mark.parametrize(
+        "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
+    )
+    def test_all_monotonically_increasing_params(self, Model):
+        """
+        Ensure all parameter grids are monotonically increasing.
+        This applies to ccsn, wind, and agb source objects when present.
+        """
+        model = Model()
+
+        if hasattr(model, "ccsn"):
+            self._test_monotonically_increasing_params(model.ccsn)
+
+        if hasattr(model, "wind"):
+            self._test_monotonically_increasing_params(model.wind)
+
+        if hasattr(model, "agb"):
+            self._test_monotonically_increasing_params(model.agb)
+
+    @pytest.mark.parametrize(
+        "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
+    )
+    def test_all_check_positive_tables(self, Model):
+        """
+        Ensure all tables have no negative yields.
+        This applies to ccsn, wind, and agb source objects when present.
+        """
+        model = Model()
+
+        if hasattr(model, "ccsn"):
+            self._test_check_positive_tables(model.ccsn)
+
+        if hasattr(model, "wind"):
+            self._test_check_positive_tables(model.wind)
+
+        if hasattr(model, "agb"):
+            self._test_check_positive_tables(model.agb)
+
+    @pytest.mark.parametrize(
+        "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
+    )
+    def test_all_remnant_mass_from_interpolation(self, Model):
+        """
+        Ensure all parameter grids are monotonically increasing.
+        This applies to ccsn, wind, and agb source objects when present.
+        """
+        model = Model()
+
+        if hasattr(model, "ccsn"):
+            self._test_remnant_mass_from_interpolation(model.ccsn)
+
+        if hasattr(model, "wind"):
+            self._test_remnant_mass_from_interpolation(model.wind)
+
+        if hasattr(model, "agb"):
+            self._test_remnant_mass_from_interpolation(model.agb)
+
+    def _test_monotonically_increasing_params(self, source):
+        """Ensure monotonically increasing parameter grid"""
+        for param in source.params:
+            assert np.all(
+                param[1:] >= param[:-1]
+            ), f"Parameter {param} is not monotonically increasing."
+
+    def _test_check_positive_tables(self, source):
+        """Ensure no negative yields"""
+        for element in source.yields.keys():
+            assert np.all(
+                source.yields[element].values >= 0
+            ), f"Negative values in tables for {element}."
+
+    def _test_remnant_mass_from_interpolation(self, source):
+        """Test interpolation methods to ensure no negative mass remnants"""
+        interp_methods = ["nearest", "linear"]
+        params = [np.linspace(min(param), max(param), 1000) for param in source.params]
+
+        for interp_method in interp_methods:
+            mloss = source.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=False
+            )
+            diff = params[-1] - mloss
+            failed = np.flatnonzero(diff < 0)
+            assert (
+                failed.size == 0
+            ), f"Negative remnant at {failed.size} indices using {interp_method} (worst case: {np.min(diff)})"
 
 
 class TestLimongiChieffi2018:
     """Tests for yields from Limongi & Chieffi (2018)"""
 
     lc18 = arsenal_gear.element_yields.LimongiChieffi2018()
-
-    def test_monotinically_increasing_params(self):
-        """Ensure monotonically increasing parameter grid"""
-        for param in self.lc18.wind.params:
-            assert np.all(
-                param[1:] >= param[:-1]
-            ), f"Parameter {param} for wind in {self.lc18.name} is not stricktly increasing."
-        for param in self.lc18.ccsn.params:
-            assert np.all(
-                param[1:] >= param[:-1]
-            ), f"Parameter {param} for ccsn in {self.lc18.name} is not stricktly increasing."
 
     def test_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -66,7 +159,7 @@ class TestLimongiChieffi2018:
             )
             loaded_yld = np.array([yc + yw for yc, yw in zip(ccsn_yld, wind_yld)])
 
-            assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
+            _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
 
 
 class TestNuGrid:
@@ -75,27 +168,6 @@ class TestNuGrid:
     p16 = arsenal_gear.element_yields.Pignatari2016()
     r18 = arsenal_gear.element_yields.Ritter2018()
     bat = arsenal_gear.element_yields.Battino20192021()
-
-    def test_monotinically_increasing_params(self):
-        """Ensure monotonically increasing parameter grid"""
-        for yld_set in [self.p16, self.r18, self.nugrid]:
-            for param in yld_set.agb.params:
-                assert np.all(
-                    param[1:] >= param[:-1]
-                ), f"Parameter {param} for agb in {yld_set.name} is not stricktly increasing."
-            for param in yld_set.wind.params:
-                assert np.all(
-                    param[1:] >= param[:-1]
-                ), f"Parameter {param} for wind in {yld_set.name} is not stricktly increasing."
-            for param in yld_set.ccsn.params:
-                assert np.all(
-                    param[1:] >= param[:-1]
-                ), f"Parameter {param} for ccsn in {yld_set.name} is not stricktly increasing."
-
-        for param in self.bat.agb.params:
-            assert np.all(
-                param[1:] >= param[:-1]
-            ), f"Parameter {param} for agb in {self.bat.name} is not stricktly increasing."
 
     def test_p16_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -123,7 +195,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(agb_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=4)
 
         for model, yld in zip(models_hi, ylds_hi):
             wind_yld = self.p16.wind.get_yld(
@@ -132,7 +204,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
 
         for model, yld in zip(models_hi, ylds_sn):
             wind_yld = self.p16.ccsn.get_yld(
@@ -141,7 +213,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
 
     def test_r18_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -169,7 +241,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(agb_yld.flatten(), yld, significant=3)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=3)
 
         for model, yld in zip(models_hi, ylds_wi):
             wind_yld = self.r18.wind.get_yld(
@@ -178,7 +250,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(wind_yld.flatten(), yld, significant=3)
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=3)
 
         for model, yld_tot in zip(models_hi, ylds_hi):
             ccsn_yld = self.r18.ccsn.get_yld(
@@ -196,7 +268,7 @@ class TestNuGrid:
             loaded_yld = np.array(
                 [yc + yw for yc, yw in zip(ccsn_yld.flatten(), wind_yld.flatten())]
             )
-            assert_array_approx_equal(loaded_yld, yld_tot, significant=3)
+            _assert_array_approx_equal(loaded_yld, yld_tot, significant=3)
 
     def test_bat_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -215,4 +287,4 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(agb_yld.flatten(), yld, significant=5)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=5)
