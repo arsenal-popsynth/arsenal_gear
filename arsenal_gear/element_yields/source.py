@@ -49,7 +49,6 @@ class Source:
             List of yields matching provided element list
 
         """
-        elements = np.atleast_1d(elements)
 
         if len(params) != len(self.params):
             raise ValueError("Supplied parameters do not match yield set parameters.")
@@ -138,15 +137,17 @@ class Source:
             Interpolation points for RegularGridInterpolator
 
         """
-        plens = np.array([len(param) if isinstance(param, (list, np.ndarray))
-                         else 1 for param in params])
+        plens = np.array(
+            [
+                len(param) if isinstance(param, (list, np.ndarray)) else 1
+                for param in params
+            ]
+        )
         max_length = max(plens)
 
         # Ensure all arguments are lists or arrays of the same length
         if np.any((plens != 1) & (plens != max_length)):
-            raise ValueError(
-                "All lists of parameters must have the same length."
-            )
+            raise ValueError("All lists of parameters must have the same length.")
 
         args = []
         for param in params:
