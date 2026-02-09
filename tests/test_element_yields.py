@@ -6,107 +6,125 @@ This file contains unit tests for the yield interpolation methods
 which are contained in element_yields
 """
 
+import inspect
+
 import numpy as np
+import pytest
 from numpy.testing import assert_approx_equal
 
 import arsenal_gear
 
 
-def assert_array_approx_equal(actual_arr, desired_arr, significant=7):
+def _assert_array_approx_equal(actual_arr, desired_arr, significant=7):
     for actual, desired in zip(actual_arr, desired_arr):
         assert_approx_equal(actual, desired, significant=significant)
+
+
+class TestElementYieldModels:
+    """
+    Common interface and consistency tests for all element-yield models.
+
+    This test suite is automatically applied to every model exported
+    in ``arsenal_gear.element_yields.__all__``.
+    """
+
+    MODEL_CLASSES = [
+        getattr(arsenal_gear.element_yields, name)
+        for name in arsenal_gear.element_yields.__all__
+        if inspect.isclass(getattr(arsenal_gear.element_yields, name))
+    ]
+
+    @pytest.mark.parametrize(
+        "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
+    )
+    def test_all_monotonically_increasing_params(self, Model):
+        """
+        Ensure all parameter grids are monotonically increasing.
+        This applies to ccsn, wind, and agb source objects when present.
+        """
+        model = Model()
+
+        if hasattr(model, "ccsn"):
+            self._test_monotonically_increasing_params(model.ccsn)
+
+        if hasattr(model, "wind"):
+            self._test_monotonically_increasing_params(model.wind)
+
+        if hasattr(model, "agb"):
+            self._test_monotonically_increasing_params(model.agb)
+
+    @pytest.mark.parametrize(
+        "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
+    )
+    def test_all_check_positive_tables(self, Model):
+        """
+        Ensure all tables have no negative yields.
+        This applies to ccsn, wind, and agb source objects when present.
+        """
+        model = Model()
+
+        if hasattr(model, "ccsn"):
+            self._test_check_positive_tables(model.ccsn)
+
+        if hasattr(model, "wind"):
+            self._test_check_positive_tables(model.wind)
+
+        if hasattr(model, "agb"):
+            self._test_check_positive_tables(model.agb)
+
+    @pytest.mark.parametrize(
+        "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
+    )
+    def test_all_remnant_mass_from_interpolation(self, Model):
+        """
+        Ensure all parameter grids are monotonically increasing.
+        This applies to ccsn, wind, and agb source objects when present.
+        """
+        model = Model()
+
+        if hasattr(model, "ccsn"):
+            self._test_remnant_mass_from_interpolation(model.ccsn)
+
+        if hasattr(model, "wind"):
+            self._test_remnant_mass_from_interpolation(model.wind)
+
+        if hasattr(model, "agb"):
+            self._test_remnant_mass_from_interpolation(model.agb)
+
+    def _test_monotonically_increasing_params(self, source):
+        """Ensure monotonically increasing parameter grid"""
+        for param in source.params:
+            assert np.all(
+                param[1:] >= param[:-1]
+            ), f"Parameter {param} is not monotonically increasing."
+
+    def _test_check_positive_tables(self, source):
+        """Ensure no negative yields"""
+        for element in source.yields.keys():
+            assert np.all(
+                source.yields[element].values >= 0
+            ), f"Negative values in tables for {element}."
+
+    def _test_remnant_mass_from_interpolation(self, source):
+        """Test interpolation methods to ensure no negative mass remnants"""
+        interp_methods = ["nearest", "linear"]
+        params = [np.linspace(min(param), max(param), 1000) for param in source.params]
+
+        for interp_method in interp_methods:
+            mloss = source.get_mloss(
+                params=params, interpolate=interp_method, extrapolate=False
+            )
+            diff = params[-1] - mloss
+            failed = np.flatnonzero(diff < 0)
+            assert (
+                failed.size == 0
+            ), f"Negative remnant at {failed.size} indices using {interp_method} (worst case: {np.min(diff)})"
 
 
 class TestLimongiChieffi2018:
     """Tests for yields from Limongi & Chieffi (2018)"""
 
     lc18 = arsenal_gear.element_yields.LimongiChieffi2018()
-    # Parameter/argument space where model has been tested
-    mmin = 8.0
-    mmax = 300.0
-    Zmin = 0.00001
-    Zmax = 0.03
-    rotmin = 0.0
-    rotmax = 300
-    interp_methods = ["nearest", "linear"]
-
-    def test_monotinically_increasing_params(self):
-        """Ensure monotonically increasing parameter grid"""
-        for param in self.lc18.wind.params:
-            assert np.all(
-                param[1:] >= param[:-1]
-            ), f"Parameter {param} for wind in {self.lc18.name} is not stricktly increasing."
-        for param in self.lc18.ccsn.params:
-            assert np.all(
-                param[1:] >= param[:-1]
-            ), f"Parameter {param} for ccsn in {self.lc18.name} is not stricktly increasing."
-
-    def test_check_positive_tables(self):
-
-        for element in self.lc18.elements:
-            assert np.all(
-                self.lc18.wind.yields[element].values >= 0
-            ), f"{self.lc18.name} contains negative values in wind for {element}: {self.lc18.wind.yields[element].values}"
-            assert np.all(
-                self.lc18.ccsn.yields[element].values >= 0
-            ), f"{self.lc18.name} contains negative values in ccsn for {element}: {self.lc18.ccsn.yields[element].values}"
-
-    def test_ensure_positive_remnant_mass(self):
-
-        rot = np.linspace(self.rotmin, self.rotmax, 1000)
-        mass = np.linspace(self.mmin, self.mmax, 1000)
-        metal = np.linspace(self.Zmin, self.Zmax, 1000)
-        params = [rot, metal, mass]
-
-        for interp_method in self.interp_methods:
-            mloss = self.lc18.wind.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=False
-            )
-            index = np.argwhere(mass - mloss >= 0)[0]
-            assert np.all(
-                mass - mloss >= 0
-            ), f"Negative remnant mass in {self.lc18.name} for wind interpolated using {interp_method} without extrapolation: mass = {mass[index]}"
-            index = np.argwhere(mass - mloss >= 0)[0]
-            mloss = self.lc18.wind.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=True
-            )
-            assert np.all(
-                mass - mloss >= 0
-            ), f"Negative remnant mass in {self.lc18.name} for wind interpolated using {interp_method} with extrapolation: mass = {mass[index]}"
-
-            mloss = self.lc18.ccsn.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=False
-            )
-            index = np.argwhere(mass - mloss >= 0)[0]
-            assert np.all(
-                mass - mloss >= 0
-            ), f"Negative remnant mass in {self.lc18.name} for ccsn interpolated using {interp_method} without extrapolation: mass = {mass[index]}"
-            mloss = self.lc18.ccsn.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=True
-            )
-            index = np.argwhere(mass - mloss >= 0)[0]
-            assert np.all(
-                mass - mloss >= 0
-            ), f"Negative remnant mass in {self.lc18.name} for ccsn interpolated using {interp_method} with extrapolation: mass = {mass[index]}"
-
-            mloss = self.lc18.wind.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=False
-            ) + self.lc18.ccsn.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=False
-            )
-            index = np.argwhere(mass - mloss >= 0)[0]
-            assert np.all(
-                mass - mloss >= 0
-            ), f"Negative remnant mass in {self.lc18.name} for wind+ccsn interpolated using {interp_method} without extrapolation: mass = {mass[index]}"
-            mloss = self.lc18.wind.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=True
-            ) + self.lc18.ccsn.get_mloss(
-                params=params, interpolate=interp_method, extrapolate=True
-            )
-            index = np.argwhere(mass - mloss >= 0)[0]
-            assert np.all(
-                mass - mloss >= 0
-            ), f"Negative remnant mass in {self.lc18.name} for wind+ccsn interpolated using {interp_method} with extrapolation: mass = {mass[index]}"
 
     def test_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -141,7 +159,7 @@ class TestLimongiChieffi2018:
             )
             loaded_yld = np.array([yc + yw for yc, yw in zip(ccsn_yld, wind_yld)])
 
-            assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
+            _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
 
 
 class TestNuGrid:
@@ -150,130 +168,6 @@ class TestNuGrid:
     p16 = arsenal_gear.element_yields.Pignatari2016()
     r18 = arsenal_gear.element_yields.Ritter2018()
     bat = arsenal_gear.element_yields.Battino20192021()
-    # Parameter/argument space where model has been tested
-    lo_mmin = 0.1
-    lo_mmax = 8.0
-    hi_mmin = 8.0
-    hi_mmax = 300.0
-    Zmin = 0.00001
-    Zmax = 0.03
-    interp_methods = ["nearest", "linear"]
-
-    def test_monotinically_increasing_params(self):
-        """Ensure monotonically increasing parameter grid"""
-        for yld_set in [self.p16, self.r18, self.nugrid]:
-            for param in yld_set.agb.params:
-                assert np.all(
-                    param[1:] >= param[:-1]
-                ), f"Parameter {param} for agb in {yld_set.name} is not stricktly increasing."
-            for param in yld_set.wind.params:
-                assert np.all(
-                    param[1:] >= param[:-1]
-                ), f"Parameter {param} for wind in {yld_set.name} is not stricktly increasing."
-            for param in yld_set.ccsn.params:
-                assert np.all(
-                    param[1:] >= param[:-1]
-                ), f"Parameter {param} for ccsn in {yld_set.name} is not stricktly increasing."
-
-        for param in self.bat.agb.params:
-            assert np.all(
-                param[1:] >= param[:-1]
-            ), f"Parameter {param} for agb in {self.bat.name} is not stricktly increasing."
-
-    def test_check_positive_tables(self):
-
-        for yld_set in [self.p16, self.r18, self.nugrid]:
-            for element in yld_set.elements:
-                assert np.all(
-                    yld_set.agb.yields[element].values >= 0
-                ), f"{yld_set.name} contains negative values in agb for {element}: {yld_set.agb.yields[element].values}"
-                assert np.all(
-                    yld_set.wind.yields[element].values >= 0
-                ), f"{yld_set.name} contains negative values in wind for {element}: {yld_set.wind.yields[element].values}"
-                assert np.all(
-                    yld_set.ccsn.yields[element].values >= 0
-                ), f"{yld_set.name} contains negative values in ccsn for {element}: {yld_set.ccsn.yields[element].values}"
-
-        for element in self.bat.elements:
-            assert np.all(
-                self.bat.agb.yields[element].values > 0
-            ), f"{self.bat.name} contains negative values in agb for {element}: {self.bat.agb.yields[element].values}"
-
-    def test_ensure_positive_remnant_mass(self):
-
-        lo_mass = np.linspace(self.lo_mmin, self.lo_mmax, 100)
-        hi_mass = np.linspace(self.hi_mmin, self.hi_mmax, 100)
-        metal = np.linspace(self.Zmin, self.Zmax, 100)
-
-        params = [metal, lo_mass]
-        for yld_set in [self.p16, self.r18, self.bat, self.nugrid]:
-            for interp_method in self.interp_methods:
-                mloss = yld_set.agb.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=False
-                )
-                index = np.argwhere(lo_mass - mloss >= 0)[0]
-                assert np.all(
-                    lo_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for agb interpolated using {interp_method} without extrapolation: mass = {lo_mass[index]}"
-                mloss = yld_set.wind.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=True
-                )
-                index = np.argwhere(lo_mass - mloss >= 0)[0]
-                assert np.all(
-                    lo_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for agb interpolated using {interp_method} with extrapolation: mass = {lo_mass[index]}"
-
-        params = [metal, hi_mass]
-        for yld_set in [self.p16, self.r18, self.nugrid]:
-            for interp_method in self.interp_methods:
-                mloss = yld_set.wind.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=False
-                )
-                index = np.argwhere(hi_mass - mloss >= 0)[0]
-                assert np.all(
-                    hi_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for wind interpolated using {interp_method} without extrapolation: mass = {hi_mass[index]}"
-                mloss = yld_set.wind.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=True
-                )
-                index = np.argwhere(hi_mass - mloss >= 0)[0]
-                assert np.all(
-                    hi_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for wind interpolated using {interp_method} with extrapolation: mass = {hi_mass[index]}"
-
-                mloss = yld_set.ccsn.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=False
-                )
-                index = np.argwhere(hi_mass - mloss >= 0)[0]
-                assert np.all(
-                    hi_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for ccsn interpolated using {interp_method} without extrapolation: mass = {hi_mass[index]}"
-                mloss = yld_set.ccsn.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=True
-                )
-                index = np.argwhere(hi_mass - mloss >= 0)[0]
-                assert np.all(
-                    hi_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for ccsn interpolated using {interp_method} with extrapolation: mass = {hi_mass[index]}"
-
-                mloss = yld_set.wind.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=False
-                ) + yld_set.ccsn.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=False
-                )
-                index = np.argwhere(hi_mass - mloss >= 0)[0]
-                assert np.all(
-                    hi_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for wind+ccsn interpolated using {interp_method} without extrapolation: mass = {hi_mass[index]}"
-                mloss = yld_set.wind.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=True
-                ) + yld_set.ccsn.get_mloss(
-                    params=params, interpolate=interp_method, extrapolate=True
-                )
-                index = np.argwhere(hi_mass - mloss >= 0)[0]
-                assert np.all(
-                    hi_mass - mloss >= 0
-                ), f"Negative remnant mass in {yld_set.name} for wind+ccsn interpolated using {interp_method} with extrapolation: mass = {hi_mass[index]}"
 
     def test_p16_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -301,7 +195,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(agb_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=4)
 
         for model, yld in zip(models_hi, ylds_hi):
             wind_yld = self.p16.wind.get_yld(
@@ -310,7 +204,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
 
         for model, yld in zip(models_hi, ylds_sn):
             wind_yld = self.p16.ccsn.get_yld(
@@ -319,7 +213,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
 
     def test_r18_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -347,7 +241,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(agb_yld.flatten(), yld, significant=3)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=3)
 
         for model, yld in zip(models_hi, ylds_wi):
             wind_yld = self.r18.wind.get_yld(
@@ -356,7 +250,7 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(wind_yld.flatten(), yld, significant=3)
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=3)
 
         for model, yld_tot in zip(models_hi, ylds_hi):
             ccsn_yld = self.r18.ccsn.get_yld(
@@ -374,7 +268,7 @@ class TestNuGrid:
             loaded_yld = np.array(
                 [yc + yw for yc, yw in zip(ccsn_yld.flatten(), wind_yld.flatten())]
             )
-            assert_array_approx_equal(loaded_yld, yld_tot, significant=3)
+            _assert_array_approx_equal(loaded_yld, yld_tot, significant=3)
 
     def test_bat_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -393,4 +287,4 @@ class TestNuGrid:
                 interpolate="nearest",
                 extrapolate=False,
             )
-            assert_array_approx_equal(agb_yld.flatten(), yld, significant=5)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=5)
