@@ -126,19 +126,21 @@ class NuGrid(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-
-        yields = np.zeros_like(starPop.masses.value)
-        yields = self.ccsn.get_yld(
+        yld_array = self.ccsn.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
-        return yields * u.M_sun
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def wind_yields(
         self,
@@ -156,19 +158,21 @@ class NuGrid(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-
-        yields = np.zeros_like(starPop.masses.value)
-        yields = self.wind.get_yld(
+        yld_array = self.wind.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
-        return yields * u.M_sun
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def agb_yields(
         self,
@@ -186,19 +190,21 @@ class NuGrid(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-
-        yields = np.zeros_like(starPop.masses.value)
-        yields = self.agb.get_yld(
+        yld_array = self.agb.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
-        return yields * u.M_sun
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
 
 @cite("10.3847/0067-0049/225/2/24")
@@ -302,19 +308,21 @@ class Pignatari2016(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.ccsn.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def wind_yields(
         self,
@@ -332,19 +340,21 @@ class Pignatari2016(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.wind.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def agb_yields(
         self,
@@ -362,19 +372,21 @@ class Pignatari2016(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.agb.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.agb.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def get_element_list(self) -> None:
         """Read element symbols from tables, atomic numbers not available."""
@@ -600,19 +612,21 @@ class Ritter2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.ccsn.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def wind_yields(
         self,
@@ -630,19 +644,21 @@ class Ritter2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.wind.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def agb_yields(
         self,
@@ -660,19 +676,21 @@ class Ritter2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.agb.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.agb.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
@@ -887,19 +905,21 @@ class Battino20192021(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
-            List of yields matching provided element list
+            Dictionary of yields matching provided element list
 
         """
+        elements = np.atleast_1d(elements)
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.agb.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
+        yld_array = self.agb.get_yld(
+            elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
+
+        if len(elements) == 1:
+            return {elements[0]: yld_array * u.M_sun}
+        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def get_element_list(self) -> None:
         """Read element symbols from tables, atomic numbers not available."""
