@@ -356,17 +356,19 @@ class Chabrier(IMF):
         shi = (x >= self.m_transition) & (x <= self.max_mass)
         res = np.zeros_like(x)
 
-        res[slo] = (self.A / (x * np.log(10))) * np.exp(
-            -((np.log10(x[slo]) - np.log10(self.mc)) ** 2) / (2 * self.sigma**2)
-        )
-        res[shi] = self.A_high * np.power(x[shi], self.beta)
+        if np.any(slo):
+            res[slo] = (self.A / (x[slo] * np.log(10))) * np.exp(
+                -((np.log10(x[slo]) - np.log10(self.mc)) ** 2) / (2 * self.sigma**2)
+            )
+        if np.any(shi):
+            res[shi] = self.A_high * np.power(x[shi], self.beta)
 
         res /= self.total_area
         return res[0] if is_scalar else res
 
     def _ppf(self, q: np.ndarray, *args) -> np.ndarray:
         """inverse CDF for sampling."""
-        is_scalar = np.issacalar(q)
+        is_scalar = np.isscalar(q)
         q = np.atleast_1d(q)
         res = np.zeros_like(q)
         q_break = self.area_low / self.total_area
@@ -375,16 +377,23 @@ class Chabrier(IMF):
 
         # Segment 1: Low mass log-normal
         if np.any(slo):
-            qlo = q[slo] / q_break
-            target_erf = qlo * (self.E_trans - self.E_min) + self.E_min
+            target_erf = (
+                q[slo] * (self.E_trans - self.E_min) / (q_break if q_break > 0 else 1)
+                + self.E_min
+            )
             res[slo] = 10 ** (
                 np.sqrt(2) * self.sigma * erfinv(target_erf) + np.log10(self.mc)
             )
+
+        # Segment 2: High mass power law
         if np.any(shi):
-            # Segment 2: High mass power law
-            qhi = (q[shi] - q_break) / (1.0 - q_break)
+            denom = 1.0 - q_break
+            q_scaled = (q[shi] - q_break) / denom if denom > 0 else 0.0
             p = self.beta + 1
-            res[shi] = (qhi * (self.max_mass**p - 1.0**p) + 1.0**p) ** (1.0 / p)
+            res[shi] = (
+                q_scaled * (self.max_mass**p - self.m_transition**p)
+                + self.m_transition**p
+            ) ** (1.0 / p)
 
         sout = ~(slo | shi)
         res[sout] = np.nan
