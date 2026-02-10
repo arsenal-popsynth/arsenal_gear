@@ -365,28 +365,30 @@ class Chabrier(IMF):
         return res[0] if is_scalar else res
 
     def _ppf(self, q: np.ndarray, *args) -> np.ndarray:
-        """inverse CDF for sampling using np.select."""
+        """inverse CDF for sampling."""
+        is_scalar = np.issacalar(q)
         q = np.atleast_1d(q)
-        slo = (q >= self.min_mass) & (q < self.m_transition)
-        shi = (q >= self.m_transition) & (q <= self.max_mass)
         res = np.zeros_like(q)
         q_break = self.area_low / self.total_area
+        slo = q < q_break
+        shi = (q >= q_break) & (q <= 1.0)
 
         # Segment 1: Low mass log-normal
-        qlo = q[slo] / q_break
-        target_erf = qlo * (self.E_trans - self.E_min) + self.E_min
-        res[slo] = 10 ** (
-            np.sqrt(2) * self.sigma * erfinv(target_erf) + np.log10(self.mc)
-        )
-
-        # Segment 2: High mass power law
-        qhi = (q[shi] - q_break) / (1.0 - q_break)
-        p = self.beta + 1
-        res[shi] = (qhi * (self.max_mass**p - 1.0**p) + 1.0**p) ** (1.0 / p)
+        if np.any(slo):
+            qlo = q[slo] / q_break
+            target_erf = qlo * (self.E_trans - self.E_min) + self.E_min
+            res[slo] = 10 ** (
+                np.sqrt(2) * self.sigma * erfinv(target_erf) + np.log10(self.mc)
+            )
+        if np.any(shi):
+            # Segment 2: High mass power law
+            qhi = (q[shi] - q_break) / (1.0 - q_break)
+            p = self.beta + 1
+            res[shi] = (qhi * (self.max_mass**p - 1.0**p) + 1.0**p) ** (1.0 / p)
 
         sout = ~(slo | shi)
         res[sout] = np.nan
-        return res
+        return res[0] if is_scalar else res
 
     def mean(self, *args, **kwds):
         from scipy.integrate import quad
