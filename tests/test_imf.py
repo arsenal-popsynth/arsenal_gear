@@ -45,3 +45,36 @@ class TestSalpeter:
         """Ensure the distribution matches the expected total stellar mass."""
         masses = self.imf.sample_mass(1e5 * u.Msun)
         assert_allclose(np.sum(masses), 101237.896369 * u.Msun, rtol=1e-5)
+
+class TestKroupa:
+    """Tests for the Kroupa IMF implementation."""
+
+    N = int(1e6)
+    min_mass = 0.08 * u.Msun
+    max_mass = 100 * u.Msun
+    imf = arsenal_gear.dist_funcs.imf.Kroupa(
+        min_mass=min_mass, max_mass=max_mass, seed=1337
+    )
+
+    def test_limits(self):
+        """Ensure sampled masses are within specified limits."""
+        masses = self.imf.sample(self.N)
+        assert masses.max() <= self.max_mass
+        assert masses.min() >= self.min_mass
+
+    def test_count(self):
+        """Ensure the correct number of stars are drawn."""
+        masses = self.imf.sample(self.N)
+        assert len(masses) == self.N
+
+    def test_meanmass(self):
+        """Ensure the distribution matches the expected mean stellar mass."""
+        masses = self.imf.sample(self.N)
+        assert_allclose(
+            np.mean(masses), u.Msun * self.imf.mean(), rtol=0, atol=5 * self.imf.var()
+        )
+
+    def test_mass_sample(self):
+        """Ensure the distribution matches the expected total stellar mass."""
+        masses = self.imf.sample_mass(1e5 * u.Msun)
+        assert_allclose(np.sum(masses), 100864.947188 * u.Msun, rtol=1e-5)
