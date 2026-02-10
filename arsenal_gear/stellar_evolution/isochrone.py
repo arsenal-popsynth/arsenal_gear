@@ -297,7 +297,7 @@ class IsochroneInterpolator():
         nq = len(labels)
         (age_set, mass_set, q_set) = ([], [], [[] for _ in range(nq)])
         for (j,track) in enumerate(self.tset.tracks):
-            ages = track.qs[track.age_name]
+            ages = track.age.value
             if eep <= len(ages):
                 # get the age at the given EEP
                 age_set.append(ages[eep-1])
@@ -389,11 +389,9 @@ class IsochroneInterpolator():
         """
         interp = self._get_interpolator(method)
         iso = self._construct_eep_isochrone(t, [label], method=method, supplement=False)
-        eeps_ = iso.qs[iso.eep_name]
-        ms_ = iso.qs[iso.mini_name]
         qs_ = iso.qs[label]
         # make sure masses are monotonically increasing (not guaranteed by above interp)
-        ms_ = array_utils.make_monotonic_increasing(eeps_, ms_)
+        ms_ = array_utils.make_monotonic_increasing(iso.eep, iso.mini.value)
         # finally we interpolate the requested quantity to the requested masses
         mini = mini.to(u.Msun).value
         qi = interp(mini, ms_, qs_)
@@ -410,7 +408,7 @@ class IsochroneInterpolator():
         """
         if self.interp_op == "iso":
             lages = self.iset.lages
-            mmax = np.array([np.max(iso.qs[iso.mini_name]) for iso in self.iset.isos])
+            mmax = np.array([np.max(iso.mini.value) for iso in self.iset.isos])
         else:
             # interpolating from EEPs
             lages = np.log10((self.tset.max_ages).to(u.yr).value)[::-1]
