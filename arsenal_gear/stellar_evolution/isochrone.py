@@ -35,7 +35,6 @@ class AbstractIsochrone(ABC):
         """
         Returns the lifetime of a star as a function of its initial mass and metallicity
         """
-        pass
 
     @abstractmethod
     def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
@@ -43,7 +42,6 @@ class AbstractIsochrone(ABC):
         Returns the maximum mass of a star that can exist at a given time and metallicity
         This is the inverse of the stellar_lifetime function
         """
-        pass
 
     @abstractmethod
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
@@ -51,7 +49,6 @@ class AbstractIsochrone(ABC):
         Returns the derivative of mmax with respect to time at a given time and metallicity
         The Output quantity is not quite right, it should be mass/time
         """
-        pass
 
     @abstractmethod
     def lbol(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
