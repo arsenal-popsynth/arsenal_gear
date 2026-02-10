@@ -6,6 +6,7 @@ This file contains unit tests for the isochrone interpolation methods
 which are mostly contained in stellar_evolution/isochrone.py
 """
 
+from random import seed
 import astropy.units as u
 import numpy as np
 from numpy.testing import assert_array_less
@@ -50,8 +51,11 @@ def test_mist_interp():
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "track": arsenal_gear.StellarPopulation(interp_op="track"),
-        "iso": arsenal_gear.StellarPopulation(interp_op="iso", test=True),
+        "track": arsenal_gear.StellarPopulation(interp_op="track",
+                                                seed=42),
+        "iso": arsenal_gear.StellarPopulation(interp_op="iso",
+                                              seed=42,
+                                              test=True),
     }
 
     lmissed = {"track": [], "iso": []}
@@ -59,26 +63,26 @@ def test_mist_interp():
     T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].iso.iset.lages))
+    ais = np.arange(len(sp["iso"].iso_int.iset.lages))
     for ai in ais[2::6]:
         ai += 1
         t = (
             (1 + 1e-6)
-            * np.power(10, np.array([sp["iso"].iso.iset.lages[ai]]) - 6)
+            * np.power(10, np.array([sp["iso"].iso_int.iset.lages[ai]]) - 6)
             * u.Myr
         )
 
-        ms = sp["iso"].iso.iset.isos[ai].qs["initial_mass"] * u.Msun
+        ms = sp["iso"].iso_int.iset.isos[ai].qs["initial_mass"] * u.Msun
         xi = sp["iso"].imf.pdf(ms)
 
-        L_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_Teff"])
+        L_ref = np.power(10, sp["iso"].iso_int.iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, sp["iso"].iso_int.iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
         for k in ["track", "iso"]:
-            T[k] = (sp[k].iso.teff(ms, t) / u.K).value
-            L[k] = (sp[k].iso.lbol(ms, t) / u.Lsun).value
+            T[k] = (sp[k].iso_int.teff(ms, t) / u.K).value
+            L[k] = (sp[k].iso_int.lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
@@ -130,7 +134,7 @@ def test_lbol_methods_mist():
         for discrete in discrete_ops:
             key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
             sp = arsenal_gear.StellarPopulation(
-                interp_op=int_op, discrete=discrete
+                interp_op=int_op, discrete=discrete, seed=42
             )
             outs[key] = sp.lbol(tlin)
     # compare all combinations of the four methods
