@@ -129,7 +129,7 @@ def test_lbol_methods_mist():
     discrete_ops = [True, False]
     outs = {}
     # array of times over which to compare bolometric luminosities
-    tlin = np.logspace(5.1,9,10)*u.yr
+    tlin = np.logspace(5.1,9,20)*u.yr
     for int_op in int_ops:
         for discrete in discrete_ops:
             key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
