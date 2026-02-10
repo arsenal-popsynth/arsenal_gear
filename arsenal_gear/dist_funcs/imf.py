@@ -37,6 +37,14 @@ class IMF(rv_continuous):
     ):
         self.min_mass: float = min_mass.to(u.Msun).value
         self.max_mass: float = max_mass.to(u.Msun).value
+        if (self.min_mass <= 0) or (self.max_mass <= 0):
+            raise ValueError(
+                f"(min_mass,max_mass) ({min_mass}, {max_mass}) must both be positive. Stars cannot have zero or negative mass."
+            )
+        if self.min_mass >= self.max_mass:
+            raise ValueError(
+                f"min_mass ({min_mass}) must be less than max_mass ({max_mass})."
+            )
         super().__init__(a=self.min_mass, b=self.max_mass, name=name, seed=seed)
 
     def sample_mass(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
@@ -109,61 +117,44 @@ class PiecewisePowerLaw(IMF):
         :param masses: List/Array of transition masses (e.g., [0.5, 1.0])
         :param betas: List/Array of slopes (e.g., [-1.3, -2.3, -2.7])
         """
-
-        if min_mass.to(u.Msun).value <= 0:
-            raise ValueError(
-                f"min_mass ({min_mass}) must be positive. Stars cannot have zero or negative mass."
-            )
-
-        if min_mass.to(u.Msun).value >= max_mass.to(u.Msun).value:
-            raise ValueError(
-                f"min_mass ({min_mass}) must be less than max_mass ({max_mass})."
-            )
-
+        super().__init__(min_mass, max_mass, name=name, seed=seed)
         # define the slopes
         self.betas = np.array(betas)
 
         # create the boundaries
-        m_pts_floats = [m.to(u.Msun).value if hasattr(m, "unit") else m for m in masses]
-        full_m_pts = np.array(
-            [min(min_mass.to(u.Msun).value, 0.01)]
-            + m_pts_floats
-            + [max(max_mass.to(u.Msun).value, 150.0)]
-        )
+        m_pts = [m.to(u.Msun).value if hasattr(m, "unit") else m for m in masses]
+        m_pts = list(np.sort(m_pts))
+        if len(m_pts) != len(self.betas) - 1:
+            raise ValueError(
+                f"Number of transition masses (masses={masses}) must be one less than the number of slopes (betas={betas})."
+            )
+        if min_mass.to(u.Msun).value > m_pts[0] or max_mass.to(u.Msun).value < m_pts[-1]:
+            raise ValueError(
+                f"User-specified mass range ({min_mass}, {max_mass}) must encompass all transition masses ({masses})."
+            )
+        m_pts = np.array([min_mass.to(u.Msun).value] + m_pts + [max_mass.to(u.Msun).value])
 
         # calculate stellar continuity constants
         self.alphas = np.ones(len(self.betas))
         for i in range(1, len(self.betas)):
             self.alphas[i] = self.alphas[i - 1] * (
-                full_m_pts[i] ** (self.betas[i - 1] - self.betas[i])
+                m_pts[i] ** (self.betas[i - 1] - self.betas[i])
             )
 
-        self.m_pts = []
         self.weights = []
         # calculate weights (or areas); weight is 0 if segment falls outside user's mass range
-        # determines self.m_points which creates the true user-defined boundaries
+        # determines self.m_pts which creates the true user-defined boundaries
         for i in range(len(self.betas)):
-            seg_start = max(min_mass.to(u.Msun).value, full_m_pts[i])
-            seg_end = min(max_mass.to(u.Msun).value, full_m_pts[i + 1])
+            b_plus_1 = self.betas[i] + 1
+            w = (self.alphas[i] / b_plus_1) * (
+                m_pts[i + 1]**b_plus_1 - m_pts[i]**b_plus_1
+            )
+            self.weights.append(w)
 
-            self.m_pts.append(seg_start)
-
-            if seg_start < seg_end:
-                b_plus_1 = self.betas[i] + 1
-                w = (self.alphas[i] / b_plus_1) * (
-                    seg_end**b_plus_1 - seg_start**b_plus_1
-                )
-                self.weights.append(w)
-            else:
-                self.weights.append(0.0)
-
-        self.m_pts.append(max_mass.to(u.Msun).value)
-        self.m_pts = np.array(self.m_pts)
+        self.m_pts = m_pts
         self.weights = np.array(self.weights)
         self.total_area = np.sum(self.weights)
         self.cum_weights = np.cumsum(self.weights) / self.total_area
-
-        super().__init__(min_mass, max_mass, name=name, seed=seed)
 
     def _pdf(self, x, *args):
         # check which segment x falls into based on m_pts
