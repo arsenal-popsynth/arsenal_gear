@@ -57,8 +57,8 @@ class StellarPopulation:
                 print("Time to sample masses: ", end_samp - start_samp)
             self.Nstar = len(self.masses)
 
-        # initialize the isochrone system
-        self.iso = stellar_evolution.isochrone.IsochroneInterpolator(**kwargs)
+        # initialize the isochrone interface/interpolator
+        self.iso_int = stellar_evolution.isochrone.IsochroneInterpolator(**kwargs)
 
     def _integrate_pop(self, iso: Isochrone, q: str) -> np.float64:
         """
@@ -72,7 +72,7 @@ class StellarPopulation:
         """
         Return the number of supernovae that have gone off by time t
         """
-        Mmax = self.iso.mmax(t)
+        Mmax = self.iso_int.mmax(t)
         # if self.discrete:
         #    res = [len(np.where(self.masses.value >= max(8, mmi.value))[0]) for mmi in Mmax]
         #    return np.array(res)
@@ -86,8 +86,8 @@ class StellarPopulation:
         """
         Return the rate of supernovae at time t: the derivative of nsn
         """
-        Mmax = self.iso.mmax(t)
-        Mmaxdot = self.iso.mmaxdot(t)
+        Mmax = self.iso_int.mmax(t)
+        Mmaxdot = self.iso_int.mmaxdot(t)
         return -self.imf.pdf(Mmax) * Mmaxdot * (Mmax.value > 8) * self.Nstar
 
     def lbol(self, t: Quantity["time"]) -> Quantity["power"]:
@@ -101,14 +101,14 @@ class StellarPopulation:
                 return np.array([np.sum(self.lbol_iso(ti)).value for ti in t]) * u.Lsun
         else:
             if np.isscalar(t.value):
-                iso = self.iso.construct_isochrone(t)
-                iso.qs["L_bol"] = masked_power(10, iso.qs[self.iso.llbol_label])
+                iso = self.iso_int.construct_isochrone(t)
+                iso.qs["L_bol"] = masked_power(10, iso.qs[iso.llbol_name])
                 return self._integrate_pop(iso, "L_bol") * u.Lsun
             else:
                 res = []
                 for ti in t:
-                    iso = self.iso.construct_isochrone(ti)
-                    iso.qs["L_bol"] = masked_power(10, iso.qs[self.iso.llbol_label])
+                    iso = self.iso_int.construct_isochrone(ti)
+                    iso.qs["L_bol"] = masked_power(10, iso.qs[iso.llbol_name])
                     res.append(self._integrate_pop(iso, "L_bol"))
                 return np.array(res) * u.Lsun
 
@@ -133,14 +133,14 @@ class StellarPopulation:
         """
         Returns the bolometric luminosity of each star in the population at time t
         """
-        Lbols = self.iso.lbol(self.masses, t)
+        Lbols = self.iso_int.lbol(self.masses, t)
         return Lbols[np.logical_not(Lbols.mask)]
 
     def teff_iso(self, t: Quantity["time"]) -> Quantity["temperature"]:
         """
         Returns the effective temperature of each star in the population at time t
         """
-        Teffs = self.iso.teff(self.masses, t)
+        Teffs = self.iso_int.teff(self.masses, t)
         return Teffs[np.logical_not(Teffs.mask)]
 
     def __call__(self, N: int) -> population.StarPopulation:
