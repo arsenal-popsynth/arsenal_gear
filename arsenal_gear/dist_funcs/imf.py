@@ -86,6 +86,9 @@ class Salpeter(IMF):
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
 
+    phys_min = 0.1 * u.Msun
+    phys_max = 100.0 * u.Msun
+
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
@@ -93,6 +96,8 @@ class Salpeter(IMF):
         alpha: float = 2.35,
         seed=None,
     ):
+        min_mass = max(min_mass, self.phys_min)
+        max_mass = min(max_mass, self.phys_max)
         self.alpha = alpha
         self.name = "Salpeter"
         assert alpha >= 0
@@ -108,6 +113,14 @@ class Salpeter(IMF):
         upper = np.power(self.max_mass, 1 - self.alpha)
         lower = np.power(self.min_mass, 1 - self.alpha)
         return (q * (upper - lower) + lower) ** (1.0 / (1 - self.alpha))
+
+    def mean(self, *args, **kwds):
+        m1, m2 = self.min_mass, self.max_mass
+        a = self.alpha
+        # Analytical power law mean
+        num = (m2 ** (1 - a + 1) - m1 ** (1 - a + 1)) / (1 - a + 1)
+        den = (m2 ** (1 - a) - m1 ** (1 - a)) / (1 - a)
+        return (num / den) * u.Msun
 
 
 class PiecewisePowerLaw(IMF):
@@ -128,11 +141,16 @@ class PiecewisePowerLaw(IMF):
             raise ValueError(
                 f"Number of transition masses (masses={masses}) must be one less than the number of slopes (betas={betas})."
             )
-        if min_mass.to(u.Msun).value > m_pts[0] or max_mass.to(u.Msun).value < m_pts[-1]:
+        if (
+            min_mass.to(u.Msun).value > m_pts[0]
+            or max_mass.to(u.Msun).value < m_pts[-1]
+        ):
             raise ValueError(
                 f"User-specified mass range ({min_mass}, {max_mass}) must encompass all transition masses ({masses})."
             )
-        m_pts = np.array([min_mass.to(u.Msun).value] + m_pts + [max_mass.to(u.Msun).value])
+        m_pts = np.array(
+            [min_mass.to(u.Msun).value] + m_pts + [max_mass.to(u.Msun).value]
+        )
 
         # calculate stellar continuity constants
         self.alphas = np.ones(len(self.betas))
@@ -147,7 +165,7 @@ class PiecewisePowerLaw(IMF):
         for i in range(len(self.betas)):
             b_plus_1 = self.betas[i] + 1
             w = (self.alphas[i] / b_plus_1) * (
-                m_pts[i + 1]**b_plus_1 - m_pts[i]**b_plus_1
+                m_pts[i + 1] ** b_plus_1 - m_pts[i] ** b_plus_1
             )
             self.weights.append(w)
 
@@ -193,6 +211,16 @@ class PiecewisePowerLaw(IMF):
         final = np.select(conditions, results, default=np.nan)
         return final[0] if is_scalar else final
 
+    def mean(self, *args, **kwds):
+        """Analytical mean sum of [Integral of m * PDF(m)] for each segment"""
+        mmin = self.min_mass
+        mmax = self.max_mass
+
+        from scipy.integrate import quad
+
+        res, _ = quad(lambda m: m * self._pdf(m), mmin, mmax)
+        return res * u.Msun
+
 
 class Kroupa(PiecewisePowerLaw):
     """
@@ -207,12 +235,17 @@ class Kroupa(PiecewisePowerLaw):
 
     """
 
+    phys_min = 0.01 * u.Msun
+    phys_max = 150.0 * u.Msun
+
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
         max_mass: Quantity["mass"] = 100.0 * u.Msun,
         seed=None,
     ):
+        min_mass = max(min_mass, self.phys_min)
+        max_mass = min(max_mass, self.phys_max)
         super().__init__(
             min_mass=min_mass,
             max_mass=max_mass,
@@ -236,12 +269,17 @@ class MillerScalo(PiecewisePowerLaw):
 
     """
 
+    phys_min = 0.1 * u.Msun
+    phys_max = 100.0 * u.Msun
+
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.1 * u.Msun,
         max_mass: Quantity["mass"] = 100.0 * u.Msun,
         seed=None,
     ):
+        min_mass = max(min_mass, self.phys_min)
+        max_mass = min(max_mass, self.phys_max)
         super().__init__(
             min_mass=min_mass,
             max_mass=max_mass,
@@ -253,6 +291,9 @@ class MillerScalo(PiecewisePowerLaw):
 
 
 class Chabrier(IMF):
+    phys_min = 0.01 * u.Msun
+    phys_max = 100.0 * u.Msun
+
     def __init__(
         self,
         min_mass: u.Quantity = 0.08 * u.Msun,
@@ -260,6 +301,8 @@ class Chabrier(IMF):
         beta: float = -2.3,
         seed=None,
     ):
+        min_mass = max(min_mass, self.phys_min)
+        max_mass = min(max_mass, self.phys_max)
         self.name = "Chabrier"
         self.A = 0.158
         self.sigma = 0.69
@@ -344,3 +387,9 @@ class Chabrier(IMF):
         sout = ~(slo | shi)
         res[sout] = np.nan
         return res
+
+    def mean(self, *args, **kwds):
+        from scipy.integrate import quad
+
+        res, _ = quad(lambda m: m * self._pdf(m), self.min_mass, self.max_mass)
+        return res * u.Msun
