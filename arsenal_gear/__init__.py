@@ -88,11 +88,12 @@ class StellarPopulation:
 
     def ndotsn(self, t: Quantity["time"]) -> int:
         """
-        Return the rate of supernovae at time t: the derivative of nsn
+        Return: the rate of supernovae at time t, the derivative of nsn
+                in Myr^-1
         """
         Mmax = self.iso_int.mmax(t)
         Mmaxdot = self.iso_int.mmaxdot(t)
-        return -self.imf.pdf(Mmax) * Mmaxdot * (Mmax.value > 8) * self.Nstar
+        return -self.imf.pdf(Mmax)/u.Msun * Mmaxdot * (Mmax.value > 8) * self.Nstar
 
     def lbol(self, t: Quantity["time"]) -> Quantity["power"]:
         """

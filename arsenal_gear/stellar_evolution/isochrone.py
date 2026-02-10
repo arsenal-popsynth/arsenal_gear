@@ -473,6 +473,7 @@ class IsochroneInterpolator():
             t: the time at which to evaluate the derivative, can be an array
         Returns:
             mmax: the initial mass of the most massive star still alive at time t
+                  in solar masses
         """
         if np.isscalar(t.value):
             t = np.array([t.value]) * t.unit
@@ -498,6 +499,7 @@ class IsochroneInterpolator():
             t: the time at which to evaluate the derivative, can be an array
         Returns:
             mmaxdot: the rate at which the maximum mass is changing with respect to time
+                     in solar masses per Myr
         """
         if np.isscalar(t.value):
             t = np.array([t.value]) * t.unit

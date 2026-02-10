@@ -191,12 +191,12 @@ class MISTReader(IsochroneDataReader):
             for label in hdr_list:
                 if label.startswith("surface_"):
                     elem = self._process_elem_label(label)
-                    elems.append(elem)
                     if elem in qs:
                         # this adds together different isotopes
                         qs[elem] += iso[label]
                     else:
                         qs[elem] = iso[label]
+                        elems.append(elem)
                 elif label != "log10_isochrone_age_yr":
                     qs[label] = iso[label]
             iso_data = Isochrone(age=age,
