@@ -43,7 +43,10 @@ class StellarPopulation:
         self.verbose = kwargs.get("verbose", False)
         self.discrete = kwargs.get("discrete", True)
 
-        self.imf = dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
+        # check if an IMF was provided, otherwise defaul to Salpeter
+        self.imf = kwargs.get(
+            "imf", dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
+        )
         # expected number of stars
         self.Nstar = (self.Mtot / self.imf.mean()).value
         # log10(Z/Zsun)
