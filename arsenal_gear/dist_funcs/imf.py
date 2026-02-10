@@ -111,7 +111,7 @@ class Salpeter(IMF):
 
 
 class PiecewisePowerLaw(IMF):
-    def __init__(self, min_mass, max_mass, masses, betas, name="", seed=None):
+    def __init__(self, min_mass, max_mass, masses, betas, name="PPL", seed=None):
         """
         Generic class for N-part piecewise power law IMFs.
         :param masses: List/Array of transition masses (e.g., [0.5, 1.0])
