@@ -24,11 +24,11 @@ __all__ = [
     "dist_funcs",
     "feedbacks",
     "stellar_evolution",
-    "StellarPopulation",
+    "SynthPop",
 ]
 
 
-class StellarPopulation:
+class SynthPop:
     """
     This class will act as the primary API for aresenal
     Ideally it will take an input yaml file or accept default values for

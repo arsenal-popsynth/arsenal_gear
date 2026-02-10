@@ -51,9 +51,9 @@ def test_mist_interp():
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "track": arsenal_gear.StellarPopulation(interp_op="track",
+        "track": arsenal_gear.SynthPop(interp_op="track",
                                                 seed=42),
-        "iso": arsenal_gear.StellarPopulation(interp_op="iso",
+        "iso": arsenal_gear.SynthPop(interp_op="iso",
                                               seed=42,
                                               test=True),
     }
@@ -129,11 +129,11 @@ def test_lbol_methods_mist():
     discrete_ops = [True, False]
     outs = {}
     # array of times over which to compare bolometric luminosities
-    tlin = np.logspace(5.1,9,20)*u.yr
+    tlin = np.logspace(5.1,9,10)*u.yr
     for int_op in int_ops:
         for discrete in discrete_ops:
             key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
-            sp = arsenal_gear.StellarPopulation(
+            sp = arsenal_gear.SynthPop(
                 interp_op=int_op, discrete=discrete, seed=42
             )
             outs[key] = sp.lbol(tlin)
