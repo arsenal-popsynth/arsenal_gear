@@ -202,10 +202,6 @@ class Kroupa(PiecewisePowerLaw):
     :type min_mass: astropy mass unit
     :param max_mass: Most massive star in the IMF
     :type max_mass: astropy mass unit
-    :param beta2: Mid-mass slope. Use -2.3 for Kroupa01, -2.2 for Kroupa93
-    :type beta2: float
-    :param beta3: High-mass slope. Use -2.3 for Kroupa01, -2.7 for Kroupa93
-    :type beta3: float
     :param seed: Random seed for sampling
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
 
@@ -215,15 +211,13 @@ class Kroupa(PiecewisePowerLaw):
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
         max_mass: Quantity["mass"] = 100.0 * u.Msun,
-        beta2: float = -2.3,
-        beta3: float = -2.7,
         seed=None,
     ):
         super().__init__(
             min_mass=min_mass,
             max_mass=max_mass,
             masses=[0.5, 1.0],
-            betas=[-1.3, beta2, beta3],
+            betas=[-1.3, -2.3, -2.7],
             name="Kroupa",
             seed=seed,
         )
