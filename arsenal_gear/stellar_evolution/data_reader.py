@@ -250,12 +250,12 @@ class MISTReader(IsochroneDataReader):
             for label in data.keys():
                 if label.startswith("surface_"):
                     elem = self._process_elem_label(label)
-                    elems.append(elem)
                     if elem in qs:
                         # this adds together different isotopes
                         qs[elem] += data[label]
                     else:
                         qs[elem] = data[label]
+                        elems.append(elem)
                 else:
                     qs[label] = data[label]
 
