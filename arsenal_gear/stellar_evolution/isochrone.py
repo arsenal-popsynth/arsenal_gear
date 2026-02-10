@@ -47,12 +47,8 @@ class IsochroneInterpolator():
 
         if self.interp_op == "iso":
             self.iset = self.reader.read_iso_data()
-            self.llbol_label = self.iset.isos[0].llbol_name
-            self.lteff_label = self.iset.isos[0].lteff_name
         else:
             self.tset = self.reader.read_track_data()
-            self.llbol_label = self.tset.tracks[0].llbol_name
-            self.lteff_label = self.tset.tracks[0].lteff_name
 
     @staticmethod
     def _get_interpolator(method:str):
@@ -82,12 +78,18 @@ class IsochroneInterpolator():
             labels: The supplemented list of labels including basic quantities.
         """
         if self.interp_op == "iso":
-            necessary_labels = [self.iset.isos[0].mini_name,
-                                self.iset.isos[0].lteff_name,
-                                self.iset.isos[0].llbol_name]
+            necessary_labels = [self.iset.mini_name,
+                                self.iset.lteff_name,
+                                self.iset.llbol_name,
+                                self.iset.lrad_name,
+                                self.iset.lgrav_name]
+            necessary_labels += self.iset.elems
         else:
-            necessary_labels = [self.tset.tracks[0].lteff_name,
-                                self.tset.tracks[0].llbol_name]
+            necessary_labels = [self.tset.lteff_name,
+                                self.tset.llbol_name,
+                                self.tset.lrad_name,
+                                self.tset.lgrav_name]
+            necessary_labels += self.tset.elems
         for nl in necessary_labels:
             if nl not in labels:
                 labels.append(nl)
@@ -208,7 +210,7 @@ class IsochroneInterpolator():
         lages = np.array([self.iset.lages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
         qs = [[self.iset.isos[i].qs[label] for i in ais] for label in labels]
-        eep_str = self.iset.isos[0].eep_name
+        eep_str = self.iset.eep_name
         eeps = [self.iset.isos[i].qs[eep_str] for i in ais]
 
         # eeps present in all isochrones
@@ -220,24 +222,30 @@ class IsochroneInterpolator():
 
         # make sure initial mass is monotonic in interpolation
         for (i,label) in enumerate(labels):
-            if label == self.iset.isos[0].mini_name:
+            if label == self.iset.mini_name:
                 if np.any(np.diff(qis[i]) <= 0):
                     qis[i] = array_utils.make_monotonic_increasing(eepi,qis[i])
         iso_qs = {labels[i]: qis[i] for i in range(len(labels))}
         iso_qs["EEP"] = eepi
         if supplement:
             iso = Isochrone(age=t,
-                            eep_name='EEP',
-                            mini_name=self.iset.isos[0].mini_name,
-                            lteff_name=self.iset.isos[0].lteff_name,
-                            llbol_name=self.iset.isos[0].llbol_name,
+                            eep_name=self.iset.eep_name,
+                            mini_name=self.iset.mini_name,
+                            lteff_name=self.iset.lteff_name,
+                            llbol_name=self.iset.llbol_name,
+                            lrad_name=self.iset.lrad_name,
+                            lgrav_name=self.iset.lgrav_name,
+                            elems=self.iset.elems,
                             qs=iso_qs)
         else:
             iso = Isochrone(age=t,
-                            eep_name='EEP',
+                            eep_name=self.iset.eep_name,
                             mini_name=None,
                             lteff_name=None,
                             llbol_name=None,
+                            lrad_name=None,
+                            lgrav_name=None,
+                            elems=[],
                             qs=iso_qs)
         return iso
 
@@ -261,10 +269,10 @@ class IsochroneInterpolator():
             q_res: the specified quantity at the requested initial mass.
         """
         # construct isochrone for mass/luminosity relationship
-        labels = [self.iset.isos[0].mini_name, label]
+        labels = [self.iset.mini_name, label]
         iso = self._construct_iso_isochrone(t, labels,method=method,supplement=False)
         qi = iso.qs[label]
-        massi = iso.qs[self.iset.isos[0].mini_name]
+        massi = iso.qs[self.iset.mini_name]
 
         mini = mini.to(u.Msun).value
         q_res = pchip_interpolate(massi, qi, mini)
@@ -346,8 +354,11 @@ class IsochroneInterpolator():
             iso = Isochrone(age=t,
                             eep_name='EEP',
                             mini_name='initial_mass',
-                            lteff_name=self.tset.tracks[0].lteff_name,
-                            llbol_name=self.tset.tracks[0].llbol_name,
+                            lteff_name=self.tset.lteff_name,
+                            llbol_name=self.tset.llbol_name,
+                            lrad_name=self.tset.lrad_name,
+                            lgrav_name=self.tset.lgrav_name,
+                            elems=self.tset.elems,
                             qs=iso_qs)
         else:
             iso = Isochrone(age=t,
@@ -355,6 +366,9 @@ class IsochroneInterpolator():
                             mini_name='initial_mass',
                             lteff_name=None,
                             llbol_name=None,
+                            lrad_name=None,
+                            lgrav_name=None,
+                            elems=[],
                             qs=iso_qs)
         return iso
 
@@ -512,9 +526,9 @@ class IsochroneInterpolator():
             Quantity["power"]: the bolometric luminosity of the star.
         """
         if self.interp_op == "iso":
-            llbol_label = self.iset.isos[0].llbol_name
+            llbol_label = self.iset.llbol_name
         else:
-            llbol_label = self.tset.tracks[0].llbol_name
+            llbol_label = self.tset.llbol_name
         logLbol_res = self._interp_quantity(mini, t, llbol_label, method=method)
         return masked_power(10, logLbol_res)*u.Lsun
 
@@ -532,9 +546,9 @@ class IsochroneInterpolator():
             Quantity["temperature"]: the effective surface temperature of the star.
         """
         if self.interp_op == "iso":
-            lteff_label = self.iset.isos[0].lteff_name
+            lteff_label = self.iset.lteff_name
         else:
-            lteff_label = self.tset.tracks[0].lteff_name
+            lteff_label = self.tset.lteff_name
         # interpolating from EEPs
         logTeff_res = self._interp_quantity(mini, t, lteff_label, method=method)
         return masked_power(10, logTeff_res)*u.K

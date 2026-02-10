@@ -164,6 +164,21 @@ class MISTReader(IsochroneDataReader):
             downloader(self.rootdir / self.tarfile, url, message)
             extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
 
+    @staticmethod
+    def _process_elem_label(label):
+        """
+        Helper function to process element labels in the MIST data.
+        """
+        elem = label[8:].rstrip('0123456789')
+        if len(elem) == 1:
+            elem = elem.upper()
+            return elem
+        elif len(elem) == 2:
+            elem = elem[0].upper() + elem[1].lower()
+            return elem
+        else:
+            raise ValueError(f"Could not parse element name from label {label}")
+
     def read_iso_data(self) -> IsochroneSet:
         """
         Reads in isochrone data for MIST
@@ -172,16 +187,27 @@ class MISTReader(IsochroneDataReader):
         isos = []
         for iso in isos_mist:
             age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-            qs = {}
+            (qs, elems) = ({}, [])
             for label in hdr_list:
-                if label != "log10_isochrone_age_yr":
+                if label.startswith("surface_"):
+                    elem = self._process_elem_label(label)
+                    elems.append(elem)
+                    if elem in qs:
+                        # this adds together different isotopes
+                        qs[elem] += iso[label]
+                    else:
+                        qs[elem] = iso[label]
+                elif label != "log10_isochrone_age_yr":
                     qs[label] = iso[label]
             iso_data = Isochrone(age=age,
-                                    eep_name='EEP',
-                                    mini_name='initial_mass',
-                                    lteff_name='log_Teff',
-                                    llbol_name='log_L',
-                                    qs=qs)
+                                 eep_name='EEP',
+                                 mini_name='initial_mass',
+                                 lteff_name='log_Teff',
+                                 llbol_name='log_L',
+                                 lrad_name='log_R',
+                                 lgrav_name='log_g',
+                                 elems=elems,
+                                 qs=qs)
             isos.append(iso_data)
         self.hdr_list = hdr_list
         # get the maximum mass still alive for each isochrone
@@ -189,7 +215,15 @@ class MISTReader(IsochroneDataReader):
         iset = IsochroneSet(lages=lages,
                             hdr_list=self.hdr_list,
                             isos=isos,
-                            max_mass=max_mass*u.Msun)
+                            max_mass=max_mass*u.Msun,
+                            metallicity=self.met,
+                            eep_name='EEP',
+                            mini_name='initial_mass',
+                            lteff_name='log_Teff',
+                            llbol_name='log_L',
+                            lrad_name='log_R',
+                            lgrav_name='log_g',
+                            elems=isos[0].elems)
         return iset
 
     def read_track_data(self) -> TrackSet:
@@ -212,22 +246,45 @@ class MISTReader(IsochroneDataReader):
             masses.append(minit)
             min_ages.append(min_age)
             max_ages.append(max_age)
+            (qs, elems) = ({}, [])
+            for label in data.keys():
+                if label.startswith("surface_"):
+                    elem = self._process_elem_label(label)
+                    elems.append(elem)
+                    if elem in qs:
+                        # this adds together different isotopes
+                        qs[elem] += data[label]
+                    else:
+                        qs[elem] = data[label]
+                else:
+                    qs[label] = data[label]
+
             tracks.append(StellarTrack(mass=minit*u.Msun,
-                                        eeps=eeps,
-                                        age_name='star_age',
-                                        lteff_name='log_Teff',
-                                        llbol_name='log_L',
-                                        qs=data))
+                                       eeps=eeps,
+                                       age_name='star_age',
+                                       lteff_name='log_Teff',
+                                       llbol_name='log_L',
+                                       lrad_name='log_R',
+                                       lgrav_name='log_g',
+                                       qs=qs,
+                                       elems=elems))
         masses = np.array(masses)*u.Msun
         min_ages = np.array(min_ages)*u.yr
         max_ages = np.array(max_ages)*u.yr
         self.hdr_list = data.keys()
         tset = TrackSet(masses=masses,
-                                min_ages=min_ages,
-                                max_ages=max_ages,
-                                hdr_list=self.hdr_list,
-                                tracks=tracks,
-                                max_eep=max_eep)
+                        min_ages=min_ages,
+                        max_ages=max_ages,
+                        hdr_list=self.hdr_list,
+                        tracks=tracks,
+                        max_eep=max_eep,
+                        eep_name='EEP',
+                        age_name='star_age',
+                        lteff_name='log_Teff',
+                        llbol_name='log_L',
+                        lrad_name='log_R',
+                        lgrav_name='log_g',
+                        elems=elems)
         return tset
 
     def read_iso_file(self):

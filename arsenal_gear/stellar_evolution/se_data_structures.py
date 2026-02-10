@@ -29,6 +29,10 @@ class Isochrone:
     mini_name: str
     lteff_name: str
     llbol_name: str
+    lrad_name: str
+    lgrav_name: str
+    # list of surface abundances, if available
+    elems: list[str]
     qs: dict
 
 # TODO(@ltancas): think of the best way to make age units consistent
@@ -52,6 +56,10 @@ class StellarTrack:
     age_name: str
     lteff_name: str
     llbol_name: str
+    lrad_name: str
+    lgrav_name: str
+    # list of surface abundances, if available
+    elems: list[str]
     qs: dict
 
 @dataclass
@@ -68,6 +76,16 @@ class IsochroneSet:
     hdr_list: list[str]
     isos: list[Isochrone]
     max_mass: Quantity["mass"]
+    metallicity: float
+
+    # names also stored as attributes for ease of access
+    eep_name: str
+    mini_name: str
+    lteff_name: str
+    llbol_name: str
+    lrad_name: str
+    lgrav_name: str
+    elems: list[str]
 
 @dataclass
 class TrackSet:
@@ -86,3 +104,12 @@ class TrackSet:
     hdr_list: list[str]
     tracks: list[StellarTrack]
     max_eep: int
+
+    # names also stored as attributes for ease of access
+    eep_name: str
+    age_name: str
+    lteff_name: str
+    llbol_name: str
+    lrad_name: str
+    lgrav_name: str
+    elems: list[str]
