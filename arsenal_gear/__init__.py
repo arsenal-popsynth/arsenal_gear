@@ -42,8 +42,12 @@ class StellarPopulation:
         self.Mtot = kwargs.get("Mtot", 1e6 * u.Msun)
         self.verbose = kwargs.get("verbose", False)
         self.discrete = kwargs.get("discrete", True)
+        self.seed = kwargs.get("seed", None)
 
-        self.imf = dist_funcs.imf.Salpeter(0.08 * u.Msun, 100 * u.Msun, alpha=2.3)
+        self.imf = dist_funcs.imf.Salpeter(0.08 * u.Msun,
+                                           100 * u.Msun,
+                                           alpha=2.3,
+                                           seed=self.seed)
         # expected number of stars
         self.Nstar = (self.Mtot / self.imf.mean()).value
         # log10(Z/Zsun)
