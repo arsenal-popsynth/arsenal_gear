@@ -309,35 +309,38 @@ class Chabrier(IMF):
     def _pdf(self, x: np.ndarray, *args) -> np.ndarray:
         is_scalar = np.isscalar(x)
         x = np.atleast_1d(x)
-        condlist = [
-            (x >= self.min_mass) & (x < self.m_transition),
-            (x >= self.m_transition) & (x <= self.max_mass),
-        ]
+        slo = (x >= self.min_mass) & (x < self.m_transition)
+        shi = (x >= self.m_transition) & (x <= self.max_mass)
+        res = np.zeros_like(x)
 
-        res_low = (self.A / (x * np.log(10))) * np.exp(
-            -((np.log10(x) - np.log10(self.mc)) ** 2) / (2 * self.sigma**2)
+        res[slo] = (self.A / (x * np.log(10))) * np.exp(
+            -((np.log10(x[slo]) - np.log10(self.mc)) ** 2) / (2 * self.sigma**2)
         )
-        res_high = self.A_high * np.power(x, self.beta)
+        res[shi] = self.A_high * np.power(x[shi], self.beta)
 
-        result = np.select(condlist, [res_low, res_high], default=0.0) / self.total_area
-        return result[0] if is_scalar else result
+        res /= self.total_area
+        return res[0] if is_scalar else res
 
     def _ppf(self, q: np.ndarray, *args) -> np.ndarray:
         """inverse CDF for sampling using np.select."""
         q = np.atleast_1d(q)
+        slo = (q >= self.min_mass) & (q < self.m_transition)
+        shi = (q >= self.m_transition) & (q <= self.max_mass)
+        res = np.zeros_like(q)
         q_break = self.area_low / self.total_area
 
         # Segment 1: Low mass log-normal
-        q_scaled_low = q / q_break
-        target_erf = q_scaled_low * (self.E_trans - self.E_min) + self.E_min
-        res_low = 10 ** (
+        qlo = q[slo] / q_break
+        target_erf = qlo * (self.E_trans - self.E_min) + self.E_min
+        res[slo] = 10 ** (
             np.sqrt(2) * self.sigma * erfinv(target_erf) + np.log10(self.mc)
         )
 
         # Segment 2: High mass power law
-        q_scaled_high = (q - q_break) / (1.0 - q_break)
+        qhi = (q[shi] - q_break) / (1.0 - q_break)
         p = self.beta + 1
-        res_high = (q_scaled_high * (self.max_mass**p - 1.0**p) + 1.0**p) ** (1.0 / p)
+        res[shi] = (qhi * (self.max_mass**p - 1.0**p) + 1.0**p) ** (1.0 / p)
 
-        condlist = [q < q_break, (q >= q_break) & (q <= 1.0)]
-        return np.select(condlist, [res_low, res_high], default=np.nan)
+        sout = ~(slo | shi)
+        res[sout] = np.nan
+        return res
