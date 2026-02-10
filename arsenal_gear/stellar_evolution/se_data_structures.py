@@ -135,6 +135,8 @@ class IsochroneSet:
     lages: np.ndarray[np.float64]
     hdr_list: list[str]
     isos: list[Isochrone]
+    # minimum and maximum masses that these isochrones can be applied to
+    min_mass: Quantity["mass"]
     max_mass: Quantity["mass"]
     metallicity: float
 

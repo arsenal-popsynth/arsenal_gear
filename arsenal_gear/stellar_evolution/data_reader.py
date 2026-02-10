@@ -210,11 +210,20 @@ class MISTReader(IsochroneDataReader):
                                  qs=qs)
             isos.append(iso_data)
         self.hdr_list = hdr_list
+
+        mmaxes = np.array([np.max(iso.mini.value) for iso in isos])
+        # ensure the array is monotonic
+        int_mono = (np.where(np.diff(mmaxes) > 0)[0]+1)[-1]
+        mmaxes = np.array(mmaxes)[int_mono:]
         # get the maximum mass still alive for each isochrone
-        max_mass = np.max(isos_mist[0]['initial_mass'])
+        max_mass = np.max(mmaxes)
+        # get the minimum mass for the isochrones
+        mmins = np.array([np.min(iso.mini.value) for iso in isos])
+        min_mass = np.min(mmins)
         iset = IsochroneSet(lages=lages,
                             hdr_list=self.hdr_list,
                             isos=isos,
+                            min_mass=min_mass*u.Msun,
                             max_mass=max_mass*u.Msun,
                             metallicity=self.met,
                             eep_name='EEP',

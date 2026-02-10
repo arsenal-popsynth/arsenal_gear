@@ -9,6 +9,7 @@ through interpreting and processing their isochrones
 from functools import reduce
 
 import astropy.units as u
+from abc import ABC, abstractmethod
 import numpy as np
 from astropy.units import Quantity
 from scipy.interpolate import pchip_interpolate
@@ -18,7 +19,60 @@ from ..utils import array_utils, masked_power
 from .se_data_structures import Isochrone
 from .data_reader import MISTReader
 
-class IsochroneInterpolator():
+class AbstractIsochrone(ABC):
+    """
+    Abstract class that represents the mapping from a population's initial parameters
+    to its properties at a given time.
+    The main instantiaion of this base class is the IsochroneInterpolator class
+    which is used to interpolate isochrones directly from tabulated calculations.
+    """
+    def __init__(self, **kwargs) -> None:
+        # log10(Z/Zsun)
+        self.met = kwargs.get('met', 0.0)
+
+    @abstractmethod
+    def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
+        """
+        Returns the lifetime of a star as a function of its initial mass and metallicity
+        """
+        pass
+
+    @abstractmethod
+    def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
+        """
+        Returns the maximum mass of a star that can exist at a given time and metallicity
+        This is the inverse of the stellar_lifetime function
+        """
+        pass
+
+    @abstractmethod
+    def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
+        """
+        Returns the derivative of mmax with respect to time at a given time and metallicity
+        The Output quantity is not quite right, it should be mass/time
+        """
+        pass
+
+    @abstractmethod
+    def lbol(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+        """
+        Returns the bolometric luminosity at time t of stars with initial mass mini
+        """
+
+    @abstractmethod
+    def teff(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["temperature"]:
+        """
+        Returns the effective temperature at time t of stars with initial mass mini
+        """
+
+    @abstractmethod
+    def construct_isochrone(self, t: Quantity["time"]) -> Isochrone:
+        """
+        Constructs a Isochrone object at time t
+        Structure of Isochrone is specified in `se_data_structures.py`
+        """
+
+class IsochroneInterpolator(AbstractIsochrone):
     """
     This class is used to interpolate isochrones from various sources
     It can be used to interpolate stellar tracks or isochrones from any 
@@ -27,8 +81,7 @@ class IsochroneInterpolator():
     """
 
     def __init__(self, **kwargs) -> None:
-        # log10(Z/Zsun)
-        self.met = kwargs.get('met', 0.0)
+        super().__init__(**kwargs)
         # determines whether or not the isochrone instance
         # is being used for testing or not. This changes the 
         # selection of the isochrone data to leave out the 
@@ -409,6 +462,10 @@ class IsochroneInterpolator():
         if self.interp_op == "iso":
             lages = self.iset.lages
             mmax = np.array([np.max(iso.mini.value) for iso in self.iset.isos])
+            # ensure the array is monotonic
+            int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
+            lages = np.array(lages)[int_mono:]
+            mmax = np.array(mmax)[int_mono:]
         else:
             # interpolating from EEPs
             lages = np.log10((self.tset.max_ages).to(u.yr).value)[::-1]
@@ -464,11 +521,18 @@ class IsochroneInterpolator():
         return q_res
 
     ######## MAIN PUBLIC OUTPUT FUNCTIONS ########
+    def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
+        (lages, mmax) = self._get_mmax_age_interp()
+        # cubic spline interpolation in initial mass
+        interp = pchip_interpolate(mmax[::-1], lages[::-1], mini.to(u.Msun).value)
+        return np.power(10, interp) * u.yr
+        
     def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
         died yet (in e.g. a SN) as a funciton of age, using a cubic spline
         based on maximum mass reported in the isochrone data
+        This is the inverse of the stellar_lifetime function
         Args:
             t: the time at which to evaluate the derivative, can be an array
         Returns:
