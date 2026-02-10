@@ -9,7 +9,7 @@ which are mostly contained in stellar_evolution/isochrone.py
 from random import seed
 import astropy.units as u
 import numpy as np
-from numpy.testing import assert_array_less
+from numpy.testing import assert_array_less, assert_allclose
 from scipy.integrate import trapezoid
 
 import arsenal_gear
@@ -52,10 +52,10 @@ def test_mist_interp():
     """
     sp = {
         "track": arsenal_gear.SynthPop(interp_op="track",
-                                                seed=42),
+                                       seed=42),
         "iso": arsenal_gear.SynthPop(interp_op="iso",
-                                              seed=42,
-                                              test=True),
+                                     seed=42,
+                                     test=True),
     }
 
     lmissed = {"track": [], "iso": []}
@@ -145,3 +145,31 @@ def test_lbol_methods_mist():
             rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
             # average relative error should be less than 4%
             assert np.average(rel_err) < 0.05
+
+def test_lifetime_interp_mist():
+    """
+    Tests that the stellar_lifetime function for isochrone- and track-based interpolation
+    from the MIST isochrones are consistent with each other.
+    """
+    sp = {
+        "track": arsenal_gear.SynthPop(interp_op="track"),
+        "iso": arsenal_gear.SynthPop(interp_op="iso"),
+    }
+    # make sure we only query the lifetime function where the isochrones have data
+    mmaxes = sp["iso"].iso_int._get_mmax_age_interp()[1]
+    iso_mmin = min(mmaxes)
+    iso_mmax = max(mmaxes)
+    track_mmin = np.min(sp["track"].iso_int.tset.masses.value)
+    track_mmax = np.max(sp["track"].iso_int.tset.masses.value)
+    mmin = np.max((iso_mmin, track_mmin))
+    mmax = np.min((iso_mmax, track_mmax))
+    mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
+
+    mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
+    results = {}
+    for k in sp.keys():
+        lt = sp[k].iso_int.stellar_lifetime(mlin)
+        results[k] = lt
+        # the lifetime should be a decreasing function of mass
+        assert_array_less(lt[1:], lt[:-1])
+    assert_allclose(results["track"].value, results["iso"].value, rtol=0.075)
