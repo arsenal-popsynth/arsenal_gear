@@ -7,10 +7,16 @@ at the time of their formation. These classes are basically parsing
 of input parameters and are used to construct the real stellar populations.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
 from astropy.units import Quantity
-from .dist_funcs.imf import IMF
-from .dist_funcs.binaries import MassRatio, Period, Semimajor
+
+if TYPE_CHECKING:
+    from .dist_funcs.imf import IMF
+    from .dist_funcs.binaries import MassRatio, Period, Semimajor
 
 @dataclass
 class SinglePop:
