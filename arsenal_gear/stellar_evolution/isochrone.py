@@ -76,10 +76,6 @@ class RaiteriLifetime(AbstractIsochrone):
     The main instantiaion of this base class is the IsochroneInterpolator class
     which is used to interpolate isochrones directly from tabulated calculations.
     """
-    def __init__(self, **kwargs) -> None:
-        # log10(Z/Zsun)
-        super().__init__(**kwargs)
-
     def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
         """
         Stellar lifetimes calculated from
