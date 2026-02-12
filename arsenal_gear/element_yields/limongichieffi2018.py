@@ -7,7 +7,6 @@ Limongi & Chieffi (2018).
 """
 
 import io
-import os
 import re
 import tarfile
 from typing import List
@@ -50,7 +49,7 @@ class LimongiChieffi2018(YieldTables):
     def __init__(self, model: str = "R") -> None:
         """
         Args:
-            model: choise of model to load, see Limongi & Chieffi (2018) for details
+            model: choice of model to load, see Limongi & Chieffi (2018) for details
 
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
@@ -81,16 +80,16 @@ class LimongiChieffi2018(YieldTables):
             raise ValueError(f"Model {model} does not exist.")
 
         super().__init__()
-        self.filedir += "/LimongiChieffi2018"
+        self.filedir = self.filedir / "data/LimongiChieffi2018"
         self.name = "Limongi & Chieffi (2018)"
 
-        if not os.path.isdir(self.filedir):
-            os.mkdir(self.filedir)
+        if not self.filedir.is_dir():
+            self.filedir.mkdir(parents=True, exist_ok=True)
             self.download_yields(table=f"tab_{model}")
-        elif not os.path.isfile(self.filedir + f"/tab_{model}.tgz"):
+        elif not (self.filedir / f"tab_{model}.tgz").is_file():
             self.download_yields(table=f"tab_{model}")
 
-        self.filedir += f"/tab_{model}.tgz"
+        self.filedir = self.filedir / f"tab_{model}.tgz"
         self.elements, self.atomic_num = self.get_element_list()
 
         # Stellar wind yields
@@ -101,13 +100,14 @@ class LimongiChieffi2018(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
+    ## Main interface functions
     def ccsn_yields(
         self,
         elements: List[str],
         starPop: StarPopulation,
         interpolate: str = "nearest",
         extrapolate: bool = False,
-    ) -> Quantity["mass"]:
+    ) -> dict[str, Quantity["mass"]]:
         """Interpolate yields from core-collapse supernovae for specified elements.
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
@@ -117,7 +117,7 @@ class LimongiChieffi2018(YieldTables):
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
-            List of yields matching provided element list
+            Dict of [str, Quantity["mass"]] of yields matching provided element list
 
         """
         args = [
@@ -125,12 +125,14 @@ class LimongiChieffi2018(YieldTables):
             starPop["metals"].value,
             starPop["mass"].to(u.M_sun).value,
         ]
-        return (
+        yld_array = (
             self.ccsn.get_yld(
                 elements, args, interpolate=interpolate, extrapolate=extrapolate
             )
             * u.M_sun
         )
+
+        return {el: yld_array[i] for i, el in enumerate(elements)}
 
     def wind_yields(
         self,
@@ -138,7 +140,7 @@ class LimongiChieffi2018(YieldTables):
         starPop: StarPopulation,
         interpolate: str = "nearest",
         extrapolate: bool = False,
-    ) -> Quantity["mass"]:
+    ) -> dict[str, Quantity["mass"]]:
         """Interpolate yields from massive stars ejected as winds for specified elements.
         Stellar parameters can be provided as single value, array + single value, or arrays.
 
@@ -156,13 +158,15 @@ class LimongiChieffi2018(YieldTables):
             starPop["metals"].value,
             starPop["mass"].to(u.M_sun).value,
         ]
-        return (
+        yld_array = (
             self.wind.get_yld(
                 elements, args, interpolate=interpolate, extrapolate=extrapolate
             )
             * u.M_sun
         )
+        return {el: yld_array[i] for i, el in enumerate(elements)}
 
+    ## Internal functions for loading data
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
 
@@ -248,23 +252,25 @@ class LimongiChieffi2018(YieldTables):
 
         return ccsn_yld
 
+    ## Function for downloading data from the web
     def download_yields(self, table: str) -> None:
         """Downloader for tabulated yield files."""
         from ..utils.scraper import downloader
 
         downloader(
-            self.filedir + f"/{table}.tgz",
+            self.filedir / f"{table}.tgz",
             f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
             message=f"Yield file {table}.tgz not found.",
         )
 
-        if not os.path.isfile(self.filedir + "/readme.txt"):
+        if not (self.filedir / "readme.txt").is_file():
             downloader(
-                self.filedir + "/readme.txt",
+                self.filedir / "readme.txt",
                 f"{self.lc_url}/2018-modelli/yields/legenda",
                 message="See downloaded readme.txt for info about yields.",
             )
 
+    # helper functions for reading tables
     @staticmethod
     def _get_metal_index_from_model(model: str) -> int:
         """Convenience function for converting table metal labels into table index."""
