@@ -9,7 +9,7 @@ import astropy.units as u
 import numpy as np
 from numpy.testing import assert_allclose
 
-import arsenal_gear
+from arsenal_gear.formation.dist_funcs import imf
 
 
 class TestSalpeter:
@@ -18,7 +18,7 @@ class TestSalpeter:
     N = int(1e6)
     min_mass = 1 * u.Msun
     max_mass = 100 * u.Msun
-    imf = arsenal_gear.dist_funcs.imf.Salpeter(
+    imf = imf.Salpeter(
         min_mass=min_mass, max_mass=max_mass, seed=1337
     )
 

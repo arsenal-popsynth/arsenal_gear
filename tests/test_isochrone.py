@@ -6,7 +6,6 @@ This file contains unit tests for the isochrone interpolation methods
 which are mostly contained in stellar_evolution/isochrone.py
 """
 
-from random import seed
 import astropy.units as u
 import numpy as np
 from numpy.testing import assert_array_less, assert_allclose
@@ -63,26 +62,26 @@ def test_mist_interp():
     T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].iso_int.iset.lages))
+    ais = np.arange(len(sp["iso"].evol.se.iset.lages))
     for ai in ais[2::6]:
         ai += 1
         t = (
             (1 + 1e-6)
-            * np.power(10, np.array([sp["iso"].iso_int.iset.lages[ai]]) - 6)
+            * np.power(10, np.array([sp["iso"].evol.se.iset.lages[ai]]) - 6)
             * u.Myr
         )
 
-        ms = sp["iso"].iso_int.iset.isos[ai].qs["initial_mass"] * u.Msun
-        xi = sp["iso"].imf.pdf(ms)
+        ms = sp["iso"].evol.se.iset.isos[ai].qs["initial_mass"] * u.Msun
+        xi = sp["iso"].form.subpops[0].imf.pdf(ms)
 
-        L_ref = np.power(10, sp["iso"].iso_int.iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].iso_int.iset.isos[ai].qs["log_Teff"])
+        L_ref = np.power(10, sp["iso"].evol.se.iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, sp["iso"].evol.se.iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
         for k in ["track", "iso"]:
-            T[k] = (sp[k].iso_int.teff(ms, t) / u.K).value
-            L[k] = (sp[k].iso_int.lbol(ms, t) / u.Lsun).value
+            T[k] = (sp[k].evol.se.teff(ms, t) / u.K).value
+            L[k] = (sp[k].evol.se.lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
@@ -156,11 +155,11 @@ def test_lifetime_interp_mist():
         "iso": arsenal_gear.SynthPop(interp_op="iso"),
     }
     # make sure we only query the lifetime function where the isochrones have data
-    mmaxes = sp["iso"].iso_int._get_mmax_age_interp()[1]
+    mmaxes = sp["iso"].evol.se._get_mmax_age_interp()[1]
     iso_mmin = min(mmaxes)
     iso_mmax = max(mmaxes)
-    track_mmin = np.min(sp["track"].iso_int.tset.masses.value)
-    track_mmax = np.max(sp["track"].iso_int.tset.masses.value)
+    track_mmin = np.min(sp["track"].evol.se.tset.masses.value)
+    track_mmax = np.max(sp["track"].evol.se.tset.masses.value)
     mmin = np.max((iso_mmin, track_mmin))
     mmax = np.min((iso_mmax, track_mmax))
     mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
@@ -168,7 +167,7 @@ def test_lifetime_interp_mist():
     mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
     results = {}
     for k in sp.keys():
-        lt = sp[k].iso_int.stellar_lifetime(mlin)
+        lt = sp[k].evol.se.stellar_lifetime(mlin)
         results[k] = lt
         # the lifetime should be a decreasing function of mass
         assert_array_less(lt[1:], lt[:-1])

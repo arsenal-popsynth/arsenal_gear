@@ -9,53 +9,58 @@ import astropy.units as u
 import numpy as np
 from numpy.testing import assert_array_equal
 
-import arsenal_gear
+from arsenal_gear.formation.form_data_structures import SinglePop, BinaryPop
 
 
-def test_star():
+def test_single_pop():
     """Test the StarPopulation constructor for single stars."""
-    mass = u.Msun * np.ones(100)
-    metals = 0.1 * np.ones(100)
-    tform = u.Myr * np.zeros(100)
-    rot = u.km / u.s * np.zeros(100)
-    star = arsenal_gear.population.StarPopulation(
-        mass=mass, metals=metals, tform=tform, rot=rot
+    N = 100
+    mass = u.Msun * np.ones(N)
+    Mtot = np.sum(mass)
+    metallicity = 0.1 * u.dimensionless_unscaled
+    star = SinglePop(Mtot=Mtot,
+                     Nstar=N,
+                     metallicity=metallicity,
+                     imf=None,
+                     mmin=0.1 * u.Msun,
+                     mmax=100 * u.Msun,
+                     discrete=True,
+                     masses=mass
     )
 
-    assert_array_equal(star["mass"], mass)
-    assert_array_equal(star["metals"], metals)
-    assert_array_equal(star["tform"], tform)
-    assert_array_equal(star["rot"], rot)
+    assert_array_equal(star.masses, mass)
+    assert star.metallicity == metallicity
 
 
-def test_binary():
+def test_binary_pop():
     """Test the BinaryPopulation constructor for binary stars."""
-    mass = u.Msun * np.ones(100)
-    metals = 0.1 * np.ones(100)
-    tform = u.Myr * np.zeros(100)
-    rot = u.km / u.s * np.zeros(100)
-    star1 = arsenal_gear.population.StarPopulation(
-        mass=mass, metals=metals, tform=tform, rot=rot
+    N = 100
+    masses = u.Msun * np.ones(N)
+    Mtot = np.sum(masses) 
+    metallicity = 0.1 * u.dimensionless_unscaled
+    mmin = 0.1 * u.Msun
+    mmax = 100 * u.Msun
+    mrats = 0.5 * np.ones(N)
+    periods = 10 * u.d * np.ones(N)
+    semimajors = 100 * u.AU * np.ones(N)
+    binary = BinaryPop(Mtot=Mtot,
+                       Nstar=N,
+                       metallicity=metallicity,
+                       imf=None,
+                       mmin=mmin,
+                       mmax=mmax,
+                       discrete=True,
+                       masses=masses,
+                       q_dist=None,
+                       period_dist=None,
+                       a_dist=None,
+                       mrats=mrats,
+                       periods=periods,
+                       semimajors=semimajors
     )
-    star2 = arsenal_gear.population.StarPopulation(
-        mass=2 * mass, metals=metals, tform=tform, rot=rot
-    )
-    period = u.d * np.ones(100)
-    eccentricity = 0.5 * np.ones(100)
-    binary = arsenal_gear.population.BinaryPopulation(
-        primary=star1, secondary=star2, period=period, eccentricity=eccentricity
-    )
-    # Check the first star
-    assert_array_equal(binary.primary["mass"], star1["mass"])
-    assert_array_equal(binary.primary["metals"], star1["metals"])
-    assert_array_equal(binary.primary["tform"], star1["tform"])
-    assert_array_equal(binary.primary["rot"], star1["rot"])
-
-    # Check the second star
-    assert_array_equal(binary.secondary["mass"], star2["mass"])
-    assert_array_equal(binary.secondary["metals"], star2["metals"])
-    assert_array_equal(binary.secondary["tform"], star2["tform"])
-    assert_array_equal(binary.secondary["rot"], star2["rot"])
-    # Check binary properties
-    assert_array_equal(binary["period"], period)
-    assert_array_equal(binary["eccentricity"], eccentricity)
+    # Check the binary initilization
+    assert_array_equal(binary.masses, masses)
+    assert_array_equal(binary.mrats, mrats)
+    assert_array_equal(binary.periods, periods)
+    assert_array_equal(binary.semimajors, semimajors)
+    assert binary.metallicity == metallicity
