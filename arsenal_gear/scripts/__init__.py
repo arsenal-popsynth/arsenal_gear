@@ -36,13 +36,14 @@ def zams_single(
     else:  # We are operating in fixed-mass mode
         masses = imf_.sample_mass(mass)
     Mtot = np.sum(masses)
-    return SinglePop(Mtot = Mtot,
-                     Nstar = len(masses),
-                     metallicity=metals * u.dimensionless_unscaled,
-                     imf=imf_,
-                     mmin=min_mass,
-                     mmax=max_mass,
-                     discrete=True)
+    return SinglePop(Mtot,
+                     len(masses),
+                     metals * u.dimensionless_unscaled,
+                     imf_,
+                     min_mass,
+                     max_mass,
+                     True,
+                     masses)
 
 
 def evolve_population(population, evolution, outputs, interval):
