@@ -69,6 +69,57 @@ class AbstractIsochrone(ABC):
         Structure of Isochrone is specified in `se_data_structures.py`
         """
 
+class RaiteriLifetime(AbstractIsochrone):
+    """
+    Abstract class that represents the mapping from a population's initial parameters
+    to its properties at a given time.
+    The main instantiaion of this base class is the IsochroneInterpolator class
+    which is used to interpolate isochrones directly from tabulated calculations.
+    """
+    def __init__(self, **kwargs) -> None:
+        # log10(Z/Zsun)
+        super().__init__(**kwargs)
+
+    def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
+        """
+        Stellar lifetimes calculated from
+        `Raiteri+ 1996 <https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract>`__
+        Equation 3.
+
+        :param stars: Stellar Population
+        :type stars: StarPopulation
+        :return: lifetime of each star in the population
+        :rtype: Quantity["time"]
+        """
+        Z = np.clip(self.met, 1e-6, None)  # avoid log10(0) or negative
+        a0 = 10.13 + 0.07547 * np.log10(Z) - 0.008084 * np.power(np.log10(Z), 2)
+        a1 = -4.424 - 0.7939 * np.log10(Z) - 0.1187 * np.power(np.log10(Z), 2)
+        a2 = 1.262 + 0.3385 * np.log10(Z) + 0.05417 * np.power(np.log10(Z), 2)
+        return (
+            np.power(
+                10,
+                a0
+                + a1 * np.log10(mini.to(u.Msun).value)
+                + a2 * np.power(np.log10(mini.to(u.Msun).value), 2),
+            )
+            * u.yr
+        )
+
+    def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
+        raise NotImplementedError("mmax is not implemented for RaiteriLifetime")
+
+    def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
+        raise NotImplementedError("mmaxdot is not implemented for RaiteriLifetime")
+
+    def lbol(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+        raise NotImplementedError("lbol is not implemented for RaiteriLifetime")
+
+    def teff(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["temperature"]:
+        raise NotImplementedError("teff is not implemented for RaiteriLifetime")
+
+    def construct_isochrone(self, t: Quantity["time"]) -> Isochrone:
+        raise NotImplementedError("construct_isochrone is not implemented for RaiteriLifetime")
+
 class IsochroneInterpolator(AbstractIsochrone):
     """
     This class is used to interpolate isochrones from various sources
