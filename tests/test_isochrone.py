@@ -155,7 +155,11 @@ def test_lifetime_interp_mist():
         "iso": arsenal_gear.SynthPop(interp_op="iso"),
     }
     # make sure we only query the lifetime function where the isochrones have data
-    mmaxes = sp["iso"].evol.se._get_mmax_age_interp()[1]
+
+    mmax = np.array([np.max(iso.mini.value) for iso in sp["iso"].evol.se.iset.isos])
+    # ensure the array is monotonic
+    int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
+    mmaxes = np.array(mmax)[int_mono:]
     iso_mmin = min(mmaxes)
     iso_mmax = max(mmaxes)
     track_mmin = np.min(sp["track"].evol.se.tset.masses.value)
