@@ -26,12 +26,16 @@ class Formation():
         subpop_dicts = [kwargs.get(k) for k in kwargs if k.startswith("pop")]
         self.nsubpops = len(subpop_dicts)
         if (self.nsubpops == 0):
-            # TO DO: replace with default single population if no subpopulations specified?
-            err_msg = "No subpopulations specified.\
-                       Please provide at least one \
-                       subpopulation dictionary with keys \
-                       starting with 'pop'."
-            raise ValueError(err_msg)
+            default_pop = {
+                "Mtot": 1e6 * u.Msun,
+                "metallicity": 0.0 * u.dimensionless_unscaled,
+                "imf": "salpeter",
+                "mmin": 0.08,
+                "mmax": 100.0,
+                "discrete": True,
+                "seed": kwargs.get("seed", None)}
+            subpop_dicts = [default_pop]
+            self.nsubpops = 1
         for i, pop_dict in enumerate(subpop_dicts):
             if not isinstance(pop_dict, dict):
                 err_msg = f"Subpopulation {i} is not a dictionary.\
@@ -75,7 +79,10 @@ class Formation():
             mmin *= u.Msun
             mmax *= u.Msun
             if imf == "salpeter":
-                imf = dist_funcs.imf.Salpeter(mmin,mmax)
+                if "seed" in pop_dict and pop_dict["seed"] is not None:
+                    imf = dist_funcs.imf.Salpeter(mmin,mmax, seed=pop_dict["seed"])
+                else:
+                    imf = dist_funcs.imf.Salpeter(mmin,mmax)
             else:
                 err_msg = f"Invalid IMF string specified, {imf}. \
                             Currently only 'salpeter' is supported."
