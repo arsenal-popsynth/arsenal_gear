@@ -14,15 +14,16 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.integrate import trapezoid as trapz
 
-from . import element_yields, feedbacks, population, stellar_evolution
 from . import formation
 from .formation import SinglePop, BinaryPop
+from . import element_yields, feedbacks, stellar_evolution
+
 
 from .stellar_evolution.se_data_structures import Isochrone
 
 __version__ = "0.0.1"
 __all__ = [
-    "population",
+    "element_yields",
     "feedbacks",
     "stellar_evolution",
     "SynthPop",
