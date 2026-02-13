@@ -57,8 +57,8 @@ class BPASSConverter(BinaryEvolutionConverter):
             kwargs: Keyword arguments for the binary evolution table.
 
         Methods:
-            convert_single_data Processes single stellar track data into a SingleStarTable
-            convert_binary_data Processes binary stellar track data into a BinaryStarTable
+            convert_single_data     Processes single stellar track data into a SingleStarTable
+            convert_binary_data     Processes binary stellar track data into a BinaryStarTable
         """
         # set input parameters
         super().__init__(**kwargs)
@@ -98,10 +98,11 @@ class BPASSConverter(BinaryEvolutionConverter):
         # Number of files depends on the choice of mass limits for the IMF
         num_files = len(os.listdir(model_directory)) 
         # Times for time array
-        num_times = 502 # from log(age/yr) = 4 to 9
-        times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
-        # Save 4 properties: mass, luminosity, temperature, radius
-        data = np.zeros((num_files, 3, num_times))
+        num_times = 402 # from log(age/yr) = 5 to 9
+        times = np.concatenate((np.zeros(1), np.logspace(5, 9, 401)))
+        # Save properties as a function of time: (1) mass, (2) bolometric luminosity, 
+        # (3) surface temperature, (4) radius
+        data = np.zeros((num_files, 4, num_times))
 
         i = 0
         for model in os.listdir(model_directory):
@@ -125,11 +126,13 @@ class BPASSConverter(BinaryEvolutionConverter):
 
                     for m in _mask:
                         
-                        data[i, 0, m] = _data[t, 5] # mass in MSun
-                        data[i, 1, m] = _data[t, 4] # Lsun
+                        data[i, 0, m] = _data[t, 5] # mass in Msun
+                        data[i, 1, m] = _data[t, 4] # log Lbol in Lsun
+                        data[i, 2, m] = _data[t, 3] # log Teff in K
+                        data[i, 3, m] = _data[t, 2] # log R in Rsun
                         if t == (len(_times) - 1):
                             data[i, 1, m] *= 0      # must set to 0 after SN
-                        data[i, 2, m] = _data[t, 3] # K
+                            data[i, 2, m] *= 0
 
                 i += 1
 
@@ -141,20 +144,14 @@ class BPASSConverter(BinaryEvolutionConverter):
         if ('singles_' + self.metstr + '.h5') not in os.listdir(self.output_dir) or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            # Times
-            times = np.round(times, 2).astype('str')
-            for t in range(len(times)):
-                times[t] = times[t].ljust(4, '0')
+            masses = data[:, 0, 0]
 
-            # Masses as strings
-            masses = data[:, 0, 0].astype('str')
-            for m in range(len(masses)):
-                masses[m] = masses[m].ljust(4, '0')
-
-            ds = xr.DataArray(data, coords=[("Model", masses), 
-                                            ("Property", ["Mass (MSun)", "log L_bol (LSun)", 
-                                                          "log T_eff (K)"]), 
-                                            ("Time (log t/yr)", times)])
+            ds = xr.Dataset(data_vars=dict(mass=(["model", "time"], data[:, 0, :]),
+                                           log_Lbol=(["model", "time"], data[:, 1, :]),
+                                           log_Teff=(["model", "time"], data[:, 2, :]),
+                                           log_R=(["model", "time"], data[:, 3, :])),
+                            coords=dict(model=("model", masses), time=("time", times)),
+                           attrs=dict(description="BPASS evolution data for single stars at Z=" + str(self.met)))
             ds.to_netcdf(self.output_dir + '/singles_' + self.metstr + '.h5')
 
         else:
