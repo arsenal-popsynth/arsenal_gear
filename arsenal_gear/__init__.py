@@ -58,18 +58,21 @@ class SynthPop:
         Return the number of supernovae that have gone off by time t
         """
         Mmax = self.evol.se.mmax(t)
-        # TODO, re-implement the discrete case
-        # if self.discrete:
-        #    res = [len(np.where(self.masses.value >= max(8, mmi.value))[0]) for mmi in Mmax]
-        #    return np.array(res)
-        # fraction of stars that have exploded
-        NSN = 0
+        NSN = np.zeros_like(Mmax.value)
         for pop in self.form.subpops:
-            fexp_8 = 1 - pop.imf.cdf(8 * u.Msun)
-            fexp = 1 - pop.imf.cdf(Mmax)
-            fexp = fexp * (fexp < fexp_8) + fexp
-            NSN += fexp * pop.Nstar
-        return NSN
+            if pop.discrete:
+                ms = pop.masses.value
+                N_exp = [len(np.where((ms >= 8) & (ms >= m))[0]) for m in Mmax.value]
+                NSN += np.array(N_exp)
+            else:
+                fexp_8 = 1 - pop.imf.cdf(8 * u.Msun)
+                fexp = 1 - pop.imf.cdf(Mmax)
+                fexp = fexp * (fexp < fexp_8) + fexp_8 * (fexp >= fexp_8)
+                NSN += fexp * pop.Nstar
+        if np.isscalar(t.value):
+            return NSN[0]
+        else:
+            return NSN
 
     def ndotsn(self, t: Quantity["time"]) -> int:
         """
