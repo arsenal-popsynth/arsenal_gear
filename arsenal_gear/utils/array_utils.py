@@ -105,10 +105,7 @@ def index_monotonic(y: np.float64) -> np.ndarray:
             k = j + 1
             while y[j] > y[k]:
                 k += 1
-            # this should technically be k not k+1, but that
-            # leads to weird behavior, possibly due to very small
-            # differences in values, so skipping to the next index seems safer
-            j = k + 1
+            j = k
         else:
             j += 1
     return np.array(out, dtype=int)
