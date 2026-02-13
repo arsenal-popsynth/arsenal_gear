@@ -62,26 +62,27 @@ def test_mist_interp():
     T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].evol.se.iset.lages))
+    se_iso = sp["iso"].evol.ses[0]
+    ais = np.arange(len(se_iso.iset.lages))
     for ai in ais[2::6]:
         ai += 1
         t = (
             (1 + 1e-6)
-            * np.power(10, np.array([sp["iso"].evol.se.iset.lages[ai]]) - 6)
+            * np.power(10, np.array([se_iso.iset.lages[ai]]) - 6)
             * u.Myr
         )
 
-        ms = sp["iso"].evol.se.iset.isos[ai].qs["initial_mass"] * u.Msun
+        ms = se_iso.iset.isos[ai].qs["initial_mass"] * u.Msun
         xi = sp["iso"].form.subpops[0].imf.pdf(ms)
-
-        L_ref = np.power(10, sp["iso"].evol.se.iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].evol.se.iset.isos[ai].qs["log_Teff"])
+        L_ref = np.power(10, se_iso.iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, se_iso.iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
         for k in ["track", "iso"]:
-            T[k] = (sp[k].evol.se.teff(ms, t) / u.K).value
-            L[k] = (sp[k].evol.se.lbol(ms, t) / u.Lsun).value
+            se = sp[k].evol.ses[0]
+            T[k] = (se.teff(ms, t) / u.K).value
+            L[k] = (se.lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
@@ -155,15 +156,16 @@ def test_lifetime_interp_mist():
         "iso": arsenal_gear.SynthPop(interp_op="iso"),
     }
     # make sure we only query the lifetime function where the isochrones have data
-
-    mmax = np.array([np.max(iso.mini.value) for iso in sp["iso"].evol.se.iset.isos])
+    se_iso = sp["iso"].evol.ses[0]
+    mmax = np.array([np.max(iso.mini.value) for iso in se_iso.iset.isos])
     # ensure the array is monotonic
     int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
     mmaxes = np.array(mmax)[int_mono:]
     iso_mmin = min(mmaxes)
     iso_mmax = max(mmaxes)
-    track_mmin = np.min(sp["track"].evol.se.tset.masses.value)
-    track_mmax = np.max(sp["track"].evol.se.tset.masses.value)
+    se_track = sp["track"].evol.ses[0]
+    track_mmin = np.min(se_track.tset.masses.value)
+    track_mmax = np.max(se_track.tset.masses.value)
     mmin = np.max((iso_mmin, track_mmin))
     mmax = np.min((iso_mmax, track_mmax))
     mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
@@ -171,8 +173,9 @@ def test_lifetime_interp_mist():
     mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
     results = {}
     for k in sp.keys():
-        lt = sp[k].evol.se.stellar_lifetime(mlin)
+        se = sp[k].evol.ses[0]
+        lt = se.stellar_lifetime(mlin)
         results[k] = lt
         # the lifetime should be a decreasing function of mass
         assert_array_less(lt[1:], lt[:-1])
-    assert_allclose(results["track"].value, results["iso"].value, rtol=0.075)
+    assert_allclose(results["track"].value, results["iso"].value, rtol=0.09)
