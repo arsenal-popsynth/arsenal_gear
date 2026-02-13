@@ -17,6 +17,7 @@ from scipy.integrate import trapezoid as trapz
 from . import formation
 from .formation import SinglePop, BinaryPop
 from . import element_yields, feedbacks, stellar_evolution
+from .stellar_evolution.isochrone import AbstractIsochrone
 
 
 from .stellar_evolution.se_data_structures import Isochrone
@@ -43,9 +44,69 @@ class SynthPop:
         #       and change the below initialization so that it checks if users
         #       have already initialized the relevant submodules
         # total mass of the population
-        self.form = formation.Formation(**kwargs)
+        self.fdict = self._process_formation_kwargs(kwargs)
+        self.form = formation.Formation(**self.fdict)
+        mets = [pop.metallicity for pop in self.form.subpops]
+        self.edict = self._process_evolution_kwargs(kwargs)
+        self.edict["metallicities"] = mets
         # initialize the isochrone interface/interpolator
-        self.evol = stellar_evolution.Evolution(**kwargs)
+        self.evol = stellar_evolution.Evolution(**self.edict)
+
+    def _process_formation_kwargs(self, kwargs: dict) -> dict:
+        """
+        Process the kwargs passed to the SynthPop initializer and return a dictionary of
+        arguments to be passed to the Formation class initializer.
+        """
+        fdict = {}
+        for k in kwargs:
+            if k.startswith("pop"):
+                if not isinstance(kwargs[k], dict):
+                    err_msg = f"Subpopulation {k} is not a dictionary.\
+                               Please provide subpopulation parameters as dictionaries."
+                    raise ValueError(err_msg)
+                else:
+                    fdict[k] = kwargs[k]
+        if "seed" in kwargs:
+            fdict["seed"] = kwargs["seed"]
+        return fdict
+    
+    def _process_evolution_kwargs(self, kwargs: dict) -> dict:
+        """
+        Process the kwargs passed to the SynthPop initializer and return a dictionary of
+        arguments to be passed to the Evolution class initializer.
+        """
+        edict = {}
+        def_args = ["single_evolution",
+                    "test",
+                    "interp_op",
+                    "isochrone_opt",
+                    "rootdir",
+                    "vvcrit",
+                    "verbose",
+                    "force_download"]
+        for arg in def_args:
+             if arg in kwargs:
+                edict[arg] = kwargs[arg]
+        # set default se_opt
+        if "single_evolution" in edict:
+            se_opt = edict["single_evolution"]
+        else:
+            se_opt = "interpolator"
+
+        # check for population arguments setting evolution parameters
+        population_set = False
+        se_opt_list = []
+        for k in kwargs:
+            if k.startswith("pop"):
+                pop_dict = kwargs[k]
+                if "evolution" in pop_dict:
+                    population_set = True
+                    se_opt_list.append(pop_dict["evolution"])
+                elif population_set:
+                    se_opt_list.append(se_opt)
+        if population_set:
+            edict["single_evolution"] = se_opt_list
+        return edict
 
     def _integrate_subpop(self, iso: Isochrone, pop: SinglePop, q: str) -> np.float64:
         """
@@ -57,9 +118,9 @@ class SynthPop:
         """
         Return the number of supernovae that have gone off by time t
         """
-        Mmax = self.evol.se.mmax(t)
-        NSN = np.zeros_like(Mmax.value)
-        for pop in self.form.subpops:
+        NSN = np.zeros_like(t.value)
+        for (se,pop) in zip(self.evol.ses, self.form.subpops):
+            Mmax = se.mmax(t)
             if pop.discrete:
                 ms = pop.masses.value
                 N_exp = [len(np.where((ms >= 8) & (ms >= m))[0]) for m in Mmax.value]
@@ -79,10 +140,10 @@ class SynthPop:
         Return: the rate of supernovae at time t, the derivative of nsn
                 in Myr^-1
         """
-        Mmax = self.evol.se.mmax(t)
-        Mmaxdot = self.evol.se.mmaxdot(t)
-        NSN_dot = 0
-        for pop in self.form.subpops:
+        NSN_dot = np.zeros_like(t.value) / u.Myr
+        for (se,pop) in zip(self.evol.ses, self.form.subpops):
+            Mmax = se.mmax(t)
+            Mmaxdot = se.mmaxdot(t)
             NSN_dot += -pop.imf.pdf(Mmax)/u.Msun * Mmaxdot * (Mmax.value > 8) * pop.Nstar
         return NSN_dot
 
@@ -95,21 +156,21 @@ class SynthPop:
         else:
             lbol_tot = np.zeros_like(t.value) * u.Lsun
 
-        for pop in self.form.subpops:
+        for (se, pop) in zip(self.evol.ses, self.form.subpops):
             if pop.discrete:
                 if np.isscalar(t.value):
-                    lbol_tot += np.sum(self.lbol_iso(t, pop))
+                    lbol_tot += np.sum(self.lbol_iso(t, se, pop))
                 else:
-                    lbol_tot += np.array([np.sum(self.lbol_iso(ti, pop)).value for ti in t]) * u.Lsun
+                    lbol_tot += np.array([np.sum(self.lbol_iso(ti, se, pop)).value for ti in t]) * u.Lsun
             else:
                 if np.isscalar(t.value):
-                    iso = self.evol.se.construct_isochrone(t)
+                    iso = se.construct_isochrone(t)
                     iso.qs["L_bol"] = iso.lbol
                     lbol_tot += self._integrate_subpop(iso, pop, "L_bol") * u.Lsun
                 else:
                     res = []
                     for ti in t:
-                        iso = self.evol.se.construct_isochrone(ti)
+                        iso = se.construct_isochrone(ti)
                         iso.qs["L_bol"] = iso.lbol
                         res.append(self._integrate_subpop(iso, pop, "L_bol"))
                     lbol_tot += np.array(res) * u.Lsun
@@ -125,46 +186,46 @@ class SynthPop:
         else:
             teff_weight_tot = np.zeros_like(t.value) * u.K * u.Lsun
         
-        for pop in self.form.subpops:
+        for (se, pop) in zip(self.evol.ses, self.form.subpops):
             if pop.discrete:
                 if np.isscalar(t.value):
-                    teffs = self.teff_iso(t, pop)
-                    lbols = self.lbol_iso(t, pop)
+                    teffs = self.teff_iso(t, se, pop)
+                    lbols = self.lbol_iso(t, se, pop)
                     teff_weight_tot += np.sum(teffs * lbols)
                 else:
                     teff_arr = []
                     for ti in t:
-                        teffs = self.teff_iso(ti, pop)
-                        lbols = self.lbol_iso(ti, pop)
+                        teffs = self.teff_iso(ti, se, pop)
+                        lbols = self.lbol_iso(ti, se, pop)
                         teff_arr.append((np.sum(teffs * lbols)).value)
                     teff_weight_tot += np.array(teff_arr) * u.K * u.Lsun
             else:
                 if np.isscalar(t.value):
-                    iso = self.evol.se.construct_isochrone(t)
+                    iso = se.construct_isochrone(t)
                     iso.qs["L_bol*Teff"] = iso.lbol.value*iso.teff.value
                     teff_weight_tot += self._integrate_subpop(iso, pop, "L_bol*Teff") * u.K * u.Lsun
                 else:
                     res = []
                     for ti in t:
-                        iso = self.evol.se.construct_isochrone(ti)
+                        iso = se.construct_isochrone(ti)
                         iso.qs["L_bol*Teff"] = iso.lbol.value*iso.teff.value
                         res.append(self._integrate_subpop(iso, pop, "L_bol*Teff"))
                     teff_weight_tot += np.array(res) * u.K * u.Lsun
         lbol = self.lbol(t)
         return (teff_weight_tot / lbol).to(u.K)
 
-    def lbol_iso(self, t: Quantity["time"], pop:SinglePop) -> Quantity["power"]:
+    def lbol_iso(self, t: Quantity["time"], se: AbstractIsochrone, pop:SinglePop) -> Quantity["power"]:
         """
         Returns the bolometric luminosity of each star in the population at time t
         """
-        Lbols = self.evol.se.lbol(pop.masses, t)
+        Lbols = se.lbol(pop.masses, t)
         return Lbols[np.logical_not(Lbols.mask)]
 
-    def teff_iso(self, t: Quantity["time"], pop:SinglePop) -> Quantity["temperature"]:
+    def teff_iso(self, t: Quantity["time"], se: AbstractIsochrone, pop:SinglePop) -> Quantity["temperature"]:
         """
         Returns the effective temperature of each star in the population at time t
         """
-        Teffs = self.evol.se.teff(pop.masses, t)
+        Teffs = se.teff(pop.masses, t)
         return Teffs[np.logical_not(Teffs.mask)]
 
     @property
