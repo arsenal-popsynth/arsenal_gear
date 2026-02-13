@@ -167,6 +167,25 @@ class SynthPop:
         Teffs = self.evol.se.teff(pop.masses, t)
         return Teffs[np.logical_not(Teffs.mask)]
 
+    @property
+    def masses(self) -> Quantity["mass"]:
+        """
+        Return the masses of all stars in the population as a 1D array
+        If the population is not discrete, mass from these populations is not included
+        """
+        masses = []
+        for pop in self.form.subpops:
+            if pop.discrete:
+                masses.append(pop.masses)
+        return np.concatenate(masses) * u.Msun
+    
+    @property
+    def Mtot(self) -> Quantity["mass"]:
+        """
+        Return the total mass of the population
+        """
+        return self.form.Mtot
+
     # ltlancas: commented this out for now, I can't think of what calling the SynthPop
     #           object should do by default right now...
     #def __call__(self, N: int) -> SinglePop:
