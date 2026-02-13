@@ -14,7 +14,7 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 
-from ..utils import downloader, extract_one, find_match, is_valid_txz
+from ..utils import downloader, extract_one, find_match, is_valid_txz, get_metstr
 from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
 
 
@@ -86,10 +86,7 @@ class MISTReader(IsochroneDataReader):
         self.rot = None
         self.abun = None
 
-        if self.met<0:
-            self.metstr = f"m{-1*self.met:.2f}"
-        else:
-            self.metstr = f"p{self.met:.2f}"
+        self.metstr = get_metstr(self.met)
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
         if self.vvcrit not in ["0.0", "0.4"]:
