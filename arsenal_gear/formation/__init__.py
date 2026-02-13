@@ -78,14 +78,19 @@ class Formation():
                 raise ValueError("mmin and mmax must be floats specifying mass in Msun.")
             mmin *= u.Msun
             mmax *= u.Msun
+            seed = pop_dict.get("seed", None)
             if imf == "salpeter":
-                if "seed" in pop_dict and pop_dict["seed"] is not None:
-                    imf = dist_funcs.imf.Salpeter(mmin,mmax, seed=pop_dict["seed"])
-                else:
-                    imf = dist_funcs.imf.Salpeter(mmin,mmax)
+                imf = dist_funcs.imf.Salpeter(mmin, mmax, seed=seed)
+            elif imf == "kroupa":
+                imf = dist_funcs.imf.Kroupa(mmin, mmax, seed=seed)
+            elif imf == "miller-scalo":
+                imf = dist_funcs.imf.MillerScalo(mmin, mmax, seed=seed)
+            elif imf == "chabrier":
+                imf = dist_funcs.imf.Chabrier(mmin, mmax, seed=seed)
             else:
                 err_msg = f"Invalid IMF string specified, {imf}. \
-                            Currently only 'salpeter' is supported."
+                            Currently supported options are 'salpeter', 'kroupa',\
+                            'miller-scalo', and 'chabrier'."
                 raise ValueError(err_msg)
         else:
             err_msg = f"Invalid IMF specified, {imf}. \
