@@ -14,7 +14,7 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..formation import SinglePop
 from .source import Source
 from .yieldtables import YieldTables
 
@@ -49,9 +49,17 @@ class NuGrid(YieldTables):
         Usage:
             >> nugrid = arsenal_gear.element_yields.NuGrid()
             >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
+            >> metallicity = u.dimensionless_unscaled * 0.1
+            >> (mmin, mmax) = (np.min(mass), np.max(mass))
+            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
+                                                        Nstar=Nstar,
+                                                        metallicity=metallicity,
+                                                        imf=None,
+                                                        mmin=mmin,
+                                                        mmax=mmax,
+                                                        masses=mass,
+                                                        discrete=True)
             >> plt.plot(mass, nugrid.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -104,7 +112,7 @@ class NuGrid(YieldTables):
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -113,7 +121,7 @@ class NuGrid(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
@@ -121,11 +129,11 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
 
-        yields = np.zeros_like(starPop["mass"].value)
+        yields = np.zeros_like(starPop.masses.value)
         yields = self.ccsn.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
@@ -134,7 +142,7 @@ class NuGrid(YieldTables):
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -143,7 +151,7 @@ class NuGrid(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
@@ -151,11 +159,11 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
 
-        yields = np.zeros_like(starPop["mass"].value)
+        yields = np.zeros_like(starPop.masses.value)
         yields = self.wind.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
@@ -164,7 +172,7 @@ class NuGrid(YieldTables):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -173,7 +181,7 @@ class NuGrid(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
@@ -181,11 +189,11 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
 
-        yields = np.zeros_like(starPop["mass"].value)
+        yields = np.zeros_like(starPop.masses.value)
         yields = self.agb.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
@@ -225,9 +233,17 @@ class Pignatari2016(YieldTables):
         Usage:
             >> p16 = arsenal_gear.element_yields.Pignatari2016()
             >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
+            >> metallicity = u.dimensionless_unscaled * 0.1
+            >> (mmin, mmax) = (np.min(mass), np.max(mass))
+            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
+                                                        Nstar=Nstar,
+                                                        metallicity=metallicity,
+                                                        imf=None,
+                                                        mmin=mmin,
+                                                        mmax=mmax,
+                                                        masses=mass,
+                                                        discrete=True)
             >> plt.plot(mass, p16.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -271,7 +287,7 @@ class Pignatari2016(YieldTables):
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -288,8 +304,8 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.ccsn.get_yld(
@@ -301,7 +317,7 @@ class Pignatari2016(YieldTables):
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -318,8 +334,8 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.wind.get_yld(
@@ -331,7 +347,7 @@ class Pignatari2016(YieldTables):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -348,8 +364,8 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.agb.get_yld(
@@ -508,9 +524,17 @@ class Ritter2018(YieldTables):
         Usage:
             >> r18 = arsenal_gear.element_yields.Ritter2018()
             >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
+            >> metallicity = u.dimensionless_unscaled * 0.1
+            >> (mmin, mmax) = (np.min(mass), np.max(mass))
+            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
+                                                        Nstar=Nstar,
+                                                        metallicity=metallicity,
+                                                        imf=None,
+                                                        mmin=mmin,
+                                                        mmax=mmax,
+                                                        masses=mass,
+                                                        discrete=True)
             >> plt.plot(mass, r18.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -560,7 +584,7 @@ class Ritter2018(YieldTables):
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -577,8 +601,8 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.ccsn.get_yld(
@@ -590,7 +614,7 @@ class Ritter2018(YieldTables):
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -607,8 +631,8 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.wind.get_yld(
@@ -620,7 +644,7 @@ class Ritter2018(YieldTables):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -637,8 +661,8 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.agb.get_yld(
@@ -800,10 +824,18 @@ class Battino20192021(YieldTables):
         """
         Usage:
             >> bat = arsenal_gear.element_yields.Battino20192021()
-            >> mass = np.linspace(0.5, 8, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> mass = np.linspace(8, 120, 100)*u.M_sun
+            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
+            >> metallicity = u.dimensionless_unscaled * 0.1
+            >> (mmin, mmax) = (np.min(mass), np.max(mass))
+            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
+                                                        Nstar=Nstar,
+                                                        metallicity=metallicity,
+                                                        imf=None,
+                                                        mmin=mmin,
+                                                        mmax=mmax,
+                                                        masses=mass,
+                                                        discrete=True)
             >> plt.plot(mass, bat.agb_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -838,7 +870,7 @@ class Battino20192021(YieldTables):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -855,8 +887,8 @@ class Battino20192021(YieldTables):
 
         """
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         return (
             self.agb.get_yld(

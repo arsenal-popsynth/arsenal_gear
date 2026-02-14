@@ -10,8 +10,8 @@ import argparse
 import astropy.units as u
 import numpy as np
 
-from arsenal_gear.dist_funcs import *
-from arsenal_gear.population import *
+from arsenal_gear.formation.dist_funcs import *
+from arsenal_gear.formation import *
 
 
 def zams_single(
@@ -20,8 +20,6 @@ def zams_single(
     N=None,
     mass=None,
     metals=0,
-    rot=0 * u.km / u.s,
-    tform=0 * u.Myr,
     min_mass=0.1 * u.Msun,
     max_mass=100 * u.Msun,
 ):
@@ -37,7 +35,15 @@ def zams_single(
         masses = imf_.sample(N)
     else:  # We are operating in fixed-mass mode
         masses = imf_.sample_mass(mass)
-    return StarPopulation(mass=masses, metals=metals, rot=rot, tform=tform)
+    Mtot = np.sum(masses)
+    return SinglePop(Mtot,
+                     len(masses),
+                     metals * u.dimensionless_unscaled,
+                     imf_,
+                     min_mass,
+                     max_mass,
+                     True,
+                     masses)
 
 
 def evolve_population(population, evolution, outputs, interval):

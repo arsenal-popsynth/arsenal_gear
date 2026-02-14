@@ -11,7 +11,7 @@ from typing import List
 
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..formation import SinglePop
 
 
 class Yields(ABC):
@@ -28,7 +28,7 @@ class Yields(ABC):
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -36,7 +36,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -48,7 +48,7 @@ class Yields(ABC):
     def snia_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -56,7 +56,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -68,7 +68,7 @@ class Yields(ABC):
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -76,7 +76,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -88,7 +88,7 @@ class Yields(ABC):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -96,7 +96,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -107,14 +107,14 @@ class Yields(ABC):
     @abstractmethod
     def ccsn_mloss(
         self,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
         """Abstract method for core-collapse SNe mloss.
 
         Args:
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -125,14 +125,14 @@ class Yields(ABC):
     @abstractmethod
     def snia_mloss(
         self,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
         """Abstract method for SNe type Ia mloss.
 
         Args:
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -143,14 +143,14 @@ class Yields(ABC):
     @abstractmethod
     def wind_mloss(
         self,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
         """Abstract method for stellar wind mloss.
 
         Args:
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -161,14 +161,14 @@ class Yields(ABC):
     @abstractmethod
     def agb_mloss(
         self,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
         """Abstract method for AGB mass loss mloss.
 
         Args:
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -180,7 +180,7 @@ class Yields(ABC):
     def ccsn_relative(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -189,7 +189,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -201,7 +201,7 @@ class Yields(ABC):
     def snia_relative(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -211,7 +211,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -223,7 +223,7 @@ class Yields(ABC):
     def wind_relative(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -233,7 +233,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 
@@ -245,7 +245,7 @@ class Yields(ABC):
     def agb_relative(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -255,7 +255,7 @@ class Yields(ABC):
 
         Args:
             elements: list of elements to get yields for
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: interpolation method
             extrapolate: whether to extrapolate beyond bounds
 

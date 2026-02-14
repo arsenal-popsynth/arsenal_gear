@@ -11,7 +11,7 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-__all__ = ["FBMechanism", "sn"]
+__all__ = ["FBMechanism"]
 
 
 class FBMechanism:

@@ -13,7 +13,7 @@ from typing import List
 
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..formation import SinglePop
 
 
 def _not_implemented(channel: str, name: str):
@@ -33,7 +33,7 @@ class YieldTables:
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -44,7 +44,7 @@ class YieldTables:
     def snia_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -55,7 +55,7 @@ class YieldTables:
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -66,7 +66,7 @@ class YieldTables:
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:

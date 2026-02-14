@@ -15,7 +15,7 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..formation import SinglePop
 from .source import Source
 from .yieldtables import YieldTables
 
@@ -54,10 +54,17 @@ class LimongiChieffi2018(YieldTables):
         Usage:
             >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
             >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> rot = u.km / u.s * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform, rot=rot)
+            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
+            >> metallicity = u.dimensionless_unscaled * 0.1
+            >> (mmin, mmax) = (np.min(mass), np.max(mass))
+            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
+                                                        Nstar=Nstar,
+                                                        metallicity=metallicity,
+                                                        imf=None,
+                                                        mmin=mmin,
+                                                        mmax=mmax,
+                                                        masses=mass,
+                                                        discrete=True)
             >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -104,7 +111,7 @@ class LimongiChieffi2018(YieldTables):
     def ccsn_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> dict[str, Quantity["mass"]]:
@@ -113,7 +120,7 @@ class LimongiChieffi2018(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starSop: StarPopulation object
+            starSop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
@@ -121,9 +128,9 @@ class LimongiChieffi2018(YieldTables):
 
         """
         args = [
-            starPop["rot"].to(u.km / u.s).value,
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            np.zeros_like(starPop.masses.value),
+            starPop.metallicity.value * np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         yld_array = (
             self.ccsn.get_yld(
@@ -137,7 +144,7 @@ class LimongiChieffi2018(YieldTables):
     def wind_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> dict[str, Quantity["mass"]]:
@@ -146,17 +153,18 @@ class LimongiChieffi2018(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starSop: StarPopulation object
+            starPop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
         Returns:
             List of yields matching provided element list
 
         """
+        # TO DO: replace these calls with a default argument parsing function
         args = [
-            starPop["rot"].to(u.km / u.s).value,
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            np.zeros_like(starPop.masses.value),
+            starPop.metallicity.value * np.ones_like(starPop.masses.value),
+            starPop.masses.to(u.M_sun).value,
         ]
         yld_array = (
             self.wind.get_yld(

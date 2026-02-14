@@ -8,7 +8,7 @@ which are mostly contained in stellar_evolution/isochrone.py
 
 import astropy.units as u
 import numpy as np
-from numpy.testing import assert_array_less
+from numpy.testing import assert_array_less, assert_allclose
 from scipy.integrate import trapezoid
 
 import arsenal_gear
@@ -50,8 +50,11 @@ def test_mist_interp():
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "track": arsenal_gear.StellarPopulation(interp_op="track"),
-        "iso": arsenal_gear.StellarPopulation(interp_op="iso", test=True),
+        "track": arsenal_gear.SynthPop(interp_op="track",
+                                       seed=42),
+        "iso": arsenal_gear.SynthPop(interp_op="iso",
+                                     seed=42,
+                                     test=True),
     }
 
     lmissed = {"track": [], "iso": []}
@@ -59,26 +62,27 @@ def test_mist_interp():
     T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].iso.iset.lages))
+    se_iso = sp["iso"].evol.ses[0]
+    ais = np.arange(len(se_iso.iset.lages))
     for ai in ais[2::6]:
         ai += 1
         t = (
             (1 + 1e-6)
-            * np.power(10, np.array([sp["iso"].iso.iset.lages[ai]]) - 6)
+            * np.power(10, np.array([se_iso.iset.lages[ai]]) - 6)
             * u.Myr
         )
 
-        ms = sp["iso"].iso.iset.isos[ai].qs["initial_mass"] * u.Msun
-        xi = sp["iso"].imf.pdf(ms)
-
-        L_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_Teff"])
+        ms = se_iso.iset.isos[ai].qs["initial_mass"] * u.Msun
+        xi = sp["iso"].form.subpops[0].imf.pdf(ms)
+        L_ref = np.power(10, se_iso.iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, se_iso.iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
         for k in ["track", "iso"]:
-            T[k] = (sp[k].iso.teff(ms, t) / u.K).value
-            L[k] = (sp[k].iso.lbol(ms, t) / u.Lsun).value
+            se = sp[k].evol.ses[0]
+            T[k] = (se.teff(ms, t) / u.K).value
+            L[k] = (se.lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
@@ -129,8 +133,8 @@ def test_lbol_methods_mist():
     for int_op in int_ops:
         for discrete in discrete_ops:
             key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
-            sp = arsenal_gear.StellarPopulation(
-                interp_op=int_op, discrete=discrete
+            sp = arsenal_gear.SynthPop(
+                interp_op=int_op, discrete=discrete, seed=42
             )
             outs[key] = sp.lbol(tlin)
     # compare all combinations of the four methods
@@ -141,3 +145,37 @@ def test_lbol_methods_mist():
             rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
             # average relative error should be less than 4%
             assert np.average(rel_err) < 0.05
+
+def test_lifetime_interp_mist():
+    """
+    Tests that the stellar_lifetime function for isochrone- and track-based interpolation
+    from the MIST isochrones are consistent with each other.
+    """
+    sp = {
+        "track": arsenal_gear.SynthPop(interp_op="track"),
+        "iso": arsenal_gear.SynthPop(interp_op="iso"),
+    }
+    # make sure we only query the lifetime function where the isochrones have data
+    se_iso = sp["iso"].evol.ses[0]
+    mmax = np.array([np.max(iso.mini.value) for iso in se_iso.iset.isos])
+    # ensure the array is monotonic
+    int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
+    mmaxes = np.array(mmax)[int_mono:]
+    iso_mmin = min(mmaxes)
+    iso_mmax = max(mmaxes)
+    se_track = sp["track"].evol.ses[0]
+    track_mmin = np.min(se_track.tset.masses.value)
+    track_mmax = np.max(se_track.tset.masses.value)
+    mmin = np.max((iso_mmin, track_mmin))
+    mmax = np.min((iso_mmax, track_mmax))
+    mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
+
+    mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
+    results = {}
+    for k in sp.keys():
+        se = sp[k].evol.ses[0]
+        lt = se.stellar_lifetime(mlin)
+        results[k] = lt
+        # the lifetime should be a decreasing function of mass
+        assert_array_less(lt[1:], lt[:-1])
+    assert_allclose(results["track"].value, results["iso"].value, rtol=0.09)
