@@ -85,7 +85,7 @@ class SynthPop:
                     "verbose",
                     "force_download"]
         for arg in def_args:
-             if arg in kwargs:
+            if arg in kwargs:
                 edict[arg] = kwargs[arg]
         # set default se_opt
         if "single_evolution" in edict:
