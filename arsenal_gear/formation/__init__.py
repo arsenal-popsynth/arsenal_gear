@@ -74,8 +74,16 @@ class Formation():
         elif isinstance(imf, str):
             mmin = pop_dict.get("mmin", 0.08)
             mmax = pop_dict.get("mmax", 100.)
-            if not isinstance(mmin, float) or not isinstance(mmax, float):
-                raise ValueError("mmin and mmax must be floats specifying mass in Msun.")
+            try:
+                if isinstance(mmin, u.Quantity):
+                    mmin = mmin.to(u.Msun).value
+                if isinstance(mmax, u.Quantity):
+                    mmax = mmax.to(u.Msun).value
+                (mmin, mmax) = (float(mmin), float(mmax))
+            except:
+                err_msg = f"Invalid mmin or mmax: {mmin}, {mmax}. \
+                            Must be floats or quantities specifying mass in Msun."
+                raise ValueError(err_msg)
             mmin *= u.Msun
             mmax *= u.Msun
             seed = pop_dict.get("seed", None)
