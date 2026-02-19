@@ -11,8 +11,6 @@ import astropy.units as u
 from astropy.units import Quantity
 import numpy as np
 
-from ..utils import masked_power
-
 @dataclass
 class Isochrone:
     """
@@ -53,22 +51,22 @@ class Isochrone:
     @property
     def teff(self) -> Quantity["temperature"]:
         """Effective temperatures of the isochrone points."""
-        return masked_power(10, self.qs[self.lteff_name]) * u.K
+        return np.power(10, self.qs[self.lteff_name]) * u.K
     
     @property
     def lbol(self) -> Quantity["power"]:
         """Bolometric luminosities of the isochrone points."""
-        return masked_power(10, self.qs[self.llbol_name]) * u.Lsun
+        return np.power(10, self.qs[self.llbol_name]) * u.Lsun
     
     @property
     def rad(self) -> Quantity["length"]:
         """Radii of the isochrone points."""
-        return masked_power(10, self.qs[self.lrad_name]) * u.Rsun
+        return np.power(10, self.qs[self.lrad_name]) * u.Rsun
     
     @property
     def grav(self) -> Quantity["acceleration"]:
         """Surface gravities of the isochrone points."""
-        return masked_power(10, self.qs[self.lgrav_name]) * u.cm / u.s**2
+        return np.power(10, self.qs[self.lgrav_name]) * u.cm / u.s**2
 
 # TODO(@ltancas): think of the best way to make age units consistent
 #                 between the isochrone and stellar track data structures
@@ -112,17 +110,17 @@ class StellarTrack:
     @property
     def lbol(self) -> Quantity["power"]:
         """Bolometric luminosities of the stellar track points."""
-        return masked_power(10, self.qs[self.llbol_name]) * u.Lsun
+        return np.power(10, self.qs[self.llbol_name]) * u.Lsun
     
     @property
     def rad(self) -> Quantity["length"]:
         """Radii of the stellar track points."""
-        return masked_power(10, self.qs[self.lrad_name]) * u.Rsun
+        return np.power(10, self.qs[self.lrad_name]) * u.Rsun
     
     @property
     def grav(self) -> Quantity["acceleration"]:
         """Surface gravities of the stellar track points."""
-        return masked_power(10, self.qs[self.lgrav_name]) * u.cm / u.s**2
+        return np.power(10, self.qs[self.lgrav_name]) * u.cm / u.s**2
 
 @dataclass
 class IsochroneSet:
