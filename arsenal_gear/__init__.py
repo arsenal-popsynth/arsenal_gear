@@ -172,8 +172,8 @@ class SynthPop:
                     for ti in t:
                         iso = se.construct_isochrone(ti)
                         iso.qs["L_bol"] = iso.lbol
-                        res.append(self._integrate_subpop(iso, pop, "L_bol"))
-                    lbol_tot += np.array(res)
+                        res.append(self._integrate_subpop(iso, pop, "L_bol").value)
+                    lbol_tot += np.array(res) * u.Lsun
         return lbol_tot
 
     def teff(self, t: Quantity["time"]) -> Quantity["power"]:
