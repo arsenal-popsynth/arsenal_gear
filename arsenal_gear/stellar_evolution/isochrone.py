@@ -625,13 +625,15 @@ class IsochroneInterpolator(AbstractIsochrone):
         self, mini: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
     ) -> Quantity["power"]:
         """
-        get the bolometric luminosity of a star of initial mass mini at age t
+        get the bolometric luminosity of stars of initial mass mini at age t
         Args:
             mini: the initial mass of the star. Can be an array
             t: the age of the isochrone. Should be a single time (for now...)
             method: the interpolation method to use, either pchip or linear
         Returns:
-            Quantity["power"]: the bolometric luminosity of the star.
+            MaskedQuantity["power"]: The bolometric luminosity of the star.
+                                     Stars that are not available for interpolation
+                                     at time t are masked in the output
         """
         if self.interp_op == "iso":
             llbol_label = self.iset.llbol_name

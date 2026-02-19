@@ -112,7 +112,7 @@ class SynthPop:
         """
         Integrate a given quantity over a single subpopulation given an isochrone
         """
-        return pop.Nstar * trapz(iso.qs[q] * pop.imf.pdf(iso.mini), iso.mini)
+        return pop.Nstar * trapz(iso.qs[q] * pop.imf.pdf(iso.mini), iso.mini.value)
 
     def nsn(self, t: Quantity["time"]) -> int:
         """
@@ -166,14 +166,14 @@ class SynthPop:
                 if np.isscalar(t.value):
                     iso = se.construct_isochrone(t)
                     iso.qs["L_bol"] = iso.lbol
-                    lbol_tot += self._integrate_subpop(iso, pop, "L_bol") * u.Lsun
+                    lbol_tot += self._integrate_subpop(iso, pop, "L_bol")
                 else:
                     res = []
                     for ti in t:
                         iso = se.construct_isochrone(ti)
                         iso.qs["L_bol"] = iso.lbol
                         res.append(self._integrate_subpop(iso, pop, "L_bol"))
-                    lbol_tot += np.array(res) * u.Lsun
+                    lbol_tot += np.array(res)
         return lbol_tot
 
     def teff(self, t: Quantity["time"]) -> Quantity["power"]:
@@ -219,14 +219,16 @@ class SynthPop:
         Returns the bolometric luminosity of each star in the population at time t
         """
         Lbols = se.lbol(pop.masses, t)
-        return Lbols[np.logical_not(Lbols.mask)]
+        valid_mask = np.logical_not(Lbols.mask)
+        return u.Quantity(Lbols[valid_mask].data, unit=Lbols.unit)
 
     def teff_iso(self, t: Quantity["time"], se: AbstractIsochrone, pop:SinglePop) -> Quantity["temperature"]:
         """
         Returns the effective temperature of each star in the population at time t
         """
         Teffs = se.teff(pop.masses, t)
-        return Teffs[np.logical_not(Teffs.mask)]
+        valid_mask = np.logical_not(Teffs.mask)
+        return u.Quantity(Teffs[valid_mask].data, unit=Teffs.unit)
 
     @property
     def masses(self) -> Quantity["mass"]:
