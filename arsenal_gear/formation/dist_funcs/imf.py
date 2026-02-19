@@ -239,8 +239,8 @@ class Kroupa(PiecewisePowerLaw):
         super().__init__(
             min_mass=min_mass,
             max_mass=max_mass,
-            masses=[0.5, 1.0],
-            betas=[-1.3, -2.3, -2.7],
+            masses=[0.5],
+            betas=[-1.3, -2.3],
             name="Kroupa",
             seed=seed,
         )
