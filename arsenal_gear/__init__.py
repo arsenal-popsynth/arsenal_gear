@@ -138,8 +138,7 @@ class SynthPop:
 
     def ndotsn(self, t: Quantity["time"]) -> int:
         """
-        Return: the rate of supernovae at time t, the derivative of nsn
-                in Myr^-1
+        Return: the rate of supernovae at time t, the derivative of nsn in Myr^-1
                 This is only really defined for a continuous populations: it is a series
                 of delta functions for a discrete popultion. We still provide an answer 
                 for a discrete populations by treating it as a continuous population.
