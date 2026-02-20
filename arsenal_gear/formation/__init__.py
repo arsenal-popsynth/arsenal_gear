@@ -80,10 +80,10 @@ class Formation():
                 if isinstance(mmax, u.Quantity):
                     mmax = mmax.to(u.Msun).value
                 (mmin, mmax) = (float(mmin), float(mmax))
-            except:
+            except Exception as exc:
                 err_msg = f"Invalid mmin or mmax: {mmin}, {mmax}. \
                             Must be floats or quantities specifying mass in Msun."
-                raise ValueError(err_msg)
+                raise ValueError(err_msg) from exc
             mmin *= u.Msun
             mmax *= u.Msun
             seed = pop_dict.get("seed", None)
