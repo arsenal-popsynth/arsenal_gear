@@ -19,6 +19,7 @@ def test_single_pop():
     Mtot = np.sum(mass)
     metallicity = 0.1 * u.dimensionless_unscaled
     star = SinglePop(Mtot=Mtot,
+                     tform=0.0 * u.Myr,
                      Nstar=N,
                      metallicity=metallicity,
                      imf=None,
@@ -44,6 +45,7 @@ def test_binary_pop():
     periods = 10 * u.d * np.ones(N)
     semimajors = 100 * u.AU * np.ones(N)
     binary = BinaryPop(Mtot=Mtot,
+                       tform=0.0 * u.Myr,
                        Nstar=N,
                        metallicity=metallicity,
                        imf=None,
