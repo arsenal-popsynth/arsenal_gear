@@ -184,34 +184,23 @@ class Formation():
             Mtot += pop.Mtot.to(u.Msun)
         return Mtot
 
-    def Mtot(self, t:u.Quantity["time"]) -> u.Quantity["mass"]:
-        """
-        Return the total mass of the population, which is just the sum of Mtot
-        for all subpopulations that have formed by time t.
-        """
-        Mtot = 0.0 * u.Msun
-        for pop in self.subpops:
-            if pop.tform <= t:
-                Mtot += pop.Mtot.to(u.Msun)
-        return Mtot
-
-    def Nstar(self, t:u.Quantity["time"]) -> int | float:
+    @property
+    def Nstar(self) -> int | float:
         """
         Return the total number of stars in the population, which is just the
-        sum of Nstar for all subpopulations that have formed by time t.
+        sum of Nstar for all subpopulations.
         """
         Nstar = 0
         for pop in self.subpops:
-            if pop.tform <= t:
-                Nstar += pop.Nstar
+            Nstar += pop.Nstar
         return Nstar
 
-    def mean_mass(self, t:u.Quantity["time"]) -> u.Quantity["mass"]:
+    @property
+    def mean_mass(self) -> u.Quantity["mass"]:
         """
         Return the mean mass of the population, which is just Mtot/Nstar.
         """
-        (Mtot,Ntot) = (self.Mtot(t),self.Nstar(t))
-        if Ntot == 0:
+        if self.Nstar == 0:
             return 0.0 * u.Msun
         else:
-            return (Mtot/Ntot).to(u.Msun)
+            return (self.Mtot / self.Nstar).to(u.Msun)

@@ -37,6 +37,7 @@ def zams_single(
         masses = imf_.sample_mass(mass)
     Mtot = np.sum(masses)
     return SinglePop(Mtot,
+                     0.0 * u.Myr,
                      len(masses),
                      metals * u.dimensionless_unscaled,
                      imf_,

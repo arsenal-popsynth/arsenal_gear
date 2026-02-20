@@ -252,26 +252,13 @@ class SynthPop:
             if pop.discrete:
                 masses.append(pop.masses.to(u.Msun).value)
         return np.concatenate(masses) * u.Msun
-    
-    def masses(self, t: Quantity["time"]) -> Quantity["mass"]:
-        """
-        Return the masses of all stars in the population at time t as a 1D array
-        If the population is not discrete, mass from these populations is not included
-        """
-        masses = []
-        for (se, pop) in zip(self.evol.ses, self.form.subpops):
-            if pop.discrete:
-                if pop.tform < t:
-                    m = se.mmax(t-pop.tform)
-                    masses.append(pop.masses[pop.masses <= m].to(u.Msun).value)
-        return np.concatenate(masses) * u.Msun
-    
+
     @property
     def Mtot(self) -> Quantity["mass"]:
         """
         Return the total mass of the population
         """
-        return self.form.Mtot(t)
+        return self.form.Mtot
     # ltlancas: commented this out for now, I can't think of what calling the SynthPop
     #           object should do by default right now...
     #def __call__(self, N: int) -> SinglePop:
