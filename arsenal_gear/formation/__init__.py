@@ -57,8 +57,7 @@ class Formation():
                 raise ValueError(err_msg)
         self.subpops = subpops
         # Nstar can be a float if one of the populations is not discrete
-        self.Nstar = np.sum([pop.Nstar for pop in self.subpops])
-        self.Mtot = np.sum([pop.Mtot.value for pop in self.subpops]) * u.Msun
+        self.tforms = np.array([pop.tform.to(u.Myr).value for pop in self.subpops])*u.Myr
         self.metallicities = [pop.metallicity for pop in self.subpops]
 
 
@@ -76,6 +75,18 @@ class Formation():
         else:
             err_msg = (f"Invalid Mtot: {Mtot}. Must be a quantity specifying "
                        "mass or a number specifying mass in Msun."
+            )
+            raise ValueError(err_msg)
+        
+        # check tform value
+        tform = pop_dict.get("tform", 0.0 * u.Myr)
+        if isinstance(tform, u.Quantity):
+            tform = tform.to(u.Myr)
+        elif isinstance(tform, (int, float)):
+            tform = tform * u.Myr
+        else:
+            err_msg = (f"Invalid tform: {tform}. Must be a quantity specifying "
+                       "time or a number specifying time in Myr."
             )
             raise ValueError(err_msg)
 
@@ -146,6 +157,7 @@ class Formation():
             masses = None
 
         return SinglePop(Mtot,
+                         tform,
                          Nstar,
                          metallicity,
                          imf,
@@ -160,3 +172,46 @@ class Formation():
         Initialize a binary population of stars from a dictionary of parameters.
         """
         raise NotImplementedError("Binary populations not yet implemented.")
+
+    @property
+    def Mtot(self) -> u.Quantity["mass"]:
+        """
+        Return the total mass of the population, which is just the sum of Mtot
+        for all subpopulations.
+        """
+        Mtot = 0.0 * u.Msun
+        for pop in self.subpops:
+            Mtot += pop.Mtot.to(u.Msun)
+        return Mtot
+
+    def Mtot(self, t:u.Quantity["time"]) -> u.Quantity["mass"]:
+        """
+        Return the total mass of the population, which is just the sum of Mtot
+        for all subpopulations that have formed by time t.
+        """
+        Mtot = 0.0 * u.Msun
+        for pop in self.subpops:
+            if pop.tform <= t:
+                Mtot += pop.Mtot.to(u.Msun)
+        return Mtot
+
+    def Nstar(self, t:u.Quantity["time"]) -> int | float:
+        """
+        Return the total number of stars in the population, which is just the
+        sum of Nstar for all subpopulations that have formed by time t.
+        """
+        Nstar = 0
+        for pop in self.subpops:
+            if pop.tform <= t:
+                Nstar += pop.Nstar
+        return Nstar
+
+    def mean_mass(self, t:u.Quantity["time"]) -> u.Quantity["mass"]:
+        """
+        Return the mean mass of the population, which is just Mtot/Nstar.
+        """
+        (Mtot,Ntot) = (self.Mtot(t),self.Nstar(t))
+        if Ntot == 0:
+            return 0.0 * u.Msun
+        else:
+            return (Mtot/Ntot).to(u.Msun)

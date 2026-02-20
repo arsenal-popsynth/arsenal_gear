@@ -121,16 +121,17 @@ class SynthPop:
         """
         NSN = np.zeros_like(t.value)
         for (se,pop) in zip(self.evol.ses, self.form.subpops):
-            Mmax = se.mmax(t)
-            if pop.discrete:
-                ms = pop.masses.value
-                N_exp = [len(np.where((ms >= 8) & (ms >= m))[0]) for m in Mmax.value]
-                NSN += np.array(N_exp)
-            else:
-                fexp_8 = 1 - pop.imf.cdf(8 * u.Msun)
-                fexp = 1 - pop.imf.cdf(Mmax)
-                fexp = fexp * (fexp < fexp_8) + fexp_8 * (fexp >= fexp_8)
-                NSN += fexp * pop.Nstar
+            if pop.tform < t:
+                Mmax = se.mmax(t-pop.tform)
+                if pop.discrete:
+                    ms = pop.masses.value
+                    N_exp = [len(np.where((ms >= 8) & (ms >= m))[0]) for m in Mmax.value]
+                    NSN += np.array(N_exp)
+                else:
+                    fexp_8 = 1 - pop.imf.cdf(8 * u.Msun)
+                    fexp = 1 - pop.imf.cdf(Mmax)
+                    fexp = fexp * (fexp < fexp_8) + fexp_8 * (fexp >= fexp_8)
+                    NSN += fexp * pop.Nstar
         if np.isscalar(t.value):
             return NSN[0]
         else:
@@ -145,9 +146,10 @@ class SynthPop:
         """
         NSN_dot = np.zeros_like(t.value) / u.Myr
         for (se,pop) in zip(self.evol.ses, self.form.subpops):
-            Mmax = se.mmax(t)
-            Mmaxdot = se.mmaxdot(t)
-            NSN_dot += -pop.imf.pdf(Mmax)/u.Msun * Mmaxdot * (Mmax.value > 8) * pop.Nstar
+            if pop.tform < t:
+                Mmax = se.mmax(t-pop.tform)
+                Mmaxdot = se.mmaxdot(t-pop.tform)
+                NSN_dot += -pop.imf.pdf(Mmax)/u.Msun * Mmaxdot * (Mmax.value > 8) * pop.Nstar
         return NSN_dot
 
     def lbol(self, t: Quantity["time"]) -> Quantity["power"]:
@@ -221,17 +223,23 @@ class SynthPop:
         """
         Returns the bolometric luminosity of each star in the population at time t
         """
-        Lbols = se.lbol(pop.masses, t)
-        valid_mask = np.logical_not(Lbols.mask)
-        return u.Quantity(Lbols[valid_mask].data, unit=Lbols.unit)
+        if pop.tform < t:
+            Lbols = se.lbol(pop.masses, t)
+            valid_mask = np.logical_not(Lbols.mask)
+            return u.Quantity(Lbols[valid_mask].data, unit=Lbols.unit)
+        else:
+            return np.zeros_like(pop.masses.value) * u.Lsun
 
     def teff_iso(self, t: Quantity["time"], se: AbstractIsochrone, pop:SinglePop) -> Quantity["temperature"]:
         """
         Returns the effective temperature of each star in the population at time t
         """
-        Teffs = se.teff(pop.masses, t)
-        valid_mask = np.logical_not(Teffs.mask)
-        return u.Quantity(Teffs[valid_mask].data, unit=Teffs.unit)
+        if pop.tform < t:
+            Teffs = se.teff(pop.masses, t)
+            valid_mask = np.logical_not(Teffs.mask)
+            return u.Quantity(Teffs[valid_mask].data, unit=Teffs.unit)
+        else:
+            return np.zeros_like(pop.masses.value) * u.K
 
     @property
     def masses(self) -> Quantity["mass"]:
@@ -242,7 +250,20 @@ class SynthPop:
         masses = []
         for pop in self.form.subpops:
             if pop.discrete:
-                masses.append(pop.masses)
+                masses.append(pop.masses.to(u.Msun).value)
+        return np.concatenate(masses) * u.Msun
+    
+    def masses(self, t: Quantity["time"]) -> Quantity["mass"]:
+        """
+        Return the masses of all stars in the population at time t as a 1D array
+        If the population is not discrete, mass from these populations is not included
+        """
+        masses = []
+        for (se, pop) in zip(self.evol.ses, self.form.subpops):
+            if pop.discrete:
+                if pop.tform < t:
+                    m = se.mmax(t-pop.tform)
+                    masses.append(pop.masses[pop.masses <= m].to(u.Msun).value)
         return np.concatenate(masses) * u.Msun
     
     @property
@@ -250,8 +271,7 @@ class SynthPop:
         """
         Return the total mass of the population
         """
-        return self.form.Mtot
-
+        return self.form.Mtot(t)
     # ltlancas: commented this out for now, I can't think of what calling the SynthPop
     #           object should do by default right now...
     #def __call__(self, N: int) -> SinglePop:

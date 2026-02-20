@@ -25,6 +25,7 @@ class SinglePop:
     BinaryPop extends this for binary star populations.
     """
     Mtot: Quantity["mass"]
+    tform: Quantity["time"]
     Nstar: int | float
     metallicity: Quantity["dimensionless"]
     imf: IMF
