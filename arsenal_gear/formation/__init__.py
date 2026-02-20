@@ -67,8 +67,31 @@ class Formation():
         """
         Initialize a single population of stars from a dictionary of parameters.
         """
+        # check Mtot value
         Mtot = pop_dict.get("Mtot", 1e6 * u.Msun)
-        metallicity = pop_dict.get("metallicity", 0.0) * u.dimensionless_unscaled
+        if isinstance(Mtot, u.Quantity):
+            Mtot = Mtot.to(u.Msun)
+        elif isinstance(Mtot, (int, float)):
+            Mtot = Mtot * u.Msun
+        else:
+            err_msg = (f"Invalid Mtot: {Mtot}. Must be a quantity specifying "
+                       "mass or a number specifying mass in Msun."
+            )
+            raise ValueError(err_msg)
+
+        # check metallicity
+        metallicity = pop_dict.get("metallicity", 0.0 * u.dimensionless_unscaled)
+        if isinstance(metallicity, u.Quantity):
+            metallicity = metallicity.to(u.dimensionless_unscaled)
+        elif isinstance(metallicity, (int, float)):
+            metallicity = metallicity * u.dimensionless_unscaled
+        else:
+            err_msg = (f"Invalid metallicity: {metallicity}. Must be a dimensionless quantity "
+                       "or a number specifying metallicity in log10(Z/Zsun)."
+            )
+            raise ValueError(err_msg)
+        
+        # check IMF
         imf = pop_dict.get("imf", "salpeter")
         if isinstance(imf, dist_funcs.imf.IMF):
             mmin = imf.min_mass * u.Msun
