@@ -38,8 +38,9 @@ class Formation():
             self.nsubpops = 1
         for i, pop_dict in enumerate(subpop_dicts):
             if not isinstance(pop_dict, dict):
-                err_msg = f"Subpopulation {i} is not a dictionary.\
-                           Please provide subpopulation parameters as dictionaries."
+                err_msg = (f"Subpopulation {i} is not a dictionary. "
+                           "Please provide subpopulation parameters as dictionaries."
+                )
                 raise ValueError(err_msg)
         
         subpops = []
@@ -50,8 +51,9 @@ class Formation():
             elif pop_type == "binary":
                 subpops.append(self._init_binary_pop(pop_dict))
             else:
-                err_msg = f"Invalid population type: {pop_type}.\
-                           Must be 'single' or 'binary'."
+                err_msg = (f"Invalid population type: {pop_type}. "
+                           "Must be 'single' or 'binary'."
+                )
                 raise ValueError(err_msg)
         self.subpops = subpops
         # Nstar can be a float if one of the populations is not discrete
@@ -81,8 +83,9 @@ class Formation():
                     mmax = mmax.to(u.Msun).value
                 (mmin, mmax) = (float(mmin), float(mmax))
             except Exception as exc:
-                err_msg = f"Invalid mmin or mmax: {mmin}, {mmax}. \
-                            Must be floats or quantities specifying mass in Msun."
+                err_msg = (f"Invalid mmin or mmax: {mmin}, {mmax}. "
+                           "Must be floats or quantities specifying mass in Msun."
+                )
                 raise ValueError(err_msg) from exc
             mmin *= u.Msun
             mmax *= u.Msun
@@ -96,13 +99,15 @@ class Formation():
             elif imf == "chabrier":
                 imf = dist_funcs.imf.Chabrier(mmin, mmax, seed=seed)
             else:
-                err_msg = f"Invalid IMF string specified, {imf}. \
-                            Currently supported options are 'salpeter', 'kroupa',\
-                            'miller-scalo', and 'chabrier'."
+                err_msg = (f"Invalid IMF string specified, {imf}."
+                            " Currently supported options are 'salpeter', 'kroupa',"
+                            "'miller-scalo', and 'chabrier'."
+                )
                 raise ValueError(err_msg)
         else:
-            err_msg = f"Invalid IMF specified, {imf}. \
-                        Must be an IMF instance or string specifying IMF."
+            err_msg = (f"Invalid IMF specified, {imf}. "
+                       "Must be an IMF instance or string specifying IMF."
+            )
             raise ValueError(err_msg)
 
         Nstar = (Mtot / imf.mean()).value

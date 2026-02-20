@@ -61,8 +61,9 @@ class SynthPop:
         for k in kwargs:
             if k.startswith("pop"):
                 if not isinstance(kwargs[k], dict):
-                    err_msg = f"Subpopulation {k} is not a dictionary.\
-                               Please provide subpopulation parameters as dictionaries."
+                    err_msg = (f"Subpopulation {k} is not a dictionary. "
+                               "Please provide subpopulation parameters as dictionaries."
+                    )
                     raise ValueError(err_msg)
                 else:
                     fdict[k] = kwargs[k]

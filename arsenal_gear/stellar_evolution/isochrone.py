@@ -551,8 +551,9 @@ class IsochroneInterpolator(AbstractIsochrone):
             min_age = min(self.tset.min_ages)
             max_age = max(self.tset.max_ages)
         if (t < min_age) or (t > max_age):
-            emsg = f"t = {t.value} yrs is outside the range of applicability: " + \
+            emsg = (f"t = {t.value} yrs is outside the range of applicability: "
                     f"{min_age.value} - {max_age.value} yrs"
+            )
             raise ValueError(emsg)
 
         if self.interp_op == "iso":
