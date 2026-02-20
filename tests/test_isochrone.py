@@ -12,7 +12,7 @@ from numpy.testing import assert_array_less, assert_allclose
 from scipy.integrate import trapezoid
 
 import arsenal_gear
-
+from arsenal_gear.stellar_evolution.isochrone import IsochroneInterpolator
 
 def get_contiguous_regions(mask):
     """
@@ -42,6 +42,61 @@ def integrate_mask(y, x, mask):
         if e - s > 1:
             total_integral += trapezoid(y[s:e], x[s:e])
     return total_integral
+
+def test_call_signatures():
+    """
+    Makes sure that the different ways of calling the isochrone interpolators main functions
+    are all working without any error and return the right shapes of arrasys with the right units.
+    """
+    # continuous population
+    pop1_dict = {"Mtot": 1e6 * u.Msun, "imf": "salpeter", "discrete": False}
+    # discrete population
+    pop2_dict = {"Mtot": 1e6 * u.Msun, "imf": "salpeter", "seed": 42}
+    sp = {
+        "track1": arsenal_gear.SynthPop(interp_op="track", pop1=pop1_dict),
+        "iso1": arsenal_gear.SynthPop(interp_op="iso",     pop1=pop1_dict),
+        "track2": arsenal_gear.SynthPop(interp_op="track", pop2=pop2_dict),
+        "iso2": arsenal_gear.SynthPop(interp_op="iso",     pop2=pop2_dict),
+    }
+
+    t_scal = 1*u.Myr
+    t_uarr = np.array([1.])*u.Myr
+    t_array = np.array([1., 10., 100.])*u.Myr
+    for k in sp.keys():
+        # first test direct methods of the stellar evolution class
+        se = sp[k].evol.ses[0]
+        pop = sp[k].form.subpops[0]
+        if pop.discrete:
+            ms = pop.masses
+        else:
+            ms = np.logspace(np.log10(pop.imf.min_mass), np.log10(pop.imf.max_mass), 10)*u.Msun
+        lbol_pop_scal = se.lbol(ms, t_scal)
+        lbol_pop_uarr = se.lbol(ms, t_uarr)
+        teff_pop_scal = se.teff(ms, t_scal)
+        teff_pop_uarr = se.teff(ms, t_uarr)
+        assert isinstance(lbol_pop_scal, u.Quantity)
+        assert isinstance(lbol_pop_uarr, u.Quantity)
+        assert isinstance(teff_pop_scal, u.Quantity)
+        assert isinstance(teff_pop_uarr, u.Quantity)
+        assert lbol_pop_scal.unit == u.Lsun
+        assert lbol_pop_uarr.unit == u.Lsun
+        assert teff_pop_scal.unit == u.K
+        assert teff_pop_uarr.unit == u.K
+        assert lbol_pop_scal.shape == ms.shape
+        assert lbol_pop_uarr.shape == ms.shape
+        assert teff_pop_scal.shape == ms.shape
+        assert teff_pop_uarr.shape == ms.shape
+
+        # test population-level methods
+        lbol_scal = sp[k].lbol(t_scal)
+        lbol_uarr = sp[k].lbol(t_uarr)
+        lbol_array = sp[k].lbol(t_array)
+        assert lbol_scal.unit == u.Lsun
+        assert lbol_uarr.unit == u.Lsun
+        assert lbol_array.unit == u.Lsun
+        assert lbol_scal.shape == ()
+        assert lbol_uarr.shape == t_uarr.shape
+        assert lbol_array.shape == t_array.shape
 
 
 def test_mist_interp():
