@@ -12,7 +12,6 @@ from numpy.testing import assert_array_less, assert_allclose
 from scipy.integrate import trapezoid
 
 import arsenal_gear
-from arsenal_gear.stellar_evolution.isochrone import IsochroneInterpolator
 
 def get_contiguous_regions(mask):
     """
