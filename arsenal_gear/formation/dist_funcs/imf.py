@@ -32,6 +32,23 @@ class IMF(rv_continuous):
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
 
+    class MassDist(rv_continuous):
+        """
+        This sub-class defines the mass distribtuion for an IMF.
+        Since this only defines the PDF in terms of the IMF's PDF, calculation of all other
+        derived functions (CDF, PPF, etc.) is handled *numerically* by rv_continuous, meaning
+        that these functions can be slow. This class should only be used for plots and simple
+        calls like:
+        >> half_mass_mass = imf.mass_dist.ppf(0.5)
+        """
+        def __init__(self, imf):
+            self._imf = imf
+            self.mean_mass = imf.mean().value # in Msun
+            super().__init__(a=imf.min_mass, b=imf.max_mass, name=imf.name+"_mass")
+
+        def _pdf(self, x, *args):
+            return x*self._imf.pdf(x, *args)/self.mean_mass
+
     def __init__(
         self, min_mass: Quantity["mass"], max_mass: Quantity["mass"], name="", seed=None
     ):
@@ -46,6 +63,7 @@ class IMF(rv_continuous):
                 f"min_mass ({min_mass}) must be less than max_mass ({max_mass})."
             )
         super().__init__(a=self.min_mass, b=self.max_mass, name=name, seed=seed)
+        self.mass_dist = self.MassDist(self)
 
     def sample_mass(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
         """
@@ -125,7 +143,6 @@ class PiecewisePowerLaw(IMF):
         :param masses: List/Array of transition masses (e.g., [0.5, 1.0])
         :param betas: List/Array of slopes (e.g., [-1.3, -2.3, -2.7])
         """
-        super().__init__(min_mass, max_mass, name=name, seed=seed)
         # define the slopes
         self.betas = np.array(betas)
 
@@ -168,6 +185,8 @@ class PiecewisePowerLaw(IMF):
         self.weights = np.array(self.weights)
         self.total_area = np.sum(self.weights)
         self.cum_weights = np.cumsum(self.weights) / self.total_area
+        super().__init__(min_mass, max_mass, name=name, seed=seed)
+
 
     def _pdf(self, x, *args):
         # check which segment x falls into based on m_pts
