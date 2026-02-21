@@ -79,7 +79,7 @@ class NuGrid(YieldTables):
         bat = Battino20192021()
 
         self.elements = r18.elements
-        self.atomic_num = r18.elements
+        self.atomic_num = r18.atomic_num
 
         # Asymptotic giant branch star yields
         agb_yld = r18.load_agb_yields()

@@ -1,5 +1,5 @@
 """
-sukhbold2016
+sukhbold
 ==========
 
 This submodule contains all the code necessary to load yields from Sukhbold et al. (2016)
