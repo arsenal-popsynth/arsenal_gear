@@ -1,5 +1,5 @@
 """
-limongichieffi2018
+limongichieffi
 ==========
 
 This submodule contains all the code required to load yields from
