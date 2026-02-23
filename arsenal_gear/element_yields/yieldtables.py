@@ -73,3 +73,14 @@ class YieldTables:
         """Placeholder function for AGB yields."""
         _ = (elements, starPop, interpolate, extrapolate)
         return _not_implemented("AGB", self.name)
+
+    def sagb_yields(
+        self,
+        elements: List[str],
+        starPop: StarPopulation,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Placeholder function for SAGB yields."""
+        _ = (elements, starPop, interpolate, extrapolate)
+        return _not_implemented("SAGB", self.name)
