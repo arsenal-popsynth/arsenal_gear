@@ -119,20 +119,23 @@ class SynthPop:
         """
         Return the number of supernovae that have gone off by time t
         """
+        scalar = np.isscalar(t.value)
+        if scalar:
+            t = np.array([t.value]) * t.unit
         NSN = np.zeros_like(t.value)
         for (se,pop) in zip(self.evol.ses, self.form.subpops):
-            if pop.tform < t:
-                Mmax = se.mmax(t-pop.tform)
-                if pop.discrete:
-                    ms = pop.masses.value
-                    N_exp = [len(np.where((ms >= 8) & (ms >= m))[0]) for m in Mmax.value]
-                    NSN += np.array(N_exp)
-                else:
-                    fexp_8 = 1 - pop.imf.cdf(8 * u.Msun)
-                    fexp = 1 - pop.imf.cdf(Mmax)
-                    fexp = fexp * (fexp < fexp_8) + fexp_8 * (fexp >= fexp_8)
-                    NSN += fexp * pop.Nstar
-        if np.isscalar(t.value):
+            tsel = t - pop.tform > 0
+            Mmax = se.mmax(t[tsel]-pop.tform)
+            if pop.discrete:
+                ms = pop.masses.value
+                N_exp = [len(np.where((ms >= 8) & (ms >= m))[0]) for m in Mmax.value]
+                NSN[tsel] += np.array(N_exp)
+            else:
+                fexp_8 = 1 - pop.imf.cdf(8 * u.Msun)
+                fexp = 1 - pop.imf.cdf(Mmax)
+                fexp = fexp * (fexp < fexp_8) + fexp_8 * (fexp >= fexp_8)
+                NSN[tsel] += fexp * pop.Nstar
+        if scalar:
             return NSN[0]
         else:
             return NSN
@@ -144,13 +147,19 @@ class SynthPop:
                 of delta functions for a discrete popultion. We still provide an answer 
                 for a discrete populations by treating it as a continuous population.
         """
+        scalar = np.isscalar(t.value)
+        if scalar:
+            t = np.array([t.value]) * t.unit
         NSN_dot = np.zeros_like(t.value) / u.Myr
         for (se,pop) in zip(self.evol.ses, self.form.subpops):
-            if pop.tform < t:
-                Mmax = se.mmax(t-pop.tform)
-                Mmaxdot = se.mmaxdot(t-pop.tform)
-                NSN_dot += -pop.imf.pdf(Mmax)/u.Msun * Mmaxdot * (Mmax.value > 8) * pop.Nstar
-        return NSN_dot
+            tsel = t - pop.tform > 0
+            Mmax = se.mmax(t[tsel]-pop.tform)
+            Mmaxdot = se.mmaxdot(t[tsel]-pop.tform)
+            NSN_dot[tsel] += -pop.imf.pdf(Mmax)/u.Msun * Mmaxdot * (Mmax.value > 8) * pop.Nstar
+        if scalar:
+            return NSN_dot[0]
+        else:
+            return NSN_dot
 
     def lbol(self, t: Quantity["time"]) -> Quantity["power"]:
         """
