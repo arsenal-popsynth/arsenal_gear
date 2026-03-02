@@ -25,8 +25,10 @@ class BinaryEvolutionConverter(ABC):
         # [Fe/H]
         self.met = kwargs.get('met', 0.014)
         # Directories to read and write data
-        self.input_dir = kwargs.get('input_dir', None)
+        self.input_dir  = kwargs.get('input_dir', None)
         self.output_dir = kwargs.get('output_dir', None)
+        # Output times
+        self.output_times = kwargs.get('output_times', np.logspace(4, 9, 501))
         self.overwrite = kwargs.get('overwrite', False)
 
     @abstractmethod
@@ -98,8 +100,8 @@ class BPASSConverter(BinaryEvolutionConverter):
         # Number of files depends on the choice of mass limits for the IMF
         num_files = len(os.listdir(model_directory)) 
         # Times for time array
-        num_times = 402 # from log(age/yr) = 5 to 9
-        times = np.concatenate((np.zeros(1), np.logspace(5, 9, 401)))
+        num_times = len(self.output_times) + 1
+        times = np.concatenate((np.zeros(1), self.output_times))
         # Save properties as a function of time: (1) mass, (2) bolometric luminosity, 
         # (3) surface temperature, (4) radius
         data = np.zeros((num_files, 4, num_times))
@@ -151,13 +153,14 @@ class BPASSConverter(BinaryEvolutionConverter):
                                            log_Teff=(["model", "time"], data[:, 2, :]),
                                            log_R=(["model", "time"], data[:, 3, :])),
                             coords=dict(model=("model", masses), time=("time", times)),
-                           attrs=dict(description="BPASS evolution data for single stars at Z=" + str(self.met)))
+                            attrs=dict(description="BPASS evolution data for single stars at Z=" + str(self.met)))
             ds.to_netcdf(self.output_dir + '/singles_' + self.metstr + '.h5')
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
 
         return
+
 
     def convert_binary_data(self):
         """
@@ -181,12 +184,16 @@ class BPASSConverter(BinaryEvolutionConverter):
         # Number of files depends on the choice of IMF
         num_files = len(os.listdir(model_directory))
         # Times for time array
-        num_times = 502 # from log(age/yr) = 4 to 9
-        times = np.concatenate((np.zeros(1), np.logspace(4, 9, 501)))
-        # Save 7 properties: masses, luminosities, temperatures, period
+        num_times = len(self.output_times) + 1
+        times = np.concatenate((np.zeros(1), self.output_times))
+        # Save properties as a function of time: (1)  primary mass, 
+        # (2) primary bolometric luminosity, (3) primary surface temperature, 
+        # (4) primary radius, (5)-(8) for the companion
         data = np.zeros((num_files, 7, num_times))
 
+        M1_for_models = np.zeros(num_files)
         M2_for_models = np.zeros(num_files)
+        P_for_models = np.zeros(num_files)
 
         i = 0
         for model in os.listdir(model_directory):
@@ -209,6 +216,10 @@ class BPASSConverter(BinaryEvolutionConverter):
                 # Effective companion mass
                 M2_eff = _data[0, 37]
                 M2_for_models[i] = M2_eff
+
+                # Initial primary mass & period
+                M1_for_models[i] = _data[0, 5]
+                P_for_models[i] = _data[0, 34]
                 
                 # We want to extract the following values
                 _times = _data[:, 1]
@@ -306,46 +317,69 @@ class BPASSConverter(BinaryEvolutionConverter):
                                     data[i, 4, m] *= 0 # must set to 0 after SN
                                 data[i, 5, m] = _data_M2[t, 3]  # K 
 
-
                 i += 1
         
 
-            if ('binaries_' + self.metstr + '.h5') not in os.listdir(self.output_dir) or self.overwrite:
-                print("Saving processed data to", self.output_dir)
+        if ('binaries_' + self.metstr + '.h5') not in os.listdir(self.output_dir) or self.overwrite:
+            print("Saving processed data to", self.output_dir)
 
-                # Times
-                times = np.round(times, 2).astype('str')
-                for t in range(len(times)):
-                    times[t] = times[t].ljust(4, '0')
 
-                # Masses as strings
-                masses = data[:, 0, 0].astype('str')
-                for m in range(len(masses)):
-                    masses[m] = masses[m].ljust(4, '0')
+            # Masses as strings
+            masses = M1_for_models
+            model_masses = np.sort(np.unique(masses))[::-1]
 
-                mass_ratios = np.round(M2_for_models/data[:, 0, 0], 1).astype('str')
+            mass_ratios = np.round(M2_for_models/M1_for_models, 1)
+            model_mratios = np.sort(np.unique(mass_ratios))
+            model_mratios = model_mratios[model_mratios > 0]
 
-                periods = np.round(np.log10(data[:, 6, 0]*365.25), 1).astype('str')
+            periods = np.round(np.log10(P_for_models*365.25), 1)
+            model_periods = np.sort(np.unique(periods))
+            model_periods = model_periods[model_periods < 5]
 
-                models = np.zeros(len(masses)).astype('str')
+            model_orbits = (np.outer(model_mratios*1000, np.ones(len(model_periods))) + np.outer(np.ones(len(model_mratios)), model_periods*10)).flatten()
+            
+            def prop_arr(times, masses, mass_ratios, periods, model_m, model_o, data):
+
+                assert len(masses) == len(mass_ratios)
+                assert len(masses) == len(periods)
+                assert len(data) == len(masses)
+
+                arr = np.zeros((len(times), len(model_m), len(model_o)))
                 for i in range(len(masses)):
-                    models[i] = masses[i] + '-' + mass_ratios[i] + '-' + periods[i]
+                    if (mass_ratios[i] > 0) and (periods[i] < 5):
+                        a = np.where(model_m == masses[i])[0][0]
+                        b = np.where(model_o == (mass_ratios[i]*1000 + periods[i]*10))[0][0]
+                        arr[:, a, b] = data[i]
+                return arr
 
-                _sort = np.argsort(models)
-                data_to_save = data[_sort, :, :]
+            mass1_arr = prop_arr(times, masses, mass_ratios, periods, 
+                                 model_masses, model_orbits, data[:, 0, :])
+            mass2_arr = prop_arr(times, masses, mass_ratios, periods, 
+                                 model_masses, model_orbits, data[:, 3, :])
+            log_Lbol1_arr = prop_arr(times, masses, mass_ratios, periods, 
+                                     model_masses, model_orbits, data[:, 1, :])
+            log_Lbol2_arr = prop_arr(times, masses, mass_ratios, periods, 
+                                     model_masses, model_orbits, data[:, 4, :])
+            log_Teff1_arr = prop_arr(times, masses, mass_ratios, periods, 
+                                     model_masses, model_orbits, data[:, 2, :])
+            log_Teff2_arr = prop_arr(times, masses, mass_ratios, periods, 
+                                     model_masses, model_orbits, data[:, 5, :])
 
-                ds = xr.DataArray(data_to_save, coords=[("Model", models[_sort]), 
-                                                        ("Property", ["Mass 1 (MSun)", 
-                                                                      "log L_bol 1 (LSun)", 
-                                                                      "log T_eff 1 (K)",
-                                                                      "Mass 2 (MSun)", 
-                                                                      "log L_bol 2 (LSun)", 
-                                                                      "log T_eff 2 (K)", "P (yr)"]), 
-                                                        ("Time (log t/yr)", times)])
-                ds.to_netcdf(self.output_dir + '/binaries_' + self.metstr + '.h5')
+            print(mass2_arr)
 
-            else:
-                print("Cannot save model. Try setting overwrite=True...")
+            ds = xr.Dataset(data_vars=dict(mass1=(["time", "model_m", "model_o"], mass1_arr),
+                                           log_Lbol1=(["time", "model_m", "model_o"], log_Lbol1_arr),
+                                           log_Teff1=(["time", "model_m", "model_o"], log_Teff1_arr),
+                                           mass2=(["time", "model_m", "model_o"], mass2_arr),
+                                           log_Lbol2=(["time", "model_m", "model_o"], log_Lbol2_arr),
+                                           log_Teff2=(["time", "model_m", "model_o"], log_Teff2_arr),),
+                            coords=dict(model_m=(["model_m"], model_masses), model_o=(["model_o"], model_orbits),
+                                        time=("time", times)),
+                            attrs=dict(description="BPASS evolution data for binary stars at Z=" + str(self.met)))
+
+            ds.to_netcdf(self.output_dir + '/binaries_' + self.metstr + '.h5')
+
+        else:
+            print("Cannot save model. Try setting overwrite=True...")
 
         return
-        
