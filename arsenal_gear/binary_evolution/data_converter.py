@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from .be_data_structures import BinaryStarTable, SingleStarTable
@@ -441,3 +442,161 @@ class BPASSConverter(BinaryEvolutionConverter):
             print("Cannot save model. Try setting overwrite=True...")
 
         return
+
+
+class MPAConverter(BinaryEvolutionConverter):
+    """
+    Class for reading MPA/Bonn stellar model data and converting it to the Arsenal binary
+    evolution format. This is an instantiation of the BinaryEvolutionConverter base class.
+    """
+
+    mets = [
+        "MW",
+        "LMC",
+        "SMC",
+    ]
+
+    def __init__(self, **kwargs) -> None:
+        """
+        Args:
+            kwargs: Keyword arguments for the binary evolution table.
+
+        Methods:
+            convert_single_data     Processes single stellar track data into a SingleStarTable
+            convert_binary_data     Processes binary stellar track data into a BinaryStarTable
+        """
+        # set input parameters
+        super().__init__(**kwargs)
+
+        if self.met not in self.mets:
+            raise ValueError("Metallicity must be one of: " + str(self.mets))
+
+        # Consistent format for directories
+        if self.input_dir[-1] == "/":
+            self.input_dir: str = self.input_dir
+        else:
+            self.intput_dir: str = self.input_dir + "/"
+        if self.output_dir[-1] == "/":
+            self.output_dir: str = self.output_dir
+        else:
+            self.output_dir: str = self.output_dir + "/"
+
+    def convert_single_data(self):
+        """
+        Converts MPA/Bonn stellar model data for single stars into an Arsenal-readable
+        SingleStarTable.
+        """
+
+        # Create directory if it does not already exists
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+
+        model_directory = self.input_dir + self.met + "/single/"
+
+        # Create the zero array; assume 1000 models and clean up after
+        num_files = int(1000)
+        # Times for time array
+        num_times = int(1e5)  # Assume there are at most 1e4 outputs
+        # Save properties as a function of time: (1) time, (2) mass,
+        # (3) bolometric luminosity, (4) surface temperature, (5) radius
+        data = np.zeros((num_files, 5, num_times))
+
+        i = 0
+        for model in os.listdir(model_directory):
+
+            if model.endswith("_0_compressed.pkl.gz"):
+
+                df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
+
+                # We want to extract the following values
+                _num = np.arange(len(df.star_age.values))
+
+                data[i, 0, _num] = df.star_age.values.astype("float")  # time in yr
+                data[i, 1, _num] = df.star_mass.values.astype("float")  # mass in Msun
+                data[i, 2, _num] = df.log_L.values.astype("float")  # log Lbol in Lsun
+                data[i, 3, _num] = df.log_Teff.values.astype("float")  # log Teff in K
+                data[i, 4, _num] = df.log_R.values.astype("float")  # log R in Rsun
+
+                i += 1
+
+        # Remove superfluous models
+        first_empty = 0
+        i = 0
+        while i < num_files:
+            if len(np.nonzero(data[i, 1, :])[0]) > 0:
+                first_empty += 1
+                i += 1
+            else:
+                first_empty += 1
+                i = num_times
+
+        data = data[:first_empty, :, :]
+
+        # Remove superfluous model numbers
+        first_empty = 0
+        j = 0
+        while j < num_times:
+            if len(np.nonzero(data[:, 1, j])[0]) > 0:
+                first_empty += 1
+                j += 1
+            else:
+                first_empty += 1
+                j = num_times
+
+        data = data[:, :, :first_empty]
+
+        # If fewer models, fill with sensible values
+        for i in range(len(data[:, 0, 0])):
+            _zeros = np.where(data[i, 0, :] == 0)[0]
+            if len(_zeros) > 1:  # if not longest
+                data[i, 0, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 0, _zeros[1] - 1]
+                )
+                data[i, 1, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 1, _zeros[1] - 1]
+                )
+                data[i, 2, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 2, _zeros[1] - 1]
+                )
+                data[i, 3, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 3, _zeros[1] - 1]
+                )
+                data[i, 4, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 4, _zeros[1] - 1]
+                )
+
+        # Sort by mass
+        _sort = np.argsort(data[:, 1, 0])
+        data = data[_sort, :, :]
+
+        if ("singles_" + self.met + ".h5") not in os.listdir(
+            self.output_dir
+        ) or self.overwrite:
+            print("Saving processed data to", self.output_dir)
+
+            masses = data[:, 1, 0]
+
+            ds = xr.Dataset(
+                data_vars=dict(
+                    time=(["model", "step"], data[:, 0, :]),
+                    mass=(["model", "step"], data[:, 1, :]),
+                    log_Lbol=(["model", "step"], data[:, 2, :]),
+                    log_Teff=(["model", "step"], data[:, 3, :]),
+                    log_R=(["model", "step"], data[:, 4, :]),
+                ),
+                coords=dict(
+                    model=("model", masses), step=("step", np.arange(first_empty))
+                ),
+                attrs=dict(
+                    description="MPA/Bonn evolution data for single stars at Z="
+                    + str(self.met)
+                ),
+            )
+            ds.to_netcdf(self.output_dir + "/singles_" + self.met + ".h5")
+
+        else:
+            print("Cannot save model. Try setting overwrite=True...")
+
+        return
+
+    def convert_binary_data(self):
+        pass
