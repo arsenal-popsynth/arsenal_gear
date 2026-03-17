@@ -8,6 +8,7 @@ through downloading, reorganzing and interpreting their outputs.
 
 import os
 from abc import ABC, abstractmethod
+from multiprocessing.pool import ThreadPool as Pool
 from pathlib import Path
 
 import numpy as np
@@ -111,32 +112,41 @@ class BPASSConverter(BinaryEvolutionConverter):
 
         # Create the zero array
         # Number of files depends on the choice of mass limits for the IMF
-        num_files = len(os.listdir(model_directory))
+        files = os.listdir(model_directory)
+        num_files = len(files)
         # Times for time array
         num_times = int(1e4)  # Assume there are at most 1e4 outputs
         # Save properties as a function of time: (1) time, (2) mass,
         # (3) bolometric luminosity, (4) surface temperature, (5) radius
         data = np.zeros((num_files, 5, num_times))
 
-        i = 0
-        for model in os.listdir(model_directory):
+        # Function to extract the data
+        def extract_data(model):
 
             if model.startswith("sneplot"):
 
                 _data = np.genfromtxt(model_directory + "/" + model)
-
                 # Replace NaNs by 0s --> What about files without a companion?
                 _data = np.nan_to_num(_data)
                 # We want to extract the following values
                 _num = np.arange(len(_data[:, 1]))
 
-                data[i, 0, _num] = _data[:, 1]  # time in yr
-                data[i, 1, _num] = _data[:, 5]  # mass in Msun
-                data[i, 2, _num] = _data[:, 4]  # log Lbol in Lsun
-                data[i, 3, _num] = _data[:, 3]  # log Teff in K
-                data[i, 4, _num] = _data[:, 2]  # log R in Rsun
+                # Indices for time in yr, mass in Msun, log Lbol in Lsun,
+                # log Teff in K, log R in Rsun
+                return_ids = [1, 5, 4, 3, 2]
 
-                i += 1
+                return np.transpose(_data[:, return_ids])  # log R in Rsun
+
+        pool = Pool()
+
+        i = 0
+
+        for result in pool.imap_unordered(extract_data, files):
+
+            data[i, :, : len(result[0, :])] = result
+            i += 1
+
+        pool.close()
 
         # Remove superfluous model numbers
         first_empty = 0
