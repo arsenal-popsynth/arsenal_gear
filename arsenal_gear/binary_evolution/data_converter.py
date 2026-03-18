@@ -270,9 +270,9 @@ class BPASSConverter(BinaryEvolutionConverter):
                 extracted_data, model_split = result
                 data[i, :, : len(extracted_data[0, :])] = extracted_data
                 model_orbits[i] = int(
-                    float(model_split[2]) * 1e4
-                    + float(model_split[3]) * 1e3
-                    + float(model_split[4]) * 10
+                    float(model_split[2]) * 1e6
+                    + float(model_split[3]) * 1e5
+                    + float(model_split[4]) * 100
                 )
                 i += 1
 
@@ -324,13 +324,21 @@ class BPASSConverter(BinaryEvolutionConverter):
                     time = data[system, 0, :][step]
 
             else:
-                step = np.where(data[system, 0, :] != 0)[0][-1]
-                time = data[system, 0, :][step]
-                M_eff = data[system, 5, 0]
-                if M_eff > 0.8:  # If actual companion, and not empty array
-                    M_closest = M_single[np.argmin(np.abs(M_single - M_eff))]
-                else:
+                if len(np.where(data[system, 0, :] != 0)[0]) == 0:
+                    # Use as failsafe for broken files; ignore for now by looping over
+                    # Example is sneplot=z040-35-0.9-4
                     M_closest = 0
+                    # Also set time = 0 to avoid linter error; this will be ignored
+                    time = 0
+
+                else:
+                    step = np.where(data[system, 0, :] != 0)[0][-1]
+                    time = data[system, 0, :][step]
+                    M_eff = data[system, 5, 0]
+                    if M_eff > 0.8:  # If actual companion, and not empty array
+                        M_closest = M_single[np.argmin(np.abs(M_single - M_eff))]
+                    else:
+                        M_closest = 0
 
             # Now use mass and time for subsequent evolution
             # Name-match the single BPASS files
@@ -615,4 +623,182 @@ class MPAConverter(BinaryEvolutionConverter):
         return
 
     def convert_binary_data(self):
-        pass
+        """
+        Converts MPA/Bonn stellar model data for binary stars into an Arsenal-readable
+        BinaryStarTable.
+        """
+
+        # Create directory if it does not already exists
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+
+        primary_directory = self.input_dir + self.met + "/primary/"
+        secondary_directory = self.input_dir + self.met + "/secondary/"
+
+        # Create the zero array
+        # Number of files depends on the choice of IMF
+        num_files = int(1e5)
+        # Times for time array
+        num_times = int(1e5)  # Assume there are at most 1e4 outputs
+        # Save properties as a function of time: (1) time,
+        # (2) primary mass, (3) primary bolometric luminosity,
+        # (4) primary surface temperature, (5) primary radius, (6)-(9) for the companion
+        data = np.zeros((num_files, 9, num_times))
+
+        model_orbits = np.zeros(num_files)
+
+        i = 0
+        for subdirectory in os.listdir(primary_directory):
+            print("Starting to collect data from /", subdirectory)
+
+            if subdirectory == "2.000":
+
+                for model in os.listdir(primary_directory + "/" + subdirectory):
+
+                    df_1 = pd.read_pickle(
+                        primary_directory + "/" + subdirectory + "/" + model,
+                        compression="gzip",
+                    )
+                    df_2 = pd.read_pickle(
+                        secondary_directory + "/" + subdirectory + "/" + model,
+                        compression="gzip",
+                    )
+
+                    # We want to extract the following values
+                    _num_1 = np.arange(len(df_1.star_age))
+                    _num_2 = np.arange(len(df_2.star_age))
+
+                    data[i, 0, _num_2] = df_2.star_age.values.astype(
+                        "float"
+                    )  # time in yr
+                    data[i, 1, _num_1] = df_1.star_mass.values.astype(
+                        "float"
+                    )  # mass in Msun
+                    data[i, 2, _num_1] = df_1.log_L.values.astype(
+                        "float"
+                    )  # log Lbol in Lsun
+                    data[i, 3, _num_1] = df_1.log_Teff.values.astype(
+                        "float"
+                    )  # log Teff in K
+                    data[i, 4, _num_1] = df_1.log_R.values.astype(
+                        "float"
+                    )  # log R in Rsun
+                    data[i, 5, _num_2] = df_2.star_mass.values.astype(
+                        "float"
+                    )  # companion mass in Msun
+                    data[i, 6, _num_2] = df_2.log_L.values.astype(
+                        "float"
+                    )  # companion log Lbol in Lsun
+                    data[i, 7, _num_2] = df_2.log_Teff.values.astype(
+                        "float"
+                    )  # companion log Teff in K
+                    data[i, 8, _num_2] = df_2.log_R.values.astype(
+                        "float"
+                    )  # companion log R in Rsun
+
+                    model_split = model.split("_")
+                    model_orbits[i] = int(
+                        round(10 ** float(model_split[0]), 1) * 1e6
+                        + float(model_split[1]) * 1e5
+                        + float(model_split[2]) * 100
+                    )
+
+                    print(model, model_split, model_orbits[i])
+
+                    i += 1
+
+        # Remove superfluous models
+        first_empty = 0
+        i = 0
+        while i < num_files:
+            if len(np.nonzero(data[i, 1, :])[0]) > 0:
+                first_empty += 1
+                i += 1
+            else:
+                first_empty += 1
+                i = num_times
+
+        data = data[:first_empty, :, :]
+
+        # Sort by model
+        sorted_models = np.argsort(model_orbits)[::-1]
+        data = data[sorted_models, :, :]
+        model_orbits = model_orbits[sorted_models]
+
+        # Remove superfluous model numbers
+        first_empty = 0
+        j = 0
+        while j < num_times:
+            if len(np.nonzero(data[:, 1, j])[0]) > 0:
+                first_empty += 1
+                j += 1
+            else:
+                first_empty += 1
+                j = num_times
+
+        data = data[:, :, :first_empty]
+
+        # If fewer models, fill with sensible values
+        for i in range(len(data[:, 0, 0])):
+            _zeros = np.where(data[i, 0, :] == 0)[0]
+            if len(_zeros) > 1:  # if not longest
+                data[i, 0, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 0, _zeros[1] - 1]
+                )
+                data[i, 1, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 1, _zeros[1] - 1]
+                )
+                data[i, 2, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 2, _zeros[1] - 1]
+                )
+                data[i, 3, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 3, _zeros[1] - 1]
+                )
+                data[i, 4, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 4, _zeros[1] - 1]
+                )
+                data[i, 5, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 5, _zeros[1] - 1]
+                )
+                data[i, 6, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 6, _zeros[1] - 1]
+                )
+                data[i, 7, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 7, _zeros[1] - 1]
+                )
+                data[i, 8, _zeros[1:]] = (
+                    np.ones(len(_zeros) - 1) * data[i, 8, _zeros[1] - 1]
+                )
+
+        if ("binaries_" + self.met + ".h5") not in os.listdir(
+            self.output_dir
+        ) or self.overwrite:
+            print("Saving processed data to", self.output_dir)
+
+            ds = xr.Dataset(
+                data_vars=dict(
+                    time=(["model", "step"], data[:, 0, :]),
+                    mass1=(["model", "step"], data[:, 1, :]),
+                    log_Lbol1=(["model", "step"], data[:, 2, :]),
+                    log_Teff1=(["model", "step"], data[:, 3, :]),
+                    log_R1=(["model", "step"], data[:, 4, :]),
+                    mass2=(["model", "step"], data[:, 5, :]),
+                    log_Lbol2=(["model", "step"], data[:, 6, :]),
+                    log_Teff2=(["model", "step"], data[:, 7, :]),
+                    log_R2=(["model", "step"], data[:, 8, :]),
+                ),
+                coords=dict(
+                    model=(["model"], model_orbits),
+                    step=("step", np.arange(first_empty)),
+                ),
+                attrs=dict(
+                    description="MPA/Bonn evolution data for binary stars at Z="
+                    + str(self.met)
+                ),
+            )
+
+            ds.to_netcdf(self.output_dir + "/binaries_" + self.met + ".h5")
+
+        else:
+            print("Cannot save model. Try setting overwrite=True...")
+
+        return
