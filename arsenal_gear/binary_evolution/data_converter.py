@@ -138,11 +138,8 @@ class BPASSConverter(BinaryEvolutionConverter):
                 return np.transpose(_data[:, return_ids])  # log R in Rsun
 
         pool = Pool()
-
         i = 0
-
         for result in pool.imap_unordered(extract_data, files):
-
             data[i, :, : len(result[0, :])] = result
             i += 1
 
@@ -232,9 +229,11 @@ class BPASSConverter(BinaryEvolutionConverter):
         )
 
         # Create the zero array
-        # Number of files depends on the choice of IMF
-        num_files = len(os.listdir(model_directory))
+        # Number of files depends on the choice of mass limits for the IMF
+        files = os.listdir(model_directory)
+        num_files = len(files)
         # Times for time array
+        num_times = int(1e4)  # Assume there are at most 1e4 outputs
         num_times = int(1e4)  # Assume there are at most 1e4 outputs
         # Save properties as a function of time: (1) time,
         # (2) primary mass, (3) primary bolometric luminosity,
@@ -243,41 +242,48 @@ class BPASSConverter(BinaryEvolutionConverter):
 
         model_orbits = np.zeros(num_files)
 
-        i = 0
-        for model in os.listdir(model_directory):
+        # Function to extract the data
+        def extract_data(model):
 
             if model.startswith("sneplot"):
 
                 _data = np.genfromtxt(model_directory + "/" + model)
-
                 # Replace NaNs by 0s --> What about files without a companion?
                 _data = np.nan_to_num(_data)
                 # We want to extract the following values
                 _num = np.arange(len(_data[:, 1]))
 
-                data[i, 0, _num] = _data[:, 1]  # time in yr
-                data[i, 1, _num] = _data[:, 5]  # mass in Msun
-                data[i, 2, _num] = _data[:, 4]  # log Lbol in Lsun
-                data[i, 3, _num] = _data[:, 3]  # log Teff in K
-                data[i, 4, _num] = _data[:, 2]  # log R in Rsun
-                data[i, 5, _num] = _data[:, 37]  # companion mass in Msun
-                data[i, 6, _num] = _data[:, 48]  # companion log Lbol in Lsun
-                data[i, 7, _num] = _data[:, 47]  # companion log Teff in K
-                data[i, 8, _num] = _data[:, 46]  # companion log R in Rsun
+                # Indices for time in yr, mass in Msun, log Lbol in Lsun,
+                # log Teff in K, log R in Rsun, then same for companion
+                return_ids = [1, 5, 4, 3, 2, 37, 48, 47, 46]
 
                 model_split = model.split("-")
+
+                return np.transpose(_data[:, return_ids]), model_split  # log R in Rsun
+
+        pool = Pool()
+
+        i = 0
+
+        for result in pool.imap_unordered(extract_data, files):
+            if result is not None:
+                extracted_data, model_split = result
+                data[i, :, : len(extracted_data[0, :])] = extracted_data
                 model_orbits[i] = int(
                     float(model_split[2]) * 1e4
                     + float(model_split[3]) * 1e3
                     + float(model_split[4]) * 10
                 )
-
                 i += 1
+
+        pool.close()
 
         # Sort by model
         sorted_models = np.argsort(model_orbits)[::-1]
         data = data[sorted_models, :, :]
         model_orbits = model_orbits[sorted_models]
+
+        print("Pre-SN evolution done. Now checking for rejuvenation...")
 
         # Check for mergers and rejuvenation
         dM1 = data[:, 1, 1:] - data[:, 1, :-1]
