@@ -515,45 +515,46 @@ class MPAConverter(BinaryEvolutionConverter):
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
         model_directory = self.input_dir + self.met + "/single/"
+        files = []
 
-        # Create the zero array; assume 1000 models and clean up after
-        num_files = int(1000)
+        # Scan directory
+        with os.scandir(model_directory) as all_models:
+            for model in all_models:
+                if model.is_file() and model.name.endswith("_0_compressed.pkl.gz"):
+                    files.append(model.name)
+
+        # Create the zero array
+        num_files = len(files)
         # Times for time array
-        num_times = int(1e5)  # Assume there are at most 1e4 outputs
+        num_times = int(1e5)  # Assume there are at most 1e5 outputs
         # Save properties as a function of time: (1) time, (2) mass,
         # (3) bolometric luminosity, (4) surface temperature, (5) radius
         data = np.zeros((num_files, 5, num_times))
 
+        # Function to extract the data
+        def extract_data(model):
+
+            df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
+
+            _data = np.vstack(
+                (
+                    df.star_age.values.astype("float"),  # time in yr
+                    df.star_mass.values.astype("float"),  # mass in Msun
+                    df.log_L.values.astype("float"),  # log Lbol in Lsun
+                    df.log_Teff.values.astype("float"),  # log Teff in K
+                    df.log_R.values.astype("float"),  # log R in Rsun
+                )
+            )
+
+            return _data
+
+        pool = Pool()
         i = 0
-        for model in os.listdir(model_directory):
+        for result in pool.imap_unordered(extract_data, files):
+            data[i, :, : len(result[0, :])] = result
+            i += 1
 
-            if model.endswith("_0_compressed.pkl.gz"):
-
-                df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
-
-                # We want to extract the following values
-                _num = np.arange(len(df.star_age.values))
-
-                data[i, 0, _num] = df.star_age.values.astype("float")  # time in yr
-                data[i, 1, _num] = df.star_mass.values.astype("float")  # mass in Msun
-                data[i, 2, _num] = df.log_L.values.astype("float")  # log Lbol in Lsun
-                data[i, 3, _num] = df.log_Teff.values.astype("float")  # log Teff in K
-                data[i, 4, _num] = df.log_R.values.astype("float")  # log R in Rsun
-
-                i += 1
-
-        # Remove superfluous models
-        first_empty = 0
-        i = 0
-        while i < num_files:
-            if len(np.nonzero(data[i, 1, :])[0]) > 0:
-                first_empty += 1
-                i += 1
-            else:
-                first_empty += 1
-                i = num_times
-
-        data = data[:first_empty, :, :]
+        pool.close()
 
         # Remove superfluous model numbers
         first_empty = 0
@@ -567,26 +568,6 @@ class MPAConverter(BinaryEvolutionConverter):
                 j = num_times
 
         data = data[:, :, :first_empty]
-
-        # If fewer models, fill with sensible values
-        for i in range(len(data[:, 0, 0])):
-            _zeros = np.where(data[i, 0, :] == 0)[0]
-            if len(_zeros) > 1:  # if not longest
-                data[i, 0, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 0, _zeros[1] - 1]
-                )
-                data[i, 1, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 1, _zeros[1] - 1]
-                )
-                data[i, 2, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 2, _zeros[1] - 1]
-                )
-                data[i, 3, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 3, _zeros[1] - 1]
-                )
-                data[i, 4, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 4, _zeros[1] - 1]
-                )
 
         # Sort by mass
         _sort = np.argsort(data[:, 1, 0])
