@@ -8,14 +8,18 @@ through downloading, reorganzing and interpreting their outputs.
 
 import os
 from abc import ABC, abstractmethod
+from multiprocessing import set_start_method
 from multiprocessing.pool import ThreadPool as Pool
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import tqdm
 import xarray as xr
 
 from .be_data_structures import BinaryStarTable, SingleStarTable
+
+set_start_method("fork")
 
 
 class BinaryEvolutionConverter(ABC):
@@ -549,8 +553,12 @@ class MPAConverter(BinaryEvolutionConverter):
             return _data
 
         pool = Pool()
+        results = list(
+            tqdm.tqdm(pool.imap_unordered(extract_data, files), total=len(files))
+        )
+
         i = 0
-        for result in pool.imap_unordered(extract_data, files):
+        for result in results:
             data[i, :, : len(result[0, :])] = result
             i += 1
 
@@ -614,12 +622,24 @@ class MPAConverter(BinaryEvolutionConverter):
 
         primary_directory = self.input_dir + self.met + "/primary/"
         secondary_directory = self.input_dir + self.met + "/secondary/"
+        files = []
+
+        # Scan directory
+        with os.scandir(primary_directory) as subdirectories:
+            for subdirectory in subdirectories:
+                with os.scandir(
+                    primary_directory + "/" + subdirectory.name
+                ) as all_models:
+                    for model in all_models:
+                        if model.is_file() and model.name.endswith(
+                            "_compressed.pkl.gz"
+                        ):
+                            files.append(subdirectory.name + "/" + model.name)
 
         # Create the zero array
-        # Number of files depends on the choice of IMF
-        num_files = int(1e5)
+        num_files = len(files)
         # Times for time array
-        num_times = int(1e5)  # Assume there are at most 1e4 outputs
+        num_times = int(1e5)  # Assume there are at most 1e5 outputs
         # Save properties as a function of time: (1) time,
         # (2) primary mass, (3) primary bolometric luminosity,
         # (4) primary surface temperature, (5) primary radius, (6)-(9) for the companion
@@ -627,78 +647,118 @@ class MPAConverter(BinaryEvolutionConverter):
 
         model_orbits = np.zeros(num_files)
 
-        i = 0
-        for subdirectory in os.listdir(primary_directory):
-            print("Starting to collect data from /", subdirectory)
+        # Function to extract the data
+        def extract_data(model):
 
-            if subdirectory == "2.000":
+            df_1 = pd.read_pickle(
+                primary_directory + "/" + model,
+                compression="gzip",
+            )
+            df_2 = pd.read_pickle(
+                secondary_directory + "/" + model,
+                compression="gzip",
+            )
 
-                for model in os.listdir(primary_directory + "/" + subdirectory):
+            pad_length = len(df_2.star_age.values) - len(df_1.star_age.values)
 
-                    df_1 = pd.read_pickle(
-                        primary_directory + "/" + subdirectory + "/" + model,
-                        compression="gzip",
+            if pad_length > 0:
+                _data = np.vstack(
+                    (
+                        df_2.star_age.values.astype("float"),  # time in yr
+                        np.pad(
+                            df_1.star_mass.values.astype("float"),
+                            (0, pad_length),
+                            "edge",
+                        ),  # mass in Msun
+                        np.pad(
+                            df_1.log_L.values.astype("float"),
+                            (0, pad_length),
+                            "constant",
+                            constant_values=(0, 0),
+                        ),  # log Lbol in Lsun
+                        np.pad(
+                            df_1.log_Teff.values.astype("float"),
+                            (0, pad_length),
+                            "constant",
+                            constant_values=(0, 0),
+                        ),  # log Teff in K
+                        np.pad(
+                            df_1.log_R.values.astype("float"), (0, pad_length), "edge"
+                        ),  # log R in Rsun
+                        df_2.star_mass.values.astype("float"),  # mass in Msun
+                        df_2.log_L.values.astype("float"),  # log Lbol in Lsun
+                        df_2.log_Teff.values.astype("float"),  # log Teff in K
+                        df_2.log_R.values.astype("float"),  # log R in Rsun
                     )
-                    df_2 = pd.read_pickle(
-                        secondary_directory + "/" + subdirectory + "/" + model,
-                        compression="gzip",
-                    )
+                )
 
-                    # We want to extract the following values
-                    _num_1 = np.arange(len(df_1.star_age))
-                    _num_2 = np.arange(len(df_2.star_age))
-
-                    data[i, 0, _num_2] = df_2.star_age.values.astype(
-                        "float"
-                    )  # time in yr
-                    data[i, 1, _num_1] = df_1.star_mass.values.astype(
-                        "float"
-                    )  # mass in Msun
-                    data[i, 2, _num_1] = df_1.log_L.values.astype(
-                        "float"
-                    )  # log Lbol in Lsun
-                    data[i, 3, _num_1] = df_1.log_Teff.values.astype(
-                        "float"
-                    )  # log Teff in K
-                    data[i, 4, _num_1] = df_1.log_R.values.astype(
-                        "float"
-                    )  # log R in Rsun
-                    data[i, 5, _num_2] = df_2.star_mass.values.astype(
-                        "float"
-                    )  # companion mass in Msun
-                    data[i, 6, _num_2] = df_2.log_L.values.astype(
-                        "float"
-                    )  # companion log Lbol in Lsun
-                    data[i, 7, _num_2] = df_2.log_Teff.values.astype(
-                        "float"
-                    )  # companion log Teff in K
-                    data[i, 8, _num_2] = df_2.log_R.values.astype(
-                        "float"
-                    )  # companion log R in Rsun
-
-                    model_split = model.split("_")
-                    model_orbits[i] = int(
-                        round(10 ** float(model_split[0]), 1) * 1e6
-                        + float(model_split[1]) * 1e5
-                        + float(model_split[2]) * 100
-                    )
-
-                    print(model, model_split, model_orbits[i])
-
-                    i += 1
-
-        # Remove superfluous models
-        first_empty = 0
-        i = 0
-        while i < num_files:
-            if len(np.nonzero(data[i, 1, :])[0]) > 0:
-                first_empty += 1
-                i += 1
             else:
-                first_empty += 1
-                i = num_times
+                _data = np.vstack(
+                    (
+                        df_1.star_age.values.astype("float"),  # time in yr
+                        df_1.star_mass.values.astype("float"),  # mass in Msun
+                        df_1.log_L.values.astype("float"),  # log Lbol in Lsun
+                        df_1.log_Teff.values.astype("float"),  # log Teff in K
+                        df_1.log_R.values.astype("float"),  # log R in Rsun
+                        np.pad(
+                            df_2.star_mass.values.astype("float"),
+                            (0, -1 * pad_length),
+                            "edge",
+                        ),  # mass in Msun
+                        np.pad(
+                            df_2.log_L.values.astype("float"),
+                            (0, -1 * pad_length),
+                            "constant",
+                            constant_values=(0, 0),
+                        ),  # log Lbol in Lsun
+                        np.pad(
+                            df_2.log_Teff.values.astype("float"),
+                            (0, -1 * pad_length),
+                            "constant",
+                            constant_values=(0, 0),
+                        ),  # log Teff in K
+                        np.pad(
+                            df_2.log_R.values.astype("float"),
+                            (0, -1 * pad_length),
+                            "edge",
+                        ),  # log R in Rsun
+                    )
+                )
 
-        data = data[:first_empty, :, :]
+            model_split = model.split("/")
+            model_split = model_split[1].split("_")
+
+            return _data, model_split
+
+        print("Starting to extract data...")
+
+        i = 0
+        for file in tqdm.tqdm(files):
+            extracted_data, model_split = extract_data(file)
+            data[i, :, : len(extracted_data[0, :])] = extracted_data
+            model_orbits[i] = int(
+                round(10 ** float(model_split[0]), 1) * 1e6
+                + float(model_split[1]) * 1e5
+                + float(model_split[2]) * 100
+            )
+            i += 1
+
+        # pool = Pool()
+        # results = list(tqdm.tqdm(pool.imap_unordered(extract_data, files), total=len(files)))
+
+        # i = 0
+        # for result in pool.imap_unordered(extract_data, files):
+        #    if result is not None:
+        #        extracted_data, model_split = result
+        #        data[i, :, : len(extracted_data[0, :])] = extracted_data
+        #        model_orbits[i] = int(
+        #            round(10 ** float(model_split[0]), 1) * 1e6
+        #            + float(model_split[1]) * 1e5
+        #            + float(model_split[2]) * 100
+        #        )
+        #        i += 1
+
+        # pool.close()
 
         # Sort by model
         sorted_models = np.argsort(model_orbits)[::-1]
@@ -717,38 +777,6 @@ class MPAConverter(BinaryEvolutionConverter):
                 j = num_times
 
         data = data[:, :, :first_empty]
-
-        # If fewer models, fill with sensible values
-        for i in range(len(data[:, 0, 0])):
-            _zeros = np.where(data[i, 0, :] == 0)[0]
-            if len(_zeros) > 1:  # if not longest
-                data[i, 0, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 0, _zeros[1] - 1]
-                )
-                data[i, 1, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 1, _zeros[1] - 1]
-                )
-                data[i, 2, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 2, _zeros[1] - 1]
-                )
-                data[i, 3, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 3, _zeros[1] - 1]
-                )
-                data[i, 4, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 4, _zeros[1] - 1]
-                )
-                data[i, 5, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 5, _zeros[1] - 1]
-                )
-                data[i, 6, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 6, _zeros[1] - 1]
-                )
-                data[i, 7, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 7, _zeros[1] - 1]
-                )
-                data[i, 8, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 8, _zeros[1] - 1]
-                )
 
         if ("binaries_" + self.met + ".h5") not in os.listdir(
             self.output_dir
