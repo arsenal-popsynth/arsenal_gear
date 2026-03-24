@@ -216,10 +216,9 @@ class PiecewisePowerLaw(IMF):
         for i in range(len(self.betas)):
             b_plus_1 = self.betas[i] + 1
             w_prior = self.weights[:i].sum() if i > 0 else 0.0
-            res = (
-                (q * self.total_area - w_prior) * b_plus_1 / self.alphas[i]
-                + self.m_pts[i] ** b_plus_1
-            ) ** (1.0 / b_plus_1)
+            base = (q * self.total_area - w_prior) * b_plus_1 / self.alphas[i] \
+                + np.power(self.m_pts[i], b_plus_1)
+            res = np.power(base, 1.0 / b_plus_1)
             results.append(res)
 
         final = np.select(conditions, results, default=np.nan)
