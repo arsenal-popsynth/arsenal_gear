@@ -20,7 +20,8 @@ _autosummary
 
 # Isochrone data
 arsenal_gear/stellar_evolution/data/
-arsenal_gear/element_yields/data
+arsenal_gear/element_yields/data/
+arsenal_gear/binary_evolution/data/
 # plotting outputs
 plots/
 

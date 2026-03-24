@@ -9,8 +9,10 @@ evolution models.
 import os
 import tarfile
 from zipfile import ZipFile
+
 import requests
 from tqdm import tqdm
+
 
 class download_BPASS_models:
     """
@@ -37,7 +39,7 @@ class download_BPASS_models:
 
         """
 
-        self.download = force_download
+        self.force_download = force_download
 
         if bpass_dir[-1] == "/":
             self.dir: str = bpass_dir
@@ -46,9 +48,7 @@ class download_BPASS_models:
 
         super().__init__()
 
-    def downloader(
-        self, url=bpass_url, message="Downloading stellar models..."
-    ) -> None:
+    def download(self, url=bpass_url, message="Downloading stellar models...") -> None:
         """
         Method for downloading BPASS stellar models from the web.
 
@@ -60,34 +60,14 @@ class download_BPASS_models:
             Exception: If the download fails.
 
         """
-        if message is not None:
-            print(message)
+        from arsenal_gear.utils.scraper import downloader
 
-        download_url = url
         if self.dir[-1] == "/":
             fname = self.dir + "bpass_v2.2.zip"
         else:
             fname = self.dir + "/bpass_v2.2.zip"
 
-        try:
-            response = requests.get(download_url, stream=True, timeout=10)
-        except requests.exceptions.Timeout as e:
-            raise requests.exceptions.Timeout(
-                f"Request timed out. Check your internet connection. {e}"
-            )
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(f"Request failed: {e}")
-
-        # Get file size
-        total_size = int(response.headers.get("content-length", 0))
-        # create a progress bar
-        tqdm_args = {'desc': 'Downloading', 'total': total_size, 'unit': 'B',
-                        'unit_scale': True, 'unit_divisor': 1024}
-        # write the file
-        with open(fname, "wb") as f, tqdm(**tqdm_args) as prog_bar:
-            for chunk in response.iter_content(chunk_size=1024):
-                f.write(chunk)
-                prog_bar.update(len(chunk))
+        downloader(fname, url, message)
 
     def unzip(
         self, zip_name: str, target_file=None, delete_zip=False, inspect=False
@@ -149,7 +129,6 @@ class download_BPASS_models:
             print("Deleting", fname)
             fname.unlink()
 
-
     def get_stellar_models(
         self,
         tar_name="bpass-v2.2-newmodels.tar.gz",
@@ -181,8 +160,8 @@ class download_BPASS_models:
 
                 else:
                     print("zip file not available at", self.dir)
-                    if self.download:
-                        self.downloader(url)
+                    if self.force_download:
+                        self.download(url)
                         self.unzip(
                             zip_name,
                             target_file=tar_name,
@@ -195,6 +174,88 @@ class download_BPASS_models:
                     else:
                         print("Set force_download = True to download the files")
 
-        return 
+        return
 
-        
+
+class download_MPA_models:
+    """
+    Reads in MPA/Bonn stellar model files for use with a discrete stellar population.
+    """
+
+    mpa_url = "https://wwwmpa.mpa-garching.mpg.de/stellgrid/data/BonnGrids/MW"
+
+    def __init__(
+        self,
+        mpa_dir: str,
+        username: str,
+        password: str,
+        force_download: bool = False,
+    ) -> None:
+        """
+        Args:
+            mpa_dir: the directory for the MPA/Bonn models
+
+        """
+
+        self.download = force_download
+
+        self.username = username
+        self.password = password
+
+        if mpa_dir[-1] == "/":
+            self.dir: str = mpa_dir
+        else:
+            self.dir: str = mpa_dir + "/"
+
+        super().__init__()
+
+    def downloader(self, url=mpa_url, message="Downloading stellar models...") -> None:
+        """
+        Method for downloading MPA/Bonn stellar models from the web.
+
+        Args:
+            url (str): The URL of the MPA/Bonn repository.
+            message (str): Optional message to display before downloading.
+
+        Raises:
+            Exception: If the download fails.
+
+        """
+        if message is not None:
+            print(message)
+
+        download_url = url
+        if self.dir[-1] == "/":
+            fname = self.dir + "binary.tar"
+        else:
+            fname = self.dir + "/binary.tar"
+
+        try:
+            response = requests.get(
+                download_url,
+                stream=True,
+                timeout=10,
+                auth=(self.username, self.password),
+            )
+        except requests.exceptions.Timeout as e:
+            raise requests.exceptions.Timeout(
+                f"Request timed out. Check your internet connection. {e}"
+            )
+        except requests.exceptions.RequestException as e:
+            raise requests.exceptions.RequestException(f"Request failed: {e}")
+
+        # Get file size
+        total_size = int(response.headers.get("content-length", 0))
+        # create a progress bar
+        tqdm_args = {
+            "desc": "Downloading",
+            "total": total_size,
+            "unit": "B",
+            "unit_scale": True,
+            "unit_divisor": 1024,
+        }
+        # write the file
+        with open(fname, "wb") as f, tqdm(**tqdm_args) as prog_bar:
+            for chunk in response.iter_content(chunk_size=1024):
+                f.write(chunk)
+                prog_bar.update(len(chunk))
