@@ -10,9 +10,6 @@ import os
 import tarfile
 from zipfile import ZipFile
 
-import requests
-from tqdm import tqdm
-
 
 class download_BPASS_models:
     """
@@ -182,7 +179,7 @@ class download_MPA_models:
     Reads in MPA/Bonn stellar model files for use with a discrete stellar population.
     """
 
-    mpa_url = "https://wwwmpa.mpa-garching.mpg.de/stellgrid/data/BonnGrids/MW"
+    mpa_url = "https://wwwmpa.mpa-garching.mpg.de/stellgrid/data/BonnGrids/"
 
     def __init__(
         self,
@@ -197,7 +194,7 @@ class download_MPA_models:
 
         """
 
-        self.download = force_download
+        self.force_download = force_download
 
         self.username = username
         self.password = password
@@ -209,7 +206,7 @@ class download_MPA_models:
 
         super().__init__()
 
-    def downloader(self, url=mpa_url, message="Downloading stellar models...") -> None:
+    def download(self, url=mpa_url, message="Downloading stellar models...") -> None:
         """
         Method for downloading MPA/Bonn stellar models from the web.
 
@@ -221,41 +218,20 @@ class download_MPA_models:
             Exception: If the download fails.
 
         """
+
+        from arsenal_gear.utils.scraper import downloader_with_password as downloader
+
         if message is not None:
             print(message)
 
-        download_url = url
-        if self.dir[-1] == "/":
-            fname = self.dir + "binary.tar"
-        else:
-            fname = self.dir + "/binary.tar"
+        model_sets = ["MW", "LMC", "SMC"]
 
-        try:
-            response = requests.get(
-                download_url,
-                stream=True,
-                timeout=10,
-                auth=(self.username, self.password),
-            )
-        except requests.exceptions.Timeout as e:
-            raise requests.exceptions.Timeout(
-                f"Request timed out. Check your internet connection. {e}"
-            )
-        except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(f"Request failed: {e}")
+        for model_set in model_sets:
 
-        # Get file size
-        total_size = int(response.headers.get("content-length", 0))
-        # create a progress bar
-        tqdm_args = {
-            "desc": "Downloading",
-            "total": total_size,
-            "unit": "B",
-            "unit_scale": True,
-            "unit_divisor": 1024,
-        }
-        # write the file
-        with open(fname, "wb") as f, tqdm(**tqdm_args) as prog_bar:
-            for chunk in response.iter_content(chunk_size=1024):
-                f.write(chunk)
-                prog_bar.update(len(chunk))
+            download_url = url + model_set
+            if self.dir[-1] == "/":
+                fname = self.dir + model_set + ".tar"
+            else:
+                fname = self.dir + "/" + model_set + ".tar"
+
+            downloader(fname, download_url, self.username, self.password, message)
