@@ -146,6 +146,14 @@ class IsochroneInterpolator(AbstractIsochrone):
             self.iset = self.reader.read_iso_data()
         else:
             self.tset = self.reader.read_track_data()
+            self._precompute_track_arrays()
+
+        # cache for _get_mmax_age_interp (depends only on static data)
+        self._mmax_cache = None
+        # single-entry cache for the last constructed iso-mode isochrone
+        # keyed by (log10_age_yr, method); avoids rebuilding when lbol + teff
+        # are queried at the same age
+        self._iso_cache = {}
 
     @staticmethod
     def _get_interpolator(method:str):
@@ -264,20 +272,6 @@ class IsochroneInterpolator(AbstractIsochrone):
                     ais = np.arange(ai - n // 2, ai + n // 2 + 1)
         return np.array(ais, dtype=int)
 
-    @staticmethod
-    def _fixed_eep_q(j: int, eeps: list, qs: list):
-        """
-        Returns the value of a isochrone quantity at a fixed EEP
-        across several isochrones at different times.
-        Args:
-            j: the index of the EEP to get values for
-            eeps: the list of EEPs for each isochrone.
-            qs: the list of quantities for each isochrone.
-        Returns:
-            qj: the quantity at the fixed EEP.
-        """
-        return [q[np.where(eep == j)[0]][0] for (q, eep) in zip(qs, eeps)]
-
     def _construct_iso_isochrone(self, t:Quantity["time"], labels:list[str],
                                  method:str="pchip",
                                  supplement=True) -> Isochrone:
@@ -302,20 +296,35 @@ class IsochroneInterpolator(AbstractIsochrone):
             if len(t) != 1:
                 raise ValueError("t must be a single value for now")
             ai = self._age_index(Quantity([t.value[0]], t.unit))[0]
-        # get nearby isochrones and interpolate between them
-        ais = self._get_ai_range(ai, 4)
+        # get nearby isochrones and interpolate between them;
+        # pchip needs 4 neighbours, linear only needs 2
+        n_neighbours = 4 if method == "pchip" else 2
+        ais = self._get_ai_range(ai, n_neighbours)
         lages = np.array([self.iset.lages[i] for i in ais])
         lt = np.log10(t.to(u.yr).value)
-        qs = [[self.iset.isos[i].qs[label] for i in ais] for label in labels]
         eep_str = self.iset.eep_name
         eeps = [self.iset.isos[i].qs[eep_str] for i in ais]
 
         # eeps present in all isochrones
         eepi = reduce(np.intersect1d, tuple(eeps))
-        f = self._get_interpolator(method)
 
-        # interpolate in log(age) at each eep
-        qis = [np.array([f(lt, lages, self._fixed_eep_q(j,eeps,q)) for j in eepi]) for q in qs]
+        # For each neighbouring isochrone find the positions of the common EEPs
+        # in its EEP array with a single searchsorted call (replaces per-EEP np.where).
+        indices = [np.searchsorted(eep, eepi) for eep in eeps]
+
+        # Build a (n_neighbours, n_eepi) matrix per label and interpolate in
+        # log(age) across all EEPs in one vectorised call, exploiting
+        # pchip_interpolate's native 2-D yi support (first axis = x-dimension).
+        # With 2 neighbours this is equivalent to linear interpolation.
+        qis = [
+            pchip_interpolate(
+                lages,
+                np.array([self.iset.isos[ais[k]].qs[label][indices[k]]
+                          for k in range(len(ais))]),   # (n_neighbours, n_eepi)
+                lt,
+            )
+            for label in labels
+        ]
 
         # make sure initial mass is monotonic in interpolation
         for (i,label) in enumerate(labels):
@@ -365,9 +374,19 @@ class IsochroneInterpolator(AbstractIsochrone):
         Returns:
             q_res: the specified quantity at the requested initial mass.
         """
-        # construct isochrone for mass/luminosity relationship
-        labels = [self.iset.mini_name, label]
-        iso = self._construct_iso_isochrone(t, labels,method=method,supplement=False)
+        # Construct (or reuse) the supplemented isochrone for this age.
+        # Caching avoids rebuilding when lbol, teff, etc. are all queried at
+        # the same age in the same call.  The key is an integer derived from
+        # log10(age/yr) kept to 5 d.p. so equivalent ages in different units
+        # hash identically and the key is exact.
+        lt_key = int(round(np.log10(t.to(u.yr).value) * 1e5))
+        cache_key = (lt_key, method)
+        if cache_key not in self._iso_cache:
+            self._iso_cache = {}   # keep only the most recent age
+            self._iso_cache[cache_key] = self._construct_iso_isochrone(
+                t, [], method=method, supplement=True
+            )
+        iso = self._iso_cache[cache_key]
         qi = iso.qs[label]
         massi = iso.qs[self.iset.mini_name]
 
@@ -379,6 +398,63 @@ class IsochroneInterpolator(AbstractIsochrone):
         return q_res
 
     ######## EEP INTERPOLATION FUNCTIONS ########
+    def _precompute_track_arrays(self):
+        """
+        Pre-computes 2D numpy arrays from the list of StellarTrack objects so that
+        EEP-loop iterations can use fast array slices instead of Python object loops.
+
+        Builds:
+            _age_matrix    (n_masses, max_eep) float array, NaN where a track
+                           does not reach that EEP.
+            _q_matrices    dict[label -> (n_masses, max_eep)] float array, same
+                           NaN convention, for every label in tset.hdr_list.
+            _valid_mask    (n_masses, max_eep) bool array.
+            _masses_val    (n_masses,) float array of initial masses in Msun.
+            _mono_data     list of length max_eep.  Entry e is either None
+                           (no valid tracks at that EEP) or a tuple
+                           (age_col, mass_col) where age_col is the
+                           monotonicity-corrected age array (decreasing with
+                           mass) ready for direct use in _construct_eep_isochrone.
+        """
+        n_masses = len(self.tset.tracks)
+        max_eep  = self.tset.max_eep
+        # hdr_list has raw file column names; track.qs has processed names
+        # (surface_h1 → 'H', etc.), so derive labels from the actual qs keys.
+        labels   = list(self.tset.tracks[0].qs.keys())
+        age_name = self.tset.age_name
+
+        masses_val = self.tset.masses.to(u.Msun).value          # (n_masses,)
+
+        age_matrix = np.full((n_masses, max_eep), np.nan)
+        q_matrices = {lbl: np.full((n_masses, max_eep), np.nan) for lbl in labels}
+
+        for j, track in enumerate(self.tset.tracks):
+            n = len(track.qs[age_name])
+            age_matrix[j, :n] = track.qs[age_name]
+            for lbl in labels:
+                q_matrices[lbl][j, :n] = track.qs[lbl]
+
+        valid_mask = ~np.isnan(age_matrix)                       # (n_masses, max_eep)
+
+        # Pre-apply monotonicity correction for each EEP column so it is not
+        # repeated on every query.  We copy before mutating so age_matrix stays clean.
+        mono_data = []
+        for e in range(max_eep):
+            valid = valid_mask[:, e]
+            if valid.sum() > 1:
+                age_col  = age_matrix[valid, e].copy()
+                mass_col = masses_val[valid].copy()
+                age_col  = array_utils.make_monotonic_decreasing(mass_col, age_col)
+                mono_data.append((age_col, mass_col))
+            else:
+                mono_data.append(None)
+
+        self._masses_val = masses_val
+        self._age_matrix = age_matrix
+        self._q_matrices = q_matrices
+        self._valid_mask = valid_mask
+        self._mono_data  = mono_data
+
     def _get_eep_relation(self, eep:int, labels:list[str]):
         """
         For a given EEP, returns the age, mass and a list of quantities varying
@@ -391,19 +467,11 @@ class IsochroneInterpolator(AbstractIsochrone):
             mass_set: the initial masses at the given EEP across all tracks
             q_set: the list of quantities at the given EEP across all tracks
         """
-        nq = len(labels)
-        (age_set, mass_set, q_set) = ([], [], [[] for _ in range(nq)])
-        for (j,track) in enumerate(self.tset.tracks):
-            ages = track.age.value
-            if eep <= len(ages):
-                # get the age at the given EEP
-                age_set.append(ages[eep-1])
-                mass_set.append(self.tset.masses[j].value)
-                for (i,label) in enumerate(labels):
-                    q_set[i].append(track.qs[label][eep-1])
-        age_set = np.array(age_set)
-        mass_set = np.array(mass_set)*self.tset.masses.unit
-        q_set = np.array(q_set)
+        e = eep - 1  # convert to 0-indexed column
+        valid    = self._valid_mask[:, e]
+        age_set  = self._age_matrix[valid, e]
+        mass_set = self._masses_val[valid] * self.tset.masses.unit
+        q_set    = np.array([self._q_matrices[lbl][valid, e] for lbl in labels])
         return age_set, mass_set, q_set
 
     def _construct_eep_isochrone(self, t:Quantity["time"], labels:list[str],
@@ -433,16 +501,19 @@ class IsochroneInterpolator(AbstractIsochrone):
         interp = self._get_interpolator(method)
         age = array_utils.make_scalar_quantity(t, unit=u.yr).value
         (eeps_,ms_,qs_) = ([],[],[[] for _ in range(nq)])
-        for eep in range(1, self.tset.max_eep+1):
-            (age_set, mass_set, q_set) = self._get_eep_relation(eep, labels)
-            age_test = min(age_set) < age < max(age_set)
-            if ((len(age_set) > 0) and age_test):
-                eeps_.append(eep)
-                age_set = array_utils.make_monotonic_decreasing(mass_set, age_set)
-                m = interp(age, age_set[::-1], mass_set[::-1])
-                ms_.append(m)
-                for i in range(nq):
-                    qs_[i].append(interp(m, mass_set, q_set[i]))
+        for e in range(self.tset.max_eep):
+            mono = self._mono_data[e]
+            if mono is None:
+                continue
+            age_col, mass_col = mono
+            if not (age_col.min() < age < age_col.max()):
+                continue
+            eeps_.append(e + 1)
+            m = interp(age, age_col[::-1], mass_col[::-1])
+            ms_.append(m)
+            valid = self._valid_mask[:, e]
+            for i in range(nq):
+                qs_[i].append(interp(m, mass_col, self._q_matrices[labels[i]][valid, e]))
         # this is the constructed isochrone for property qs given by "labels"
         iso_qs = {labels[i]: np.array(qs_[i]) for i in range(nq)}
         iso_qs["EEP"] = np.array(eeps_)
@@ -502,7 +573,10 @@ class IsochroneInterpolator(AbstractIsochrone):
         """
         Returns the maximum mass as a function of age,
         properly interpreted from either the isochrone or EEP/track data.
+        Result is cached after the first call since it depends only on static data.
         """
+        if self._mmax_cache is not None:
+            return self._mmax_cache
         if self.interp_op == "iso":
             lages = self.iset.lages
             mmax = np.array([np.max(iso.mini.value) for iso in self.iset.isos])
@@ -517,7 +591,8 @@ class IsochroneInterpolator(AbstractIsochrone):
             sel = array_utils.index_monotonic(lages)
             lages = lages[sel]
             mmax = mmax[sel]
-        return (lages, mmax)
+        self._mmax_cache = (lages, mmax)
+        return self._mmax_cache
 
     def _interp_quantity(
         self,
