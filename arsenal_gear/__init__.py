@@ -268,9 +268,3 @@ class SynthPop:
         Return the total mass of the population
         """
         return self.form.Mtot
-    # ltlancas: commented this out for now, I can't think of what calling the SynthPop
-    #           object should do by default right now...
-    #def __call__(self, N: int) -> SinglePop:
-    #    """
-    #    Return a
-    #    """

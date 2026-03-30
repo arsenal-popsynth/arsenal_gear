@@ -29,6 +29,7 @@ class Formation():
             default_pop = {
                 "Mtot": 1e6 * u.Msun,
                 "metallicity": 0.0 * u.dimensionless_unscaled,
+                "rotation": 0.0 * u.dimensionless_unscaled,
                 "imf": "salpeter",
                 "mmin": 0.08,
                 "mmax": 100.0,
@@ -102,6 +103,18 @@ class Formation():
             )
             raise ValueError(err_msg)
         
+        # check rotation
+        rotation = pop_dict.get("rotation", 0.0 * u.dimensionless_unscaled)
+        if isinstance(rotation, u.Quantity):
+            rotation = rotation.to(u.dimensionless_unscaled)
+        elif isinstance(rotation, (int, float)):
+            rotation = rotation * u.dimensionless_unscaled
+        else:
+            err_msg = (f"Invalid rotation: {rotation}. Must be a dimensionless quantity "
+                       "or a number specifying rotation as a fraction of critical rotation."
+            )
+            raise ValueError(err_msg)
+        
         # check IMF
         imf = pop_dict.get("imf", "salpeter")
         if isinstance(imf, dist_funcs.imf.IMF):
@@ -160,6 +173,7 @@ class Formation():
                          tform,
                          Nstar,
                          metallicity,
+                         rotation,
                          imf,
                          mmin,
                          mmax,

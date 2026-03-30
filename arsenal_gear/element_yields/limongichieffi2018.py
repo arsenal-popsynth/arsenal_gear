@@ -60,6 +60,7 @@ class LimongiChieffi2018(YieldTables):
             >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
                                                         Nstar=Nstar,
                                                         metallicity=metallicity,
+                                                        rotation=0.0 * u.dimensionless_unscaled,
                                                         imf=None,
                                                         mmin=mmin,
                                                         mmax=mmax,
@@ -128,7 +129,7 @@ class LimongiChieffi2018(YieldTables):
 
         """
         args = [
-            np.zeros_like(starPop.masses.value),
+            starPop.rotation.value * np.ones_like(starPop.masses.value),
             starPop.metallicity.value * np.ones_like(starPop.masses.value),
             starPop.masses.to(u.M_sun).value,
         ]
@@ -162,7 +163,7 @@ class LimongiChieffi2018(YieldTables):
         """
         # TO DO: replace these calls with a default argument parsing function
         args = [
-            np.zeros_like(starPop.masses.value),
+            starPop.rotation.value * np.ones_like(starPop.masses.value),
             starPop.metallicity.value * np.ones_like(starPop.masses.value),
             starPop.masses.to(u.M_sun).value,
         ]

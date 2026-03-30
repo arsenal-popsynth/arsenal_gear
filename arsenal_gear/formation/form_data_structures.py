@@ -28,6 +28,9 @@ class SinglePop:
     tform: Quantity["time"]
     Nstar: int | float
     metallicity: Quantity["dimensionless"]
+    # rotation is a dimensionless quantity between 0 and 1
+    # where 0 is non-rotating and 1 is critical rotation
+    rotation: Quantity["dimensionless"]
     imf: IMF
     mmin: Quantity["mass"]
     mmax: Quantity["mass"]

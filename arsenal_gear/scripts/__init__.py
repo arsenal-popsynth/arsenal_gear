@@ -40,6 +40,7 @@ def zams_single(
                      0.0 * u.Myr,
                      len(masses),
                      metals * u.dimensionless_unscaled,
+                     0.0 * u.dimensionless_unscaled,    
                      imf_,
                      min_mass,
                      max_mass,
