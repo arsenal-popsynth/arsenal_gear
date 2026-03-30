@@ -77,8 +77,6 @@ class MISTReader(IsochroneDataReader):
         """
         # set input parameters
         super().__init__(**kwargs)
-        # TODO: add option for rotation that is connected to the stellar population
-        #       for now just set to 0
         self.vvcrit = kwargs.get("vvcrit", "0.0")
         self.rootdir = kwargs.get("rootdir", None)
         # Fill out dummy attributes
