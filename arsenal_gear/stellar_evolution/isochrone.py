@@ -272,20 +272,6 @@ class IsochroneInterpolator(AbstractIsochrone):
                     ais = np.arange(ai - n // 2, ai + n // 2 + 1)
         return np.array(ais, dtype=int)
 
-    @staticmethod
-    def _fixed_eep_q(j: int, eeps: list, qs: list):
-        """
-        Returns the value of a isochrone quantity at a fixed EEP
-        across several isochrones at different times.
-        Args:
-            j: the index of the EEP to get values for
-            eeps: the list of EEPs for each isochrone.
-            qs: the list of quantities for each isochrone.
-        Returns:
-            qj: the quantity at the fixed EEP.
-        """
-        return [q[np.where(eep == j)[0]][0] for (q, eep) in zip(qs, eeps)]
-
     def _construct_iso_isochrone(self, t:Quantity["time"], labels:list[str],
                                  method:str="pchip",
                                  supplement=True) -> Isochrone:
