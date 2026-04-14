@@ -221,14 +221,15 @@ class download_MPA_models:
 
         from arsenal_gear.utils.scraper import downloader_with_password as downloader
 
-        if message is not None:
-            print(message)
-
-        model_sets = ["MW", "LMC", "SMC"]
+        model_sets = [
+            "single_MW/single_MW",
+            "single_LMC/single_LMC",
+            "single_SMC/single_SMC",
+        ]
 
         for model_set in model_sets:
 
-            download_url = url + model_set
+            download_url = url + model_set + ".tar"
             if self.dir[-1] == "/":
                 fname = self.dir + model_set + ".tar"
             else:
