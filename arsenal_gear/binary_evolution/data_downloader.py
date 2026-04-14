@@ -10,8 +10,10 @@ import os
 import tarfile
 from zipfile import ZipFile
 
+from arsenal_gear.utils.scraper import downloader, downloader_with_password
 
-class download_BPASS_models:
+
+class BPASSDownloader:
     """
     Reads in BPASS stellar model files for use with a discrete stellar population.
     """
@@ -57,7 +59,6 @@ class download_BPASS_models:
             Exception: If the download fails.
 
         """
-        from arsenal_gear.utils.scraper import downloader
 
         if self.dir[-1] == "/":
             fname = self.dir + "bpass_v2.2.zip"
@@ -174,7 +175,7 @@ class download_BPASS_models:
         return
 
 
-class download_MPA_models:
+class MPADownloader:
     """
     Reads in MPA/Bonn stellar model files for use with a discrete stellar population.
     """
@@ -219,8 +220,6 @@ class download_MPA_models:
 
         """
 
-        from arsenal_gear.utils.scraper import downloader_with_password as downloader
-
         model_sets = [
             "single_MW/single_MW",
             "single_LMC/single_LMC",
@@ -235,4 +234,6 @@ class download_MPA_models:
             else:
                 fname = self.dir + "/" + model_set + ".tar"
 
-            downloader(fname, download_url, self.username, self.password, message)
+            downloader_with_password(
+                fname, download_url, self.username, self.password, message
+            )
