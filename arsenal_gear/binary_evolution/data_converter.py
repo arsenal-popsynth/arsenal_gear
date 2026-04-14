@@ -230,7 +230,7 @@ class BPASSConverter(BinaryEvolutionConverter):
         model_directory = self.input_dir + "/NEWBINMODS/NEWBINMODS/" + self.metstr
 
         # Values for disrupted or modified systems, when looking for new systems
-        M_single = np.concatenate(
+        m_single = np.concatenate(
             (np.arange(0.1, 10.0, 0.1), np.arange(10, 100, 1), np.arange(100, 325, 25))
         )
 
@@ -291,11 +291,11 @@ class BPASSConverter(BinaryEvolutionConverter):
         print("Pre-SN evolution done. Now checking for rejuvenation...")
 
         # Check for mergers and rejuvenation
-        dM1 = data[:, 1, 1:] - data[:, 1, :-1]
-        dM2 = data[:, 5, 1:] - data[:, 5, :-1]
+        dm1 = data[:, 1, 1:] - data[:, 1, :-1]
+        dm2 = data[:, 5, 1:] - data[:, 5, :-1]
         # Look for first instance of primary accreting without mass loss in companion
         # This is done because the companion properties are "frozen" at the start of the merger
-        merged_systems, merged_steps = np.where((dM1 > 0) & (dM2 == 0))
+        merged_systems, merged_steps = np.where((dm1 > 0) & (dm2 == 0))
         unique_systems, unique_ids = np.unique(merged_systems, return_index=True)
         unique_steps = merged_steps[unique_ids]
         for j in range(len(unique_systems)):
@@ -305,26 +305,26 @@ class BPASSConverter(BinaryEvolutionConverter):
             data[unique_systems[j], 8, unique_steps[j] :] = -1 * np.inf
 
         # Evolution of companion after SN
-        SN_systems = np.where(data[:, 1, 0] >= 8)[0]
+        sn_systems = np.where(data[:, 1, 0] >= 8)[0]
         # Look for rejuventated systems
         # Here, use the last value for the subsequent evolution
-        rejuv_systems, rejuv_steps = np.where(dM2 > 0)
-        for system in SN_systems:
+        rejuv_systems, rejuv_steps = np.where(dm2 > 0)
+        for system in sn_systems:
             # Has the system been rejuvenated?
             if system in rejuv_systems:
 
                 step = rejuv_steps[np.where(rejuv_systems == system)][-1]
                 time = data[system, 0, :][step]
-                M_eff = data[system, 5, :][step]
+                m_eff = data[system, 5, :][step]
 
                 # Meets the criteria for rejuvenation
-                if (M_eff >= 1.05 * data[system, 5, 0]) and (M_eff > 2):
-                    M_closest = M_single[np.argmin(np.abs(M_single - M_eff))]
+                if (m_eff >= 1.05 * data[system, 5, 0]) and (m_eff > 2):
+                    m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
 
                 # Does not meet the criteria; update time to match SN time
                 else:
-                    M_eff = data[system, 5, 0]
-                    M_closest = M_single[np.argmin(np.abs(M_single - M_eff))]
+                    m_eff = data[system, 5, 0]
+                    m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
                     step = np.where(data[system, 0, :] != 0)[0][-1]
                     time = data[system, 0, :][step]
 
@@ -332,30 +332,30 @@ class BPASSConverter(BinaryEvolutionConverter):
                 if len(np.where(data[system, 0, :] != 0)[0]) == 0:
                     # Use as failsafe for broken files; ignore for now by looping over
                     # Example is sneplot=z040-35-0.9-4
-                    M_closest = 0
+                    m_closest = 0
                     # Also set time = 0 to avoid linter error; this will be ignored
                     time = 0
 
                 else:
                     step = np.where(data[system, 0, :] != 0)[0][-1]
                     time = data[system, 0, :][step]
-                    M_eff = data[system, 5, 0]
-                    if M_eff > 0.8:  # If actual companion, and not empty array
-                        M_closest = M_single[np.argmin(np.abs(M_single - M_eff))]
+                    m_eff = data[system, 5, 0]
+                    if m_eff > 0.8:  # If actual companion, and not empty array
+                        m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
                     else:
-                        M_closest = 0
+                        m_closest = 0
 
             # Now use mass and time for subsequent evolution
             # Name-match the single BPASS files
-            if M_closest == 0:
+            if m_closest == 0:
                 pass
             else:
-                if np.round(M_closest, 1) == np.round(M_closest, 0):
-                    M_closest = str(int(M_closest))
-                elif M_closest < 10:
-                    M_closest = str(np.round(M_closest, 1))
+                if np.round(m_closest, 1) == np.round(m_closest, 0):
+                    m_closest = str(int(m_closest))
+                elif m_closest < 10:
+                    m_closest = str(np.round(m_closest, 1))
                 else:
-                    M_closest = str(int(M_closest))
+                    m_closest = str(int(m_closest))
                 c_file = (
                     self.input_dir
                     + "/NEWSINMODS/"
@@ -363,7 +363,7 @@ class BPASSConverter(BinaryEvolutionConverter):
                     + "/sneplot-"
                     + self.metstr
                     + "-"
-                    + M_closest
+                    + m_closest
                 )
                 c_data = np.genfromtxt(c_file)
                 c_data = np.nan_to_num(c_data)
