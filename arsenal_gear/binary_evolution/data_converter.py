@@ -141,10 +141,13 @@ class BPASSConverter(BinaryEvolutionConverter):
                 return np.transpose(_data[:, return_ids])  # log R in Rsun
 
         pool = Pool()
+        results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
+
         i = 0
-        for result in pool.imap_unordered(extract_data, files):
-            data[i, :, : len(result[0, :])] = result
-            i += 1
+        for result in results:
+            if result is not None:
+                data[i, :, : len(result[0, :])] = result
+                i += 1
 
         pool.close()
 
@@ -236,7 +239,6 @@ class BPASSConverter(BinaryEvolutionConverter):
         files = os.listdir(model_directory)
         num_files = len(files)
         # Times for time array
-        num_times = int(1e4)  # Assume there are at most 1e4 outputs
         num_times = int(1e4)  # Assume there are at most 1e4 outputs
         # Save properties as a function of time: (1) time,
         # (2) primary mass, (3) primary bolometric luminosity,
