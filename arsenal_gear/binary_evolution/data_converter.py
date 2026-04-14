@@ -8,7 +8,6 @@ through downloading, reorganzing and interpreting their outputs.
 
 import os
 from abc import ABC, abstractmethod
-from multiprocessing import set_start_method
 from multiprocessing.pool import ThreadPool as Pool
 from pathlib import Path
 
@@ -19,7 +18,7 @@ import xarray as xr
 
 from .be_data_structures import BinaryStarTable, SingleStarTable
 
-set_start_method("fork")
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 
 class BinaryEvolutionConverter(ABC):
@@ -553,9 +552,7 @@ class MPAConverter(BinaryEvolutionConverter):
             return _data
 
         pool = Pool()
-        results = list(
-            tqdm.tqdm(pool.imap_unordered(extract_data, files), total=len(files))
-        )
+        results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
         i = 0
         for result in results:
@@ -618,7 +615,7 @@ class MPAConverter(BinaryEvolutionConverter):
         """
 
         # Create directory if it does not already exists
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        # Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
         primary_directory = self.input_dir + self.met + "/primary/"
         secondary_directory = self.input_dir + self.met + "/secondary/"
@@ -733,32 +730,18 @@ class MPAConverter(BinaryEvolutionConverter):
         print("Starting to extract data...")
 
         i = 0
-        for file in tqdm.tqdm(files):
-            extracted_data, model_split = extract_data(file)
-            data[i, :, : len(extracted_data[0, :])] = extracted_data
-            model_orbits[i] = int(
-                round(10 ** float(model_split[0]), 1) * 1e6
-                + float(model_split[1]) * 1e5
-                + float(model_split[2]) * 100
-            )
-            i += 1
-
-        # pool = Pool()
-        # results = list(tqdm.tqdm(pool.imap_unordered(extract_data, files), total=len(files)))
-
-        # i = 0
-        # for result in pool.imap_unordered(extract_data, files):
-        #    if result is not None:
-        #        extracted_data, model_split = result
-        #        data[i, :, : len(extracted_data[0, :])] = extracted_data
-        #        model_orbits[i] = int(
-        #            round(10 ** float(model_split[0]), 1) * 1e6
-        #            + float(model_split[1]) * 1e5
-        #            + float(model_split[2]) * 100
-        #        )
-        #        i += 1
-
-        # pool.close()
+        for file in tqdm.tqdm(files, total=len(files)):
+            # Use Pool to avoid overflowing memory
+            with Pool(1) as pool:
+                result = pool.map(extract_data, [file])[0]
+                extracted_data, model_split = result
+                data[i, :, : len(extracted_data[0, :])] = extracted_data
+                model_orbits[i] = int(
+                    round(10 ** float(model_split[0]), 1) * 1e6
+                    + float(model_split[1]) * 1e5
+                    + float(model_split[2]) * 100
+                )
+                i += 1
 
         # Sort by model
         sorted_models = np.argsort(model_orbits)[::-1]
