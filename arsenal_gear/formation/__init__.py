@@ -193,10 +193,7 @@ class Formation():
         Return the total mass of the population, which is just the sum of Mtot
         for all subpopulations.
         """
-        Mtot = 0.0 * u.Msun
-        for pop in self.subpops:
-            Mtot += pop.Mtot.to(u.Msun)
-        return Mtot
+        return np.sum([pop.Mtot.to(u.Msun).value for pop in self.subpops]) * u.Msun
 
     @property
     def Nstar(self) -> int | float:
