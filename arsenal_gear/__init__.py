@@ -251,7 +251,7 @@ class SynthPop:
             return np.zeros_like(pop.masses.value) * u.K
 
     @property
-    def masses(self) -> Quantity["mass"]:
+    def discrete_masses(self) -> Quantity["mass"]:
         """
         Return the masses of all stars in the population as a 1D array
         If the population is not discrete, mass from these populations is not included
