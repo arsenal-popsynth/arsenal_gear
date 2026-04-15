@@ -165,37 +165,56 @@ class MISTReader(IsochroneDataReader):
     def _process_elem_label(label):
         """
         Helper function to process element labels in the MIST data.
+
+        MIST surfface abundance labels are of the form "surface_{elem}{num}"
+        where {elem} is the element symbol and {num} is the isotope number.
+        This function extracts the element symbol from the label.
         """
+        # takes the part without "surface_" and removes the isotope number at the end
         elem = label[8:].rstrip('0123456789')
         if len(elem) == 1:
             elem = elem.upper()
             return elem
+        # make sure two-letter elements have the first capitalized (He, Li, Be, etc.)
         elif len(elem) == 2:
             elem = elem[0].upper() + elem[1].lower()
             return elem
         else:
             raise ValueError(f"Could not parse element name from label {label}")
 
+    def _dictionary_to_qs_elems(self, props):
+        """
+        Takes a dictionary of existing properties and separates out the abundances of
+        surface elements, concatenating together different isotopes and returns the
+        resulting dictionary along with the list of elements.
+        """
+        (qs, elems) = ({}, [])
+        for label in props.keys():
+            if label.startswith("surface_"):
+                elem = self._process_elem_label(label)
+                if elem in qs:
+                    # this adds together different isotopes
+                    qs[elem] += props[label]
+                else:
+                    qs[elem] = props[label]
+                    elems.append(elem)
+            elif label != "log10_isochrone_age_yr":
+                qs[label] = props[label]
+        return qs, elems
+
     def read_iso_data(self) -> IsochroneSet:
         """
         Reads in isochrone data for MIST
         """
+        # reads in isochrone data from files
         lages, hdr_list, isos_mist = self.read_iso_file()
         isos = []
+        # this loop turns the read-in data into the Isochrone data structure that
+        # we usee elsewhere in the code. This concatenates all isotopes of surface
+        # abundances and separates a list of the elements tracked at the surface.
         for iso in isos_mist:
             age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-            (qs, elems) = ({}, [])
-            for label in hdr_list:
-                if label.startswith("surface_"):
-                    elem = self._process_elem_label(label)
-                    if elem in qs:
-                        # this adds together different isotopes
-                        qs[elem] += iso[label]
-                    else:
-                        qs[elem] = iso[label]
-                        elems.append(elem)
-                elif label != "log10_isochrone_age_yr":
-                    qs[label] = iso[label]
+            (qs, elems) = self._dictionary_to_qs_elems(iso)
             iso_data = Isochrone(age=age,
                                  eep_name='EEP',
                                  mini_name='initial_mass',
@@ -208,11 +227,14 @@ class MISTReader(IsochroneDataReader):
             isos.append(iso_data)
         self.hdr_list = hdr_list
 
+        # the mass-age relationship for MIST isochrones is non-monotonic at very early times
+        # (less than a few Myr) we just ignore this portion of evolution in order to assure
+        # that we have a monotonic mass-age relationship for interpolation purposes.
         mmaxes = np.array([np.max(iso.mini.value) for iso in isos])
         # ensure the array is monotonic
         int_mono = (np.where(np.diff(mmaxes) > 0)[0]+1)[-1]
         mmaxes = np.array(mmaxes)[int_mono:]
-        # get the maximum mass still alive for each isochrone
+        # get the maximum mass tracekd overall
         max_mass = np.max(mmaxes)
         # get the minimum mass for the isochrones
         mmins = np.array([np.min(iso.mini.value) for iso in isos])
@@ -252,18 +274,7 @@ class MISTReader(IsochroneDataReader):
             masses.append(minit)
             min_ages.append(min_age)
             max_ages.append(max_age)
-            (qs, elems) = ({}, [])
-            for label in data.keys():
-                if label.startswith("surface_"):
-                    elem = self._process_elem_label(label)
-                    if elem in qs:
-                        # this adds together different isotopes
-                        qs[elem] += data[label]
-                    else:
-                        qs[elem] = data[label]
-                        elems.append(elem)
-                else:
-                    qs[label] = data[label]
+            (qs, elems) = self._dictionary_to_qs_elems(data)
 
             tracks.append(StellarTrack(mass=minit*u.Msun,
                                        eeps=eeps,
@@ -330,7 +341,7 @@ class MISTReader(IsochroneDataReader):
                 iso[eep] = tuple(iso_chunk)
             iso_set.append(iso)
             ages.append(iso[0][1])
-            counter+= 3+num_eeps+2
+            counter+= 5+num_eeps
         return ages, hdr_list, iso_set
 
     def read_eep_file(self, fname):
