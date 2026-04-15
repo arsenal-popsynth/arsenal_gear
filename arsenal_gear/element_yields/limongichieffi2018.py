@@ -129,8 +129,8 @@ class LimongiChieffi2018(YieldTables):
 
         """
         args = [
-            starPop.rotation.value * np.ones_like(starPop.masses.value),
-            starPop.metallicity.value * np.ones_like(starPop.masses.value),
+            starPop.rotation.value * starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         yld_array = (
@@ -163,8 +163,8 @@ class LimongiChieffi2018(YieldTables):
         """
         # TO DO: replace these calls with a default argument parsing function
         args = [
-            starPop.rotation.value * np.ones_like(starPop.masses.value),
-            starPop.metallicity.value * np.ones_like(starPop.masses.value),
+            starPop.rotation.value * starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         yld_array = (

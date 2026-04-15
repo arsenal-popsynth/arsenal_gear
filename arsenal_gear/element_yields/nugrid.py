@@ -129,7 +129,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -159,7 +159,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -189,7 +189,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -304,7 +304,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -334,7 +334,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -364,7 +364,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -601,7 +601,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -631,7 +631,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -661,7 +661,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -887,7 +887,7 @@ class Battino20192021(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*np.ones_like(starPop.masses.value),
+            starPop.metallicity.value*starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (

@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
 from astropy.units import Quantity
 
 if TYPE_CHECKING:
@@ -37,6 +38,11 @@ class SinglePop:
     discrete: bool
     # set to None if not discrete, otherwise a list of masses
     masses: Quantity["mass"]
+
+    @property
+    def ones_like(self) -> np.array:
+        """return an array of unity values of the same length of the mass array"""
+        return np.ones_like(self.masses.value)
 
 @dataclass
 class BinaryPop(SinglePop):
