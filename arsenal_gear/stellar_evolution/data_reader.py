@@ -182,14 +182,14 @@ class MISTReader(IsochroneDataReader):
         else:
             raise ValueError(f"Could not parse element name from label {label}")
 
-    def _dictionary_to_qs_elems(self, props):
+    def _dictionary_to_qs_elems(self, props, keys):
         """
         Takes a dictionary of existing properties and separates out the abundances of
         surface elements, concatenating together different isotopes and returns the
         resulting dictionary along with the list of elements.
         """
         (qs, elems) = ({}, [])
-        for label in props.keys():
+        for label in keys:
             if label.startswith("surface_"):
                 elem = self._process_elem_label(label)
                 if elem in qs:
@@ -214,7 +214,7 @@ class MISTReader(IsochroneDataReader):
         # abundances and separates a list of the elements tracked at the surface.
         for iso in isos_mist:
             age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-            (qs, elems) = self._dictionary_to_qs_elems(iso)
+            (qs, elems) = self._dictionary_to_qs_elems(iso, hdr_list)
             iso_data = Isochrone(age=age,
                                  eep_name='EEP',
                                  mini_name='initial_mass',
@@ -274,7 +274,7 @@ class MISTReader(IsochroneDataReader):
             masses.append(minit)
             min_ages.append(min_age)
             max_ages.append(max_age)
-            (qs, elems) = self._dictionary_to_qs_elems(data)
+            (qs, elems) = self._dictionary_to_qs_elems(data, data.keys())
 
             tracks.append(StellarTrack(mass=minit*u.Msun,
                                        eeps=eeps,

@@ -66,7 +66,7 @@ def test_call_signatures():
         se = sp[k].evol.ses[0]
         pop = sp[k].form.subpops[0]
         if pop.discrete:
-            ms = pop.discrete_masses
+            ms = pop.masses
         else:
             ms = np.logspace(np.log10(pop.imf.min_mass), np.log10(pop.imf.max_mass), 10)*u.Msun
         lbol_pop_scal = se.lbol(ms, t_scal)
