@@ -9,10 +9,18 @@ import astropy.units as u
 import numpy as np
 import pytest
 
-from arsenal_gear.formation.dist_funcs.imf import Chabrier, Kroupa, MillerScalo, Salpeter
+from arsenal_gear.formation.dist_funcs.imf import (
+    Chabrier,
+    Kroupa1993,
+    Kroupa2001,
+    MillerScalo,
+    Salpeter,
+)
 
 
-@pytest.mark.parametrize("imf_class", [Salpeter, Kroupa, MillerScalo, Chabrier])
+@pytest.mark.parametrize(
+    "imf_class", [Salpeter, Kroupa1993, Kroupa2001, MillerScalo, Chabrier]
+)
 @pytest.mark.parametrize(
     "limits",
     [
@@ -44,8 +52,9 @@ class TestIMFs:
 
         expected_max = imf.max_mass
         expected_min = imf.min_mass
-        assert masses.max().to(u.Msun).value <= expected_max * (1 + 1e-7)
-        assert masses.min().to(u.Msun).value >= expected_min * (1 - 1e-7)
+
+        assert masses.max().to(u.Msun).value <= expected_max
+        assert masses.min().to(u.Msun).value >= expected_min
 
     def test_mean_mass(self, imf_class, limits):
         min_mass, max_mass = limits
