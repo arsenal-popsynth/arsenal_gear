@@ -16,7 +16,7 @@ import requests
 from astropy.units import Quantity
 from tqdm import tqdm
 
-from arsenal_gear.population import BinaryPopulation, StarPopulation
+from arsenal_gear.formation import SinglePop, BinaryPop
 
 
 class BPASS_stellar_models:
@@ -35,8 +35,8 @@ class BPASS_stellar_models:
 
     def __init__(
         self,
-        singles: StarPopulation,
-        binaries: BinaryPopulation,
+        singles: SinglePop,
+        binaries: BinaryPop,
         metal: str,
         time: Quantity["time"],
         bpass_dir: str,
@@ -44,8 +44,8 @@ class BPASS_stellar_models:
     ) -> None:
         """
         Args:
-            stars:     the StarPopulation instance for which we want information
-            binaries:  the BinaryPopulation instance for which we want information
+            singles:     the SinglePop instance for which we want information
+            binaries:  the BinaryPop instance for which we want information
             metal:     the metallicity of the stellar population
             TO DO -CCC, 26/06/2025: Read metallicity from binaries
             time:      current simulation time
@@ -81,10 +81,11 @@ class BPASS_stellar_models:
 
         self.time: Quantity["time"] = time
 
-        self.s_mass: list = singles["mass"].to(u.Msun).value
-        self.b_mass: list = binaries.primary["mass"].to(u.Msun).value
-        self.mratio: list = binaries.secondary["mass"] / binaries.primary["mass"]
-        self.logp: list = np.log10(binaries["period"].to(u.d).value)
+        self.s_mass: list = singles.masses.to(u.Msun).value
+        # TO DO: this may be a interpreted differently once 
+        self.b_mass: list = binaries.masses.to(u.Msun).value
+        self.mratio: list = binaries.mrats.to(u.dimensionless_unscaled).value
+        self.logp: list = np.log10(binaries.periods.to(u.d).value)
         super().__init__()
 
     def downloader(

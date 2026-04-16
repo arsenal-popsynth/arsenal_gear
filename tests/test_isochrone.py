@@ -8,11 +8,10 @@ which are mostly contained in stellar_evolution/isochrone.py
 
 import astropy.units as u
 import numpy as np
-from numpy.testing import assert_array_less
+from numpy.testing import assert_array_less, assert_allclose
 from scipy.integrate import trapezoid
 
 import arsenal_gear
-
 
 def get_contiguous_regions(mask):
     """
@@ -43,6 +42,61 @@ def integrate_mask(y, x, mask):
             total_integral += trapezoid(y[s:e], x[s:e])
     return total_integral
 
+def test_call_signatures():
+    """
+    Makes sure that the different ways of calling the isochrone interpolators main functions
+    are all working without any error and return the right shapes of arrasys with the right units.
+    """
+    # continuous population
+    pop1_dict = {"Mtot": 1e6 * u.Msun, "imf": "salpeter", "discrete": False}
+    # discrete population
+    pop2_dict = {"Mtot": 1e6 * u.Msun, "imf": "salpeter", "seed": 42}
+    sp = {
+        "track1": arsenal_gear.SynthPop(interp_op="track", pop1=pop1_dict),
+        "iso1": arsenal_gear.SynthPop(interp_op="iso",     pop1=pop1_dict),
+        "track2": arsenal_gear.SynthPop(interp_op="track", pop2=pop2_dict),
+        "iso2": arsenal_gear.SynthPop(interp_op="iso",     pop2=pop2_dict),
+    }
+
+    t_scal = 1*u.Myr
+    t_uarr = np.array([1.])*u.Myr
+    t_array = np.array([1., 10., 100.])*u.Myr
+    for k in sp.keys():
+        # first test direct methods of the stellar evolution class
+        se = sp[k].evol.ses[0]
+        pop = sp[k].form.subpops[0]
+        if pop.discrete:
+            ms = pop.masses
+        else:
+            ms = np.logspace(np.log10(pop.imf.min_mass), np.log10(pop.imf.max_mass), 10)*u.Msun
+        lbol_pop_scal = se.lbol(ms, t_scal)
+        lbol_pop_uarr = se.lbol(ms, t_uarr)
+        teff_pop_scal = se.teff(ms, t_scal)
+        teff_pop_uarr = se.teff(ms, t_uarr)
+        assert isinstance(lbol_pop_scal, u.Quantity)
+        assert isinstance(lbol_pop_uarr, u.Quantity)
+        assert isinstance(teff_pop_scal, u.Quantity)
+        assert isinstance(teff_pop_uarr, u.Quantity)
+        assert lbol_pop_scal.unit == u.Lsun
+        assert lbol_pop_uarr.unit == u.Lsun
+        assert teff_pop_scal.unit == u.K
+        assert teff_pop_uarr.unit == u.K
+        assert lbol_pop_scal.shape == ms.shape
+        assert lbol_pop_uarr.shape == ms.shape
+        assert teff_pop_scal.shape == ms.shape
+        assert teff_pop_uarr.shape == ms.shape
+
+        # test population-level methods
+        lbol_scal = sp[k].lbol(t_scal)
+        lbol_uarr = sp[k].lbol(t_uarr)
+        lbol_array = sp[k].lbol(t_array)
+        assert lbol_scal.unit == u.Lsun
+        assert lbol_uarr.unit == u.Lsun
+        assert lbol_array.unit == u.Lsun
+        assert lbol_scal.shape == ()
+        assert lbol_uarr.shape == t_uarr.shape
+        assert lbol_array.shape == t_array.shape
+
 
 def test_mist_interp():
     """initialize stellar population with EEP interpolation
@@ -50,8 +104,11 @@ def test_mist_interp():
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "track": arsenal_gear.StellarPopulation(interp_op="track"),
-        "iso": arsenal_gear.StellarPopulation(interp_op="iso", test=True),
+        "track": arsenal_gear.SynthPop(interp_op="track",
+                                       seed=42),
+        "iso": arsenal_gear.SynthPop(interp_op="iso",
+                                     seed=42,
+                                     test=True),
     }
 
     lmissed = {"track": [], "iso": []}
@@ -59,26 +116,27 @@ def test_mist_interp():
     T_err = {"track": [], "iso": []}
     T, L, nm, lum, lw_lerr = {}, {}, {}, {}, {}
 
-    ais = np.arange(len(sp["iso"].iso.iset.lages))
+    se_iso = sp["iso"].evol.ses[0]
+    ais = np.arange(len(se_iso.iset.lages))
     for ai in ais[2::6]:
         ai += 1
         t = (
             (1 + 1e-6)
-            * np.power(10, np.array([sp["iso"].iso.iset.lages[ai]]) - 6)
+            * np.power(10, np.array([se_iso.iset.lages[ai]]) - 6)
             * u.Myr
         )
 
-        ms = sp["iso"].iso.iset.isos[ai].qs["initial_mass"] * u.Msun
-        xi = sp["iso"].imf.pdf(ms)
-
-        L_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_L"])
-        T_ref = np.power(10, sp["iso"].iso.iset.isos[ai].qs["log_Teff"])
+        ms = se_iso.iset.isos[ai].qs["initial_mass"] * u.Msun
+        xi = sp["iso"].form.subpops[0].imf.pdf(ms)
+        L_ref = np.power(10, se_iso.iset.isos[ai].qs["log_L"])
+        T_ref = np.power(10, se_iso.iset.isos[ai].qs["log_Teff"])
         lum_ref = trapezoid(L_ref * xi, ms.value)
         lw_teff_ref = trapezoid(L_ref * xi * T_ref, ms.value) / lum_ref
 
         for k in ["track", "iso"]:
-            T[k] = (sp[k].iso.teff(ms, t) / u.K).value
-            L[k] = (sp[k].iso.lbol(ms, t) / u.Lsun).value
+            se = sp[k].evol.ses[0]
+            T[k] = (se.teff(ms, t) / u.K).value
+            L[k] = (se.lbol(ms, t) / u.Lsun).value
 
             # fraction of the total luminosity that
             # is missed by interpolation edge effects
@@ -129,8 +187,8 @@ def test_lbol_methods_mist():
     for int_op in int_ops:
         for discrete in discrete_ops:
             key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
-            sp = arsenal_gear.StellarPopulation(
-                interp_op=int_op, discrete=discrete
+            sp = arsenal_gear.SynthPop(
+                interp_op=int_op, discrete=discrete, seed=42
             )
             outs[key] = sp.lbol(tlin)
     # compare all combinations of the four methods
@@ -141,3 +199,37 @@ def test_lbol_methods_mist():
             rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
             # average relative error should be less than 4%
             assert np.average(rel_err) < 0.05
+
+def test_lifetime_interp_mist():
+    """
+    Tests that the stellar_lifetime function for isochrone- and track-based interpolation
+    from the MIST isochrones are consistent with each other.
+    """
+    sp = {
+        "track": arsenal_gear.SynthPop(interp_op="track"),
+        "iso": arsenal_gear.SynthPop(interp_op="iso"),
+    }
+    # make sure we only query the lifetime function where the isochrones have data
+    se_iso = sp["iso"].evol.ses[0]
+    mmax = np.array([np.max(iso.mini.value) for iso in se_iso.iset.isos])
+    # ensure the array is monotonic
+    int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
+    mmaxes = np.array(mmax)[int_mono:]
+    iso_mmin = min(mmaxes)
+    iso_mmax = max(mmaxes)
+    se_track = sp["track"].evol.ses[0]
+    track_mmin = np.min(se_track.tset.masses.value)
+    track_mmax = np.max(se_track.tset.masses.value)
+    mmin = np.max((iso_mmin, track_mmin))
+    mmax = np.min((iso_mmax, track_mmax))
+    mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
+
+    mlin = np.logspace(np.log10(mmin), np.log10(mmax), 100) * u.Msun
+    results = {}
+    for k in sp.keys():
+        se = sp[k].evol.ses[0]
+        lt = se.stellar_lifetime(mlin)
+        results[k] = lt
+        # the lifetime should be a decreasing function of mass
+        assert_array_less(lt[1:], lt[:-1])
+    assert_allclose(results["track"].value, results["iso"].value, rtol=0.09)

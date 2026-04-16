@@ -17,7 +17,7 @@ from astropy import units as u
 from astropy.units import Quantity
 from scipy.interpolate import interp1d
 
-from ..population import StarPopulation
+from ..formation import SinglePop
 from .source import Source
 from .yieldtables import YieldTables
 
@@ -261,14 +261,14 @@ class Sukhbold2016(YieldTables):
     def wind_yields(
         self,
         elements,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate="nearest",
         extrapolate=False,
     ) -> dict[str, Quantity["mass"]]:
         args = [
-            np.zeros(len(starPop["mass"])),
-            np.full(len(starPop["mass"]), 0.02),
-            starPop["mass"].to(u.Msun).value,
+            np.zeros(len(starPop.masses)),
+            np.full(len(starPop.masses), 0.02),
+            starPop.masses.to(u.Msun).value,
         ]
         yld_array = (
             self.wind.get_yld(
@@ -281,7 +281,7 @@ class Sukhbold2016(YieldTables):
     def ccsn_yields(
         self,
         elements,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate="nearest",
         extrapolate=False,
     ) -> dict[str, Quantity["mass"]]:
@@ -292,9 +292,9 @@ class Sukhbold2016(YieldTables):
             interpolate = "nearest"
 
         args = [
-            np.zeros(len(starPop["mass"])),
-            np.full(len(starPop["mass"]), 0.02),
-            starPop["mass"].to(u.Msun).value,
+            np.zeros(len(starPop.masses)),
+            np.full(len(starPop.masses), 0.02),
+            starPop.masses.to(u.Msun).value,
         ]
         yld_array = (
             self.ccsn.get_yld(

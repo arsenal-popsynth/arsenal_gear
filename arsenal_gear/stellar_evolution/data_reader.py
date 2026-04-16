@@ -14,7 +14,7 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 
-from ..utils import downloader, extract_one, find_match, is_valid_txz
+from ..utils import downloader, extract_one, find_match, is_valid_txz, get_metstr
 from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
 
 
@@ -86,10 +86,7 @@ class MISTReader(IsochroneDataReader):
         self.rot = None
         self.abun = None
 
-        if self.met<0:
-            self.metstr = f"m{-1*self.met:.2f}"
-        else:
-            self.metstr = f"p{self.met:.2f}"
+        self.metstr = get_metstr(self.met)
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
         if self.vvcrit not in ["0.0", "0.4"]:
@@ -164,32 +161,97 @@ class MISTReader(IsochroneDataReader):
             downloader(self.rootdir / self.tarfile, url, message)
             extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
 
+    @staticmethod
+    def _process_elem_label(label):
+        """
+        Helper function to process element labels in the MIST data.
+
+        MIST surfface abundance labels are of the form "surface_{elem}{num}"
+        where {elem} is the element symbol and {num} is the isotope number.
+        This function extracts the element symbol from the label.
+        """
+        # takes the part without "surface_" and removes the isotope number at the end
+        elem = label[8:].rstrip('0123456789')
+        if len(elem) == 1:
+            elem = elem.upper()
+            return elem
+        # make sure two-letter elements have the first capitalized (He, Li, Be, etc.)
+        elif len(elem) == 2:
+            elem = elem[0].upper() + elem[1].lower()
+            return elem
+        else:
+            raise ValueError(f"Could not parse element name from label {label}")
+
+    def _dictionary_to_qs_elems(self, props, keys):
+        """
+        Takes a dictionary of existing properties and separates out the abundances of
+        surface elements, concatenating together different isotopes and returns the
+        resulting dictionary along with the list of elements.
+        """
+        (qs, elems) = ({}, [])
+        for label in keys:
+            if label.startswith("surface_"):
+                elem = self._process_elem_label(label)
+                if elem in qs:
+                    # this adds together different isotopes
+                    qs[elem] += props[label]
+                else:
+                    qs[elem] = props[label]
+                    elems.append(elem)
+            elif label != "log10_isochrone_age_yr":
+                qs[label] = props[label]
+        return qs, elems
+
     def read_iso_data(self) -> IsochroneSet:
         """
         Reads in isochrone data for MIST
         """
+        # reads in isochrone data from files
         lages, hdr_list, isos_mist = self.read_iso_file()
         isos = []
+        # this loop turns the read-in data into the Isochrone data structure that
+        # we usee elsewhere in the code. This concatenates all isotopes of surface
+        # abundances and separates a list of the elements tracked at the surface.
         for iso in isos_mist:
             age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-            qs = {}
-            for label in hdr_list:
-                if label != "log10_isochrone_age_yr":
-                    qs[label] = iso[label]
+            (qs, elems) = self._dictionary_to_qs_elems(iso, hdr_list)
             iso_data = Isochrone(age=age,
-                                    eep_name='EEP',
-                                    mini_name='initial_mass',
-                                    lteff_name='log_Teff',
-                                    llbol_name='log_L',
-                                    qs=qs)
+                                 eep_name='EEP',
+                                 mini_name='initial_mass',
+                                 lteff_name='log_Teff',
+                                 llbol_name='log_L',
+                                 lrad_name='log_R',
+                                 lgrav_name='log_g',
+                                 elems=elems,
+                                 qs=qs)
             isos.append(iso_data)
         self.hdr_list = hdr_list
-        # get the maximum mass still alive for each isochrone
-        max_mass = np.max(isos_mist[0]['initial_mass'])
+
+        # the mass-age relationship for MIST isochrones is non-monotonic at very early times
+        # (less than a few Myr) we just ignore this portion of evolution in order to assure
+        # that we have a monotonic mass-age relationship for interpolation purposes.
+        mmaxes = np.array([np.max(iso.mini.value) for iso in isos])
+        # ensure the array is monotonic
+        int_mono = (np.where(np.diff(mmaxes) > 0)[0]+1)[-1]
+        mmaxes = np.array(mmaxes)[int_mono:]
+        # get the maximum mass tracekd overall
+        max_mass = np.max(mmaxes)
+        # get the minimum mass for the isochrones
+        mmins = np.array([np.min(iso.mini.value) for iso in isos])
+        min_mass = np.min(mmins)
         iset = IsochroneSet(lages=lages,
                             hdr_list=self.hdr_list,
                             isos=isos,
-                            max_mass=max_mass*u.Msun)
+                            min_mass=min_mass*u.Msun,
+                            max_mass=max_mass*u.Msun,
+                            metallicity=self.met,
+                            eep_name='EEP',
+                            mini_name='initial_mass',
+                            lteff_name='log_Teff',
+                            llbol_name='log_L',
+                            lrad_name='log_R',
+                            lgrav_name='log_g',
+                            elems=isos[0].elems)
         return iset
 
     def read_track_data(self) -> TrackSet:
@@ -212,22 +274,34 @@ class MISTReader(IsochroneDataReader):
             masses.append(minit)
             min_ages.append(min_age)
             max_ages.append(max_age)
+            (qs, elems) = self._dictionary_to_qs_elems(data, data.keys())
+
             tracks.append(StellarTrack(mass=minit*u.Msun,
-                                        eeps=eeps,
-                                        age_name='star_age',
-                                        lteff_name='log_Teff',
-                                        llbol_name='log_L',
-                                        qs=data))
+                                       eeps=eeps,
+                                       age_name='star_age',
+                                       lteff_name='log_Teff',
+                                       llbol_name='log_L',
+                                       lrad_name='log_R',
+                                       lgrav_name='log_g',
+                                       qs=qs,
+                                       elems=elems))
         masses = np.array(masses)*u.Msun
         min_ages = np.array(min_ages)*u.yr
         max_ages = np.array(max_ages)*u.yr
         self.hdr_list = data.keys()
         tset = TrackSet(masses=masses,
-                                min_ages=min_ages,
-                                max_ages=max_ages,
-                                hdr_list=self.hdr_list,
-                                tracks=tracks,
-                                max_eep=max_eep)
+                        min_ages=min_ages,
+                        max_ages=max_ages,
+                        hdr_list=self.hdr_list,
+                        tracks=tracks,
+                        max_eep=max_eep,
+                        eep_name='EEP',
+                        age_name='star_age',
+                        lteff_name='log_Teff',
+                        llbol_name='log_L',
+                        lrad_name='log_R',
+                        lgrav_name='log_g',
+                        elems=elems)
         return tset
 
     def read_iso_file(self):
@@ -267,7 +341,7 @@ class MISTReader(IsochroneDataReader):
                 iso[eep] = tuple(iso_chunk)
             iso_set.append(iso)
             ages.append(iso[0][1])
-            counter+= 3+num_eeps+2
+            counter+= 5+num_eeps
         return ages, hdr_list, iso_set
 
     def read_eep_file(self, fname):
