@@ -7,15 +7,11 @@ This submodule contains all the code required to sample from an IMF.
 
 import astropy.units as u
 import numpy as np
+import scipy.special as sp
 from astropy.units import Quantity
-from pyerf import erf as _scalar_erf
-from pyerf import erfinv as _scalar_erfinv
 from scipy.stats import rv_continuous
 
-erf = np.vectorize(_scalar_erf)
-erfinv = np.vectorize(_scalar_erfinv)
-
-__all__ = ["IMF", "Salpeter", "MillerScalo", "Kroupa", "Chabrier", "PiecewisePowerLaw"]
+__all__ = ["IMF", "Salpeter", "Kroupa1993", "Kroupa2001", "MillerScalo", "Chabrier"]
 
 
 class IMF(rv_continuous):
@@ -41,13 +37,14 @@ class IMF(rv_continuous):
         calls like:
         >> half_mass_mass = imf.mass_dist.ppf(0.5)
         """
+
         def __init__(self, imf):
             self._imf = imf
-            self.mean_mass = imf.mean().value # in Msun
-            super().__init__(a=imf.min_mass, b=imf.max_mass, name=imf.name+"_mass")
+            self.mean_mass = imf.mean().value  # in Msun
+            super().__init__(a=imf.min_mass, b=imf.max_mass, name=imf.name + "_mass")
 
         def _pdf(self, x, *args):
-            return x*self._imf.pdf(x, *args)/self.mean_mass
+            return x * self._imf.pdf(x, *args) / self.mean_mass
 
     def __init__(
         self, min_mass: Quantity["mass"], max_mass: Quantity["mass"], name="", seed=None
@@ -63,7 +60,29 @@ class IMF(rv_continuous):
                 f"min_mass ({min_mass}) must be less than max_mass ({max_mass})."
             )
         super().__init__(a=self.min_mass, b=self.max_mass, name=name, seed=seed)
-        self.mass_dist = self.MassDist(self)
+        self._mass_dist = None
+
+    @property
+    def mass_dist(self):
+        if self._mass_dist is None:
+            self._mass_dist = self.MassDist(self)
+        return self._mass_dist
+
+    @staticmethod
+    def get_imf(imf_identifier, **kwargs):
+        registry = {
+            "salpeter": Salpeter,
+            "kroupa1993": Kroupa1993,
+            "kroupa2001": Kroupa2001,
+            "millerscalo": MillerScalo,
+            "chabrier": Chabrier,
+        }
+        if isinstance(imf_identifier, str):
+            name = imf_identifier.lower()
+            if name in registry:
+                return registry[name](**kwargs)
+            raise ValueError(f"Unknown IMF string: {imf_identifier}")
+        return imf_identifier
 
     def sample_mass(self, mtot: Quantity["mass"]) -> Quantity["mass"]:
         """
@@ -86,7 +105,8 @@ class IMF(rv_continuous):
         :return: List of masses of stars
         :rtype: Quantity["mass"]
         """
-        return self.rvs(size=N) * u.Msun
+        vals = self.rvs(size=N)
+        return np.clip(vals, self.min_mass, self.max_mass) * u.Msun
 
 
 class Salpeter(IMF):
@@ -107,10 +127,12 @@ class Salpeter(IMF):
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
-        max_mass: Quantity["mass"] = 120 * u.Msun,
+        max_mass: Quantity["mass"] = 100 * u.Msun,
         alpha: float = 2.35,
         seed=None,
     ):
+        self.min_mass = min_mass
+        self.max_mass = max_mass
         self.alpha = alpha
         self.name = "Salpeter"
         assert alpha >= 0
@@ -143,50 +165,44 @@ class PiecewisePowerLaw(IMF):
         :param masses: List/Array of transition masses (e.g., [0.5, 1.0])
         :param betas: List/Array of slopes (e.g., [-1.3, -2.3, -2.7])
         """
-        # define the slopes
-        self.betas = np.array(betas)
+        super().__init__(min_mass, max_mass, name=name, seed=seed)
 
-        # create the boundaries
-        m_pts = [m.to(u.Msun).value if hasattr(m, "unit") else m for m in masses]
-        m_pts = list(np.sort(m_pts))
-        if len(m_pts) != len(self.betas) - 1:
-            raise ValueError(
-                f"Number of transition masses (masses={masses}) must be one less than the number of slopes (betas={betas})."
-            )
-        if (
-            min_mass.to(u.Msun).value > m_pts[0]
-            or max_mass.to(u.Msun).value < m_pts[-1]
-        ):
-            raise ValueError(
-                f"User-specified mass range ({min_mass}, {max_mass}) must encompass all transition masses ({masses})."
-            )
-        m_pts = np.array(
-            [min_mass.to(u.Msun).value] + m_pts + [max_mass.to(u.Msun).value]
+        m_min_val = self.min_mass
+        m_max_val = self.max_mass
+
+        all_pts = np.sort(
+            [m.to(u.Msun).value if hasattr(m, "unit") else m for m in masses]
         )
+        internal_pts = all_pts[(all_pts > m_min_val) & (all_pts < m_max_val)]
+        self.m_pts = np.concatenate(([m_min_val], internal_pts, [m_max_val]))
 
-        # calculate stellar continuity constants
+        # Dynamic beta selection ensures the correct slope if used for
+        # segments in self.m_pts
+        full_bounds = np.concatenate(([-np.inf], all_pts, [np.inf]))
+        matched_betas = []
+        for i in range(len(self.m_pts) - 1):
+            midpoint = (self.m_pts[i] + self.m_pts[i + 1]) / 2
+            idx = np.searchsorted(full_bounds, midpoint) - 1
+            matched_betas.append(betas[idx])
+        self.betas = np.array(matched_betas)
+
         self.alphas = np.ones(len(self.betas))
         for i in range(1, len(self.betas)):
             self.alphas[i] = self.alphas[i - 1] * (
-                m_pts[i] ** (self.betas[i - 1] - self.betas[i])
+                self.m_pts[i] ** (self.betas[i - 1] - self.betas[i])
             )
 
         self.weights = []
-        # calculate weights (or areas); weight is 0 if segment falls outside user's mass range
-        # determines self.m_pts which creates the true user-defined boundaries
         for i in range(len(self.betas)):
             b_plus_1 = self.betas[i] + 1
             w = (self.alphas[i] / b_plus_1) * (
-                m_pts[i + 1] ** b_plus_1 - m_pts[i] ** b_plus_1
+                self.m_pts[i + 1] ** b_plus_1 - self.m_pts[i] ** b_plus_1
             )
             self.weights.append(w)
 
-        self.m_pts = m_pts
         self.weights = np.array(self.weights)
         self.total_area = np.sum(self.weights)
         self.cum_weights = np.cumsum(self.weights) / self.total_area
-        super().__init__(min_mass, max_mass, name=name, seed=seed)
-
 
     def _pdf(self, x, *args):
         # check which segment x falls into based on m_pts
@@ -206,22 +222,27 @@ class PiecewisePowerLaw(IMF):
         is_scalar = np.isscalar(q)
         q = np.atleast_1d(q)
 
-        conditions = []
+        final = np.full_like(q, fill_value=np.nan, dtype=np.float64)
         prev_q = 0.0
-        for i in range(len(self.cum_weights)):
-            conditions.append((q >= prev_q) & (q <= self.cum_weights[i]))
+        for i in range(len(self.betas)):
+            cond = (q >= prev_q) & (q <= self.cum_weights[i])
+
+            if np.any(cond):
+                b_plus_1 = self.betas[i] + 1
+                w_prior = self.weights[:i].sum() if i > 0 else 0.0
+
+                q_valid = q[cond]
+
+                base = (q_valid * self.total_area - w_prior) * b_plus_1 / self.alphas[
+                    i
+                ] + self.m_pts[i] ** b_plus_1
+
+                base = np.maximum(base, 0.0)
+
+                final[cond] = base ** (1.0 / b_plus_1)
+
             prev_q = self.cum_weights[i]
 
-        results = []
-        for i in range(len(self.betas)):
-            b_plus_1 = self.betas[i] + 1
-            w_prior = self.weights[:i].sum() if i > 0 else 0.0
-            base = (q * self.total_area - w_prior) * b_plus_1 / self.alphas[i] \
-                + np.power(self.m_pts[i], b_plus_1)
-            res = np.power(base, 1.0 / b_plus_1)
-            results.append(res)
-
-        final = np.select(conditions, results, default=np.nan)
         return final[0] if is_scalar else final
 
     def mean(self, *args, **kwds):
@@ -235,9 +256,9 @@ class PiecewisePowerLaw(IMF):
         return res * u.Msun
 
 
-class Kroupa(PiecewisePowerLaw):
+class Kroupa2001(PiecewisePowerLaw):
     """
-    Kroupa (2001) / Kroupa (1993) IMF implementation
+    Kroupa (2001) IMF implementation
 
     :param min_mass: Least massive star in the IMF
     :type min_mass: astropy mass unit
@@ -251,15 +272,44 @@ class Kroupa(PiecewisePowerLaw):
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
-        max_mass: Quantity["mass"] = 120.0 * u.Msun,
+        max_mass: Quantity["mass"] = 150.0 * u.Msun,
         seed=None,
     ):
         super().__init__(
             min_mass=min_mass,
             max_mass=max_mass,
-            masses=[0.5],
-            betas=[-1.3, -2.3],
-            name="Kroupa",
+            masses=[0.08, 0.5],
+            betas=[-0.3, -1.3, -2.3],
+            name="Kroupa2001",
+            seed=seed,
+        )
+
+
+class Kroupa1993(PiecewisePowerLaw):
+    """
+    Kroupa, Tout & Gilmore (1993) IMF implementation
+
+    :param min_mass: Least massive star in the IMF
+    :type min_mass: astropy mass unit
+    :param max_mass: Most massive star in the IMF
+    :type max_mass: astropy mass unit
+    :param seed: Random seed for sampling
+    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
+
+    """
+
+    def __init__(
+        self,
+        min_mass: Quantity["mass"] = 0.08 * u.Msun,
+        max_mass: Quantity["mass"] = 100.0 * u.Msun,
+        seed=None,
+    ):
+        super().__init__(
+            min_mass=min_mass,
+            max_mass=max_mass,
+            masses=[0.5, 1.0],
+            betas=[-1.3, -2.2, -2.7],
+            name="Kroupa2001",
             seed=seed,
         )
 
@@ -279,8 +329,8 @@ class MillerScalo(PiecewisePowerLaw):
 
     def __init__(
         self,
-        min_mass: Quantity["mass"] = 0.08 * u.Msun,
-        max_mass: Quantity["mass"] = 120.0 * u.Msun,
+        min_mass: Quantity["mass"] = 0.1 * u.Msun,
+        max_mass: Quantity["mass"] = 100.0 * u.Msun,
         seed=None,
     ):
         super().__init__(
@@ -294,17 +344,15 @@ class MillerScalo(PiecewisePowerLaw):
 
 
 class Chabrier(IMF):
-    """
-    IMF class for the Chabrier IMF (citations..)
-    """
     def __init__(
         self,
         min_mass: u.Quantity = 0.08 * u.Msun,
-        max_mass: u.Quantity = 120.0 * u.Msun,
+        max_mass: u.Quantity = 100.0 * u.Msun,
         beta: float = -2.3,
         seed=None,
     ):
-        self.name = "Chabrier"
+        super().__init__(min_mass, max_mass, name="Chabrier", seed=seed)
+
         self.A = 0.158
         self.sigma = 0.69
         self.mc = 0.079
@@ -318,10 +366,10 @@ class Chabrier(IMF):
         self.max_mass = max_mass.to(u.Msun).value
         self.m_transition = 1.0
 
-        self.E_min = erf(
+        self.E_min = sp.erf(
             (np.log10(self.min_mass) - np.log10(self.mc)) / (np.sqrt(2) * self.sigma)
         )
-        self.E_trans = erf(
+        self.E_trans = sp.erf(
             (np.log10(self.m_transition) - np.log10(self.mc))
             / (np.sqrt(2) * self.sigma)
         )
@@ -330,13 +378,11 @@ class Chabrier(IMF):
         self.area_high = self._integrate_high()
         self.total_area = self.area_low + self.area_high
 
-        super().__init__(min_mass, max_mass, self.name, seed=seed)
-
     def _integrate_low(self):
         if self.min_mass >= self.m_transition:
             return 0.0
         actual_min = max(self.min_mass, 0.01)  # 0.01 as a safety floor
-        E_min_actual = erf(
+        E_min_actual = sp.erf(
             (np.log10(actual_min) - np.log10(self.mc)) / (np.sqrt(2) * self.sigma)
         )
         factor = self.A * np.sqrt(np.pi / 2) * self.sigma
@@ -383,7 +429,7 @@ class Chabrier(IMF):
                 + self.E_min
             )
             res[slo] = 10 ** (
-                np.sqrt(2) * self.sigma * erfinv(target_erf) + np.log10(self.mc)
+                np.sqrt(2) * self.sigma * sp.erfinv(target_erf) + np.log10(self.mc)
             )
 
         # Segment 2: High mass power law
