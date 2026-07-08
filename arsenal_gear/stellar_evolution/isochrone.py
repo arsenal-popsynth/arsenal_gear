@@ -6,18 +6,19 @@ This submodule defines the interface to various stellar evolution codes
 through interpreting and processing their isochrones
 """
 
+from abc import ABC, abstractmethod
 from functools import reduce
 
 import astropy.units as u
-from abc import ABC, abstractmethod
 import numpy as np
 from astropy.units import Quantity
 from scipy.interpolate import pchip_interpolate
 
 # local imports
 from ..utils import array_utils, masked_power
-from .se_data_structures import Isochrone
 from .data_reader import MISTReader
+from .se_data_structures import Isochrone
+
 
 class AbstractIsochrone(ABC):
     """
@@ -26,12 +27,13 @@ class AbstractIsochrone(ABC):
     The main instantiaion of this base class is the IsochroneInterpolator class
     which is used to interpolate isochrones directly from tabulated calculations.
     """
+
     def __init__(self, **kwargs) -> None:
         # log10(Z/Zsun)
-        self.met = kwargs.get('met', 0.0)
+        self.met = kwargs.get("met", 0.0)
 
     @abstractmethod
-    def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
+    def stellar_lifetime(self, m0: Quantity["mass"]) -> Quantity["time"]:
         """
         Returns the lifetime of a star as a function of its initial mass and metallicity
         """
@@ -51,15 +53,17 @@ class AbstractIsochrone(ABC):
         """
 
     @abstractmethod
-    def lbol(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+    def lbol(self, m0: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
         """
-        Returns the bolometric luminosity at time t of stars with initial mass mini
+        Returns the bolometric luminosity at time t of stars with initial mass m0
         """
 
     @abstractmethod
-    def teff(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["temperature"]:
+    def teff(
+        self, m0: Quantity["mass"], t: Quantity["time"]
+    ) -> Quantity["temperature"]:
         """
-        Returns the effective temperature at time t of stars with initial mass mini
+        Returns the effective temperature at time t of stars with initial mass m0
         """
 
     @abstractmethod
@@ -69,6 +73,7 @@ class AbstractIsochrone(ABC):
         Structure of Isochrone is specified in `se_data_structures.py`
         """
 
+
 class RaiteriLifetime(AbstractIsochrone):
     """
     Abstract class that represents the mapping from a population's initial parameters
@@ -76,7 +81,8 @@ class RaiteriLifetime(AbstractIsochrone):
     The main instantiaion of this base class is the IsochroneInterpolator class
     which is used to interpolate isochrones directly from tabulated calculations.
     """
-    def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
+
+    def stellar_lifetime(self, m0: Quantity["mass"]) -> Quantity["time"]:
         """
         Stellar lifetimes calculated from
         `Raiteri+ 1996 <https://ui.adsabs.harvard.edu/abs/1996A%26A...315..105R/abstract>`__
@@ -95,8 +101,8 @@ class RaiteriLifetime(AbstractIsochrone):
             np.power(
                 10,
                 a0
-                + a1 * np.log10(mini.to(u.Msun).value)
-                + a2 * np.power(np.log10(mini.to(u.Msun).value), 2),
+                + a1 * np.log10(m0.to(u.Msun).value)
+                + a2 * np.power(np.log10(m0.to(u.Msun).value), 2),
             )
             * u.yr
         )
@@ -107,19 +113,24 @@ class RaiteriLifetime(AbstractIsochrone):
     def mmaxdot(self, t: Quantity["time"]) -> Quantity["mass"]:
         raise NotImplementedError("mmaxdot is not implemented for RaiteriLifetime")
 
-    def lbol(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
+    def lbol(self, m0: Quantity["mass"], t: Quantity["time"]) -> Quantity["power"]:
         raise NotImplementedError("lbol is not implemented for RaiteriLifetime")
 
-    def teff(self, mini: Quantity["mass"], t: Quantity["time"]) -> Quantity["temperature"]:
+    def teff(
+        self, m0: Quantity["mass"], t: Quantity["time"]
+    ) -> Quantity["temperature"]:
         raise NotImplementedError("teff is not implemented for RaiteriLifetime")
 
     def construct_isochrone(self, t: Quantity["time"]) -> Isochrone:
-        raise NotImplementedError("construct_isochrone is not implemented for RaiteriLifetime")
+        raise NotImplementedError(
+            "construct_isochrone is not implemented for RaiteriLifetime"
+        )
+
 
 class IsochroneInterpolator(AbstractIsochrone):
     """
     This class is used to interpolate isochrones from various sources
-    It can be used to interpolate stellar tracks or isochrones from any 
+    It can be used to interpolate stellar tracks or isochrones from any
     stellar evolution code, provided there is a IsochroneDataReader class
     implemented in order to read the data.
     """
@@ -127,15 +138,15 @@ class IsochroneInterpolator(AbstractIsochrone):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         # determines whether or not the isochrone instance
-        # is being used for testing or not. This changes the 
-        # selection of the isochrone data to leave out the 
+        # is being used for testing or not. This changes the
+        # selection of the isochrone data to leave out the
         # data being compared against.
-        self.test = kwargs.get('test', False)
+        self.test = kwargs.get("test", False)
         # decides whether or not to force a download of the isochrone data
         self.interp_op = kwargs.get("interp_op", "iso")
         if self.interp_op not in ["iso", "track"]:
             raise ValueError("interp_op must be either iso or track")
-    
+
         self.isochrone_opt = kwargs.get("isochrone_opt", "mist")
         if self.isochrone_opt.lower() == "mist":
             self.reader = MISTReader(**kwargs)
@@ -156,7 +167,7 @@ class IsochroneInterpolator(AbstractIsochrone):
         self._iso_cache = {}
 
     @staticmethod
-    def _get_interpolator(method:str):
+    def _get_interpolator(method: str):
         """
         Returns the appropriate interpolation function based on the method string
         Args:
@@ -165,16 +176,20 @@ class IsochroneInterpolator(AbstractIsochrone):
             interp: the interpolation function
         """
         if method == "pchip":
-            def interp(x,x0,y0):
-                return pchip_interpolate(x0,y0,x)
+
+            def interp(x, x0, y0):
+                return pchip_interpolate(x0, y0, x)
+
         elif method == "linear":
-            def interp(x,x0,y0):
-                return np.interp(x,x0,y0)
+
+            def interp(x, x0, y0):
+                return np.interp(x, x0, y0)
+
         else:
             raise ValueError("method must be either pchip or linear")
         return interp
 
-    def supplement_labels(self, labels:list[str]) -> list[str]:
+    def supplement_labels(self, labels: list[str]) -> list[str]:
         """
         Adds basic labels to the list of isochrone quantities to be interpolated.
         Args:
@@ -183,17 +198,21 @@ class IsochroneInterpolator(AbstractIsochrone):
             labels: The supplemented list of labels including basic quantities.
         """
         if self.interp_op == "iso":
-            necessary_labels = [self.iset.mini_name,
-                                self.iset.lteff_name,
-                                self.iset.llbol_name,
-                                self.iset.lrad_name,
-                                self.iset.lgrav_name]
+            necessary_labels = [
+                self.iset.m0_name,
+                self.iset.lteff_name,
+                self.iset.llbol_name,
+                self.iset.lrad_name,
+                self.iset.lgrav_name,
+            ]
             necessary_labels += self.iset.elems
         else:
-            necessary_labels = [self.tset.lteff_name,
-                                self.tset.llbol_name,
-                                self.tset.lrad_name,
-                                self.tset.lgrav_name]
+            necessary_labels = [
+                self.tset.lteff_name,
+                self.tset.llbol_name,
+                self.tset.lrad_name,
+                self.tset.lgrav_name,
+            ]
             necessary_labels += self.tset.elems
         for nl in necessary_labels:
             if nl not in labels:
@@ -215,8 +234,12 @@ class IsochroneInterpolator(AbstractIsochrone):
         lage = np.log10(age.to(u.yr).value)
         ages = self.iset.lages
         if (max(lage) >= max(ages)) or (min(lage) <= min(ages)):
-            print('The requested age is outside the range. Try between '
-                  + str(min(ages)) + ' and ' + str(max(ages)))
+            print(
+                "The requested age is outside the range. Try between "
+                + str(min(ages))
+                + " and "
+                + str(max(ages))
+            )
             raise ValueError("Age is outside the range of the isochrones")
 
         ais = [np.where(np.array(ages) - la < 0)[0][-1] for la in lage]
@@ -272,9 +295,13 @@ class IsochroneInterpolator(AbstractIsochrone):
                     ais = np.arange(ai - n // 2, ai + n // 2 + 1)
         return np.array(ais, dtype=int)
 
-    def _construct_iso_isochrone(self, t:Quantity["time"], labels:list[str],
-                                 method:str="pchip",
-                                 supplement=True) -> Isochrone:
+    def _construct_iso_isochrone(
+        self,
+        t: Quantity["time"],
+        labels: list[str],
+        method: str = "pchip",
+        supplement=True,
+    ) -> Isochrone:
         """
         Interpolates between isochrones using the EEP values to create an
         intermediate age isochrone
@@ -285,7 +312,7 @@ class IsochroneInterpolator(AbstractIsochrone):
             supplement: Whether to supplement the labels with basic quantities
         Returns:
             iso: the isochrone at the requested age t with the requested quantities
-                 given by the labels list. 
+                 given by the labels list.
         """
         if supplement:
             labels = self.supplement_labels(labels)
@@ -319,45 +346,53 @@ class IsochroneInterpolator(AbstractIsochrone):
         qis = [
             pchip_interpolate(
                 lages,
-                np.array([self.iset.isos[ais[k]].qs[label][indices[k]]
-                          for k in range(len(ais))]),   # (n_neighbours, n_eepi)
+                np.array(
+                    [
+                        self.iset.isos[ais[k]].qs[label][indices[k]]
+                        for k in range(len(ais))
+                    ]
+                ),  # (n_neighbours, n_eepi)
                 lt,
             )
             for label in labels
         ]
 
         # make sure initial mass is monotonic in interpolation
-        for (i,label) in enumerate(labels):
-            if label == self.iset.mini_name:
+        for i, label in enumerate(labels):
+            if label == self.iset.m0_name:
                 if np.any(np.diff(qis[i]) <= 0):
-                    qis[i] = array_utils.make_monotonic_increasing(eepi,qis[i])
+                    qis[i] = array_utils.make_monotonic_increasing(eepi, qis[i])
         iso_qs = {labels[i]: qis[i] for i in range(len(labels))}
         iso_qs["EEP"] = eepi
         if supplement:
-            iso = Isochrone(age=t,
-                            eep_name=self.iset.eep_name,
-                            mini_name=self.iset.mini_name,
-                            lteff_name=self.iset.lteff_name,
-                            llbol_name=self.iset.llbol_name,
-                            lrad_name=self.iset.lrad_name,
-                            lgrav_name=self.iset.lgrav_name,
-                            elems=self.iset.elems,
-                            qs=iso_qs)
+            iso = Isochrone(
+                age=t,
+                eep_name=self.iset.eep_name,
+                m0_name=self.iset.m0_name,
+                lteff_name=self.iset.lteff_name,
+                llbol_name=self.iset.llbol_name,
+                lrad_name=self.iset.lrad_name,
+                lgrav_name=self.iset.lgrav_name,
+                elems=self.iset.elems,
+                qs=iso_qs,
+            )
         else:
-            iso = Isochrone(age=t,
-                            eep_name=self.iset.eep_name,
-                            mini_name=None,
-                            lteff_name=None,
-                            llbol_name=None,
-                            lrad_name=None,
-                            lgrav_name=None,
-                            elems=[],
-                            qs=iso_qs)
+            iso = Isochrone(
+                age=t,
+                eep_name=self.iset.eep_name,
+                m0_name=None,
+                lteff_name=None,
+                llbol_name=None,
+                lrad_name=None,
+                lgrav_name=None,
+                elems=[],
+                qs=iso_qs,
+            )
         return iso
 
     def _interp_iso_quantity_mass(
         self,
-        mini: Quantity["mass"],
+        m0: Quantity["mass"],
         t: Quantity["time"],
         label: str,
         method: str = "pchip",
@@ -367,7 +402,7 @@ class IsochroneInterpolator(AbstractIsochrone):
         that quantity and in initial mass as a funciton of EEP and then returns the
         value of the quantity at the requested initial mass
         Args:
-            mini: the initial mass of the star.
+            m0: the initial mass of the star.
             t: the age of the isochrone.
             label: the label of the quantity to be interpolated.
             method: the interpolation method to use, either pchip or linear
@@ -382,18 +417,18 @@ class IsochroneInterpolator(AbstractIsochrone):
         lt_key = int(round(np.log10(t.to(u.yr).value) * 1e5))
         cache_key = (lt_key, method)
         if cache_key not in self._iso_cache:
-            self._iso_cache = {}   # keep only the most recent age
+            self._iso_cache = {}  # keep only the most recent age
             self._iso_cache[cache_key] = self._construct_iso_isochrone(
                 t, [], method=method, supplement=True
             )
         iso = self._iso_cache[cache_key]
         qi = iso.qs[label]
-        massi = iso.qs[self.iset.mini_name]
+        massi = iso.qs[self.iset.m0_name]
 
-        mini = mini.to(u.Msun).value
-        q_res = pchip_interpolate(massi, qi, mini)
+        m0 = m0.to(u.Msun).value
+        q_res = pchip_interpolate(massi, qi, m0)
         # make sure values are zero outside the range of masses used
-        mask = np.logical_or(mini < min(massi), mini > max(massi))
+        mask = np.logical_or(m0 < min(massi), m0 > max(massi))
         q_res = np.ma.masked_array(q_res, mask=mask)
         return q_res
 
@@ -417,13 +452,13 @@ class IsochroneInterpolator(AbstractIsochrone):
                            mass) ready for direct use in _construct_eep_isochrone.
         """
         n_masses = len(self.tset.tracks)
-        max_eep  = self.tset.max_eep
+        max_eep = self.tset.max_eep
         # hdr_list has raw file column names; track.qs has processed names
         # (surface_h1 → 'H', etc.), so derive labels from the actual qs keys.
-        labels   = list(self.tset.tracks[0].qs.keys())
+        labels = list(self.tset.tracks[0].qs.keys())
         age_name = self.tset.age_name
 
-        masses_val = self.tset.masses.to(u.Msun).value          # (n_masses,)
+        masses_val = self.tset.masses.to(u.Msun).value  # (n_masses,)
 
         age_matrix = np.full((n_masses, max_eep), np.nan)
         q_matrices = {lbl: np.full((n_masses, max_eep), np.nan) for lbl in labels}
@@ -434,7 +469,7 @@ class IsochroneInterpolator(AbstractIsochrone):
             for lbl in labels:
                 q_matrices[lbl][j, :n] = track.qs[lbl]
 
-        valid_mask = ~np.isnan(age_matrix)                       # (n_masses, max_eep)
+        valid_mask = ~np.isnan(age_matrix)  # (n_masses, max_eep)
 
         # Pre-apply monotonicity correction for each EEP column so it is not
         # repeated on every query.  We copy before mutating so age_matrix stays clean.
@@ -442,9 +477,9 @@ class IsochroneInterpolator(AbstractIsochrone):
         for e in range(max_eep):
             valid = valid_mask[:, e]
             if valid.sum() > 1:
-                age_col  = age_matrix[valid, e].copy()
+                age_col = age_matrix[valid, e].copy()
                 mass_col = masses_val[valid].copy()
-                age_col  = array_utils.make_monotonic_decreasing(mass_col, age_col)
+                age_col = array_utils.make_monotonic_decreasing(mass_col, age_col)
                 mono_data.append((age_col, mass_col))
             else:
                 mono_data.append(None)
@@ -453,9 +488,9 @@ class IsochroneInterpolator(AbstractIsochrone):
         self._age_matrix = age_matrix
         self._q_matrices = q_matrices
         self._valid_mask = valid_mask
-        self._mono_data  = mono_data
+        self._mono_data = mono_data
 
-    def _get_eep_relation(self, eep:int, labels:list[str]):
+    def _get_eep_relation(self, eep: int, labels: list[str]):
         """
         For a given EEP, returns the age, mass and a list of quantities varying
         across all mass tracks at that EEP.
@@ -468,14 +503,19 @@ class IsochroneInterpolator(AbstractIsochrone):
             q_set: the list of quantities at the given EEP across all tracks
         """
         e = eep - 1  # convert to 0-indexed column
-        valid    = self._valid_mask[:, e]
-        age_set  = self._age_matrix[valid, e]
+        valid = self._valid_mask[:, e]
+        age_set = self._age_matrix[valid, e]
         mass_set = self._masses_val[valid] * self.tset.masses.unit
-        q_set    = np.array([self._q_matrices[lbl][valid, e] for lbl in labels])
+        q_set = np.array([self._q_matrices[lbl][valid, e] for lbl in labels])
         return age_set, mass_set, q_set
 
-    def _construct_eep_isochrone(self, t:Quantity["time"], labels:list[str],
-                                 method:str="pchip",supplement=True) -> Isochrone:
+    def _construct_eep_isochrone(
+        self,
+        t: Quantity["time"],
+        labels: list[str],
+        method: str = "pchip",
+        supplement=True,
+    ) -> Isochrone:
         """
         Follows the instructions of the MIST0 and MIST1 papers by looping over
         all EEPs and
@@ -500,7 +540,7 @@ class IsochroneInterpolator(AbstractIsochrone):
         nq = len(labels)
         interp = self._get_interpolator(method)
         age = array_utils.make_scalar_quantity(t, unit=u.yr).value
-        (eeps_,ms_,qs_) = ([],[],[[] for _ in range(nq)])
+        (eeps_, ms_, qs_) = ([], [], [[] for _ in range(nq)])
         for e in range(self.tset.max_eep):
             mono = self._mono_data[e]
             if mono is None:
@@ -513,58 +553,69 @@ class IsochroneInterpolator(AbstractIsochrone):
             ms_.append(m)
             valid = self._valid_mask[:, e]
             for i in range(nq):
-                qs_[i].append(interp(m, mass_col, self._q_matrices[labels[i]][valid, e]))
+                qs_[i].append(
+                    interp(m, mass_col, self._q_matrices[labels[i]][valid, e])
+                )
         # this is the constructed isochrone for property qs given by "labels"
         iso_qs = {labels[i]: np.array(qs_[i]) for i in range(nq)}
         iso_qs["EEP"] = np.array(eeps_)
         iso_qs["initial_mass"] = np.array(ms_)
         if supplement:
-            iso = Isochrone(age=t,
-                            eep_name='EEP',
-                            mini_name='initial_mass',
-                            lteff_name=self.tset.lteff_name,
-                            llbol_name=self.tset.llbol_name,
-                            lrad_name=self.tset.lrad_name,
-                            lgrav_name=self.tset.lgrav_name,
-                            elems=self.tset.elems,
-                            qs=iso_qs)
+            iso = Isochrone(
+                age=t,
+                eep_name="EEP",
+                m0_name="initial_mass",
+                lteff_name=self.tset.lteff_name,
+                llbol_name=self.tset.llbol_name,
+                lrad_name=self.tset.lrad_name,
+                lgrav_name=self.tset.lgrav_name,
+                elems=self.tset.elems,
+                qs=iso_qs,
+            )
         else:
-            iso = Isochrone(age=t,
-                            eep_name='EEP',
-                            mini_name='initial_mass',
-                            lteff_name=None,
-                            llbol_name=None,
-                            lrad_name=None,
-                            lgrav_name=None,
-                            elems=[],
-                            qs=iso_qs)
+            iso = Isochrone(
+                age=t,
+                eep_name="EEP",
+                m0_name="initial_mass",
+                lteff_name=None,
+                llbol_name=None,
+                lrad_name=None,
+                lgrav_name=None,
+                elems=[],
+                qs=iso_qs,
+            )
         return iso
 
-    def _interp_eep_quantity(self, mini:Quantity["mass"], t:Quantity["time"],
-                             label:str, method:str="pchip") -> np.float64:
+    def _interp_eep_quantity(
+        self,
+        m0: Quantity["mass"],
+        t: Quantity["time"],
+        label: str,
+        method: str = "pchip",
+    ) -> np.float64:
         """
         Uses _construct_eep_isochrone to construct an isochrone at the requested age
         processes the isochrones to insure monotonicity and then interpolates to the
         requested input masses
         Args:
-            mini: the initial mass of the star.
+            m0: the initial mass of the star.
             t: the age of the isochrone.
             label: the label of the quantity to be interpolated.
             method: the interpolation method to use, either pchip or linear
         Returns:
             qi: the specified quantity at the requested age (t) and range of initial
-                masses (mini)
+                masses (m0)
         """
         interp = self._get_interpolator(method)
         iso = self._construct_eep_isochrone(t, [label], method=method, supplement=False)
         qs_ = iso.qs[label]
         # make sure masses are monotonically increasing (not guaranteed by above interp)
-        ms_ = array_utils.make_monotonic_increasing(iso.eep, iso.mini.value)
+        ms_ = array_utils.make_monotonic_increasing(iso.eep, iso.m0.value)
         # finally we interpolate the requested quantity to the requested masses
-        mini = mini.to(u.Msun).value
-        qi = interp(mini, ms_, qs_)
+        m0 = m0.to(u.Msun).value
+        qi = interp(m0, ms_, qs_)
         # make sure values are zero outside the range of masses used
-        mask = np.logical_or(mini < min(ms_), mini > max(ms_))
+        mask = np.logical_or(m0 < min(ms_), m0 > max(ms_))
         qi = np.ma.masked_array(qi, mask=mask)
         return qi
 
@@ -579,9 +630,9 @@ class IsochroneInterpolator(AbstractIsochrone):
             return self._mmax_cache
         if self.interp_op == "iso":
             lages = self.iset.lages
-            mmax = np.array([np.max(iso.mini.value) for iso in self.iset.isos])
+            mmax = np.array([np.max(iso.m0.value) for iso in self.iset.isos])
             # ensure the array is monotonic
-            int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
+            int_mono = (np.where(np.diff(mmax) > 0)[0] + 1)[-1]
             lages = np.array(lages)[int_mono:]
             mmax = np.array(mmax)[int_mono:]
         else:
@@ -596,7 +647,7 @@ class IsochroneInterpolator(AbstractIsochrone):
 
     def _interp_quantity(
         self,
-        mini: Quantity["mass"],
+        m0: Quantity["mass"],
         t: Quantity["time"],
         label: str,
         method: str = "pchip",
@@ -605,7 +656,7 @@ class IsochroneInterpolator(AbstractIsochrone):
         Helper function to decide between which inerpolation method to use
         and properly format the arguments
         Args:
-            mini: the initial mass of the star.
+            m0: the initial mass of the star.
             t: the age of the isochrone. Should be a single time (for now...)
             label: the label of the quantity to be interpolated.
             method: the interpolation method to use, either pchip or linear
@@ -615,38 +666,39 @@ class IsochroneInterpolator(AbstractIsochrone):
                    at the specified age.
         """
 
-        if np.isscalar(mini.value):
-            mini = np.array([mini.value]) * mini.unit
+        if np.isscalar(m0.value):
+            m0 = np.array([m0.value]) * m0.unit
 
         t = array_utils.make_scalar_quantity(t)
         if self.interp_op == "iso":
-            min_age = np.power(10,min(self.iset.lages))*u.yr
-            max_age = np.power(10,max(self.iset.lages))*u.yr
+            min_age = np.power(10, min(self.iset.lages)) * u.yr
+            max_age = np.power(10, max(self.iset.lages)) * u.yr
         else:
             min_age = min(self.tset.min_ages)
             max_age = max(self.tset.max_ages)
         if (t < min_age) or (t > max_age):
-            emsg = (f"t = {t.value} yrs is outside the range of applicability: "
-                    f"{min_age.value} - {max_age.value} yrs"
+            emsg = (
+                f"t = {t.value} yrs is outside the range of applicability: "
+                f"{min_age.value} - {max_age.value} yrs"
             )
             raise ValueError(emsg)
 
         if self.interp_op == "iso":
             # interpolate from isochrones
-            q_res = self._interp_iso_quantity_mass(mini, t, label, method=method)
+            q_res = self._interp_iso_quantity_mass(m0, t, label, method=method)
         else:
             # interpolate from EEPs
-            q_res = self._interp_eep_quantity(mini, t, label, method=method)
+            q_res = self._interp_eep_quantity(m0, t, label, method=method)
 
         return q_res
 
     ######## MAIN PUBLIC OUTPUT FUNCTIONS ########
-    def stellar_lifetime(self, mini: Quantity["mass"]) -> Quantity["time"]:
+    def stellar_lifetime(self, m0: Quantity["mass"]) -> Quantity["time"]:
         (lages, mmax) = self._get_mmax_age_interp()
         # cubic spline interpolation in initial mass
-        interp = pchip_interpolate(mmax[::-1], lages[::-1], mini.to(u.Msun).value)
+        interp = pchip_interpolate(mmax[::-1], lages[::-1], m0.to(u.Msun).value)
         return np.power(10, interp) * u.yr
-        
+
     def mmax(self, t: Quantity["time"]) -> Quantity["mass"]:
         """
         get the maximum mass of the stellar population that hasn't
@@ -666,7 +718,7 @@ class IsochroneInterpolator(AbstractIsochrone):
 
         (lages, mmax) = self._get_mmax_age_interp()
         # cubic spline interpolation in log(age)
-        interp = pchip_interpolate(lages,mmax, lt)
+        interp = pchip_interpolate(lages, mmax, lt)
         if self.interp_op == "iso":
             max_mass = (self.iset.max_mass).to(u.Msun).value
         else:
@@ -698,12 +750,12 @@ class IsochroneInterpolator(AbstractIsochrone):
         return interp
 
     def lbol(
-        self, mini: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
+        self, m0: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
     ) -> Quantity["power"]:
         """
-        get the bolometric luminosity of stars of initial mass mini at age t
+        get the bolometric luminosity of stars of initial mass m0 at age t
         Args:
-            mini: the initial mass of the star. Can be an array
+            m0: the initial mass of the star. Can be an array
             t: the age of the isochrone. Should be a single time (for now...)
             method: the interpolation method to use, either pchip or linear
         Returns:
@@ -715,17 +767,17 @@ class IsochroneInterpolator(AbstractIsochrone):
             llbol_label = self.iset.llbol_name
         else:
             llbol_label = self.tset.llbol_name
-        logLbol_res = self._interp_quantity(mini, t, llbol_label, method=method)
-        return masked_power(10, logLbol_res)*u.Lsun
+        logLbol_res = self._interp_quantity(m0, t, llbol_label, method=method)
+        return masked_power(10, logLbol_res) * u.Lsun
 
     def teff(
-        self, mini: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
+        self, m0: Quantity["mass"], t: Quantity["time"], method: str = "pchip"
     ) -> Quantity["temperature"]:
         """
-        get the atmospheric effective temperature of a star of initial mass mini
+        get the atmospheric effective temperature of a star of initial mass m0
         at age t
         Args:
-            mini: the initial mass of the star. Can be an array
+            m0: the initial mass of the star. Can be an array
             t: the age of the isochrone. Should be a single time (for now...)
             method: the interpolation method to use, either pchip or linear
         Returns:
@@ -736,14 +788,15 @@ class IsochroneInterpolator(AbstractIsochrone):
         else:
             lteff_label = self.tset.lteff_name
         # interpolating from EEPs
-        logTeff_res = self._interp_quantity(mini, t, lteff_label, method=method)
-        return masked_power(10, logTeff_res)*u.K
-    
-    def construct_isochrone(self, t: Quantity["time"],
-                            method:str="pchip", labels=None) -> Isochrone:
+        logTeff_res = self._interp_quantity(m0, t, lteff_label, method=method)
+        return masked_power(10, logTeff_res) * u.K
+
+    def construct_isochrone(
+        self, t: Quantity["time"], method: str = "pchip", labels=None
+    ) -> Isochrone:
         """
         Constructs an isochrone at age t with the requested labels
-        
+
         Args:
             t: the age of the isochrone. Should be a single time
             method: the interpolation method to use, either pchip or linear
@@ -762,5 +815,5 @@ class IsochroneInterpolator(AbstractIsochrone):
         if self.interp_op == "iso":
             iso = self._construct_iso_isochrone(t, labels, method=method)
         else:
-            iso = self._construct_eep_isochrone(t, labels,method=method)
+            iso = self._construct_eep_isochrone(t, labels, method=method)
         return iso

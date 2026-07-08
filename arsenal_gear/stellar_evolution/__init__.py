@@ -5,12 +5,13 @@ stellar_evolution
 Submodule to handle stellar evolution codes and their isochrones
 """
 
-from . import isochrone
 from ..utils.file_io import get_metstr
+from . import isochrone
 
 __all__ = ["Evolution"]
 
-class Evolution():
+
+class Evolution:
     def __init__(self, **kwargs):
         # initialize the single star evolution interface
         se_opt = kwargs.get("single_evolution", "interpolator")
@@ -23,17 +24,19 @@ class Evolution():
         if opt_list:
             # proces list of options
             if len(se_opt) != self.nmets:
-                err_msg = ("Length of single_evolution list must match "
-                           "number of metallicities."
+                err_msg = (
+                    "Length of single_evolution list must match "
+                    "number of metallicities."
                 )
                 raise ValueError(err_msg)
             else:
                 for i in range(self.nmets):
                     if isinstance(se_opt[i], isochrone.AbstractIsochrone):
                         if se_opt[i].met != self.mets[i]:
-                            err_msg = ("Metallicity of single_evolution isochrone "
-                                       f"at index {i} does not match metallicity "
-                                       f"at index {i} in metallicities."
+                            err_msg = (
+                                "Metallicity of single_evolution isochrone "
+                                f"at index {i} does not match metallicity "
+                                f"at index {i} in metallicities."
                             )
                             raise ValueError(err_msg)
                         else:
@@ -41,8 +44,9 @@ class Evolution():
                     elif isinstance(se_opt[i], str):
                         self.ses.append(self.handle_iso_str_single(se_opt[i], **kwargs))
                     else:
-                        err_msg = (f"Invalid single_evolution option type at index {i}: "
-                                   f"{type(se_opt[i])}"
+                        err_msg = (
+                            f"Invalid single_evolution option type at index {i}: "
+                            f"{type(se_opt[i])}"
                         )
                         raise ValueError(err_msg)
         elif opt_str:
@@ -63,9 +67,8 @@ class Evolution():
         # initialize the binary star evolution interface
         self.be = None
 
-
     @staticmethod
-    def handle_iso_str_single(opt:str, **kwargs) -> isochrone.AbstractIsochrone:
+    def handle_iso_str_single(opt: str, **kwargs) -> isochrone.AbstractIsochrone:
         if opt == "interpolator":
             return isochrone.IsochroneInterpolator(**kwargs)
         else:

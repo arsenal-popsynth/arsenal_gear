@@ -8,10 +8,11 @@ which are mostly contained in stellar_evolution/isochrone.py
 
 import astropy.units as u
 import numpy as np
-from numpy.testing import assert_array_less, assert_allclose
+from numpy.testing import assert_allclose, assert_array_less
 from scipy.integrate import trapezoid
 
 import arsenal_gear
+
 
 def get_contiguous_regions(mask):
     """
@@ -42,6 +43,7 @@ def integrate_mask(y, x, mask):
             total_integral += trapezoid(y[s:e], x[s:e])
     return total_integral
 
+
 def test_call_signatures():
     """
     Makes sure that the different ways of calling the isochrone interpolators main functions
@@ -53,14 +55,14 @@ def test_call_signatures():
     pop2_dict = {"Mtot": 1e6 * u.Msun, "imf": "salpeter", "seed": 42}
     sp = {
         "track1": arsenal_gear.SynthPop(interp_op="track", pop1=pop1_dict),
-        "iso1": arsenal_gear.SynthPop(interp_op="iso",     pop1=pop1_dict),
+        "iso1": arsenal_gear.SynthPop(interp_op="iso", pop1=pop1_dict),
         "track2": arsenal_gear.SynthPop(interp_op="track", pop2=pop2_dict),
-        "iso2": arsenal_gear.SynthPop(interp_op="iso",     pop2=pop2_dict),
+        "iso2": arsenal_gear.SynthPop(interp_op="iso", pop2=pop2_dict),
     }
 
-    t_scal = 1*u.Myr
-    t_uarr = np.array([1.])*u.Myr
-    t_array = np.array([1., 10., 100.])*u.Myr
+    t_scal = 1 * u.Myr
+    t_uarr = np.array([1.0]) * u.Myr
+    t_array = np.array([1.0, 10.0, 100.0]) * u.Myr
     for k in sp.keys():
         # first test direct methods of the stellar evolution class
         se = sp[k].evol.ses[0]
@@ -68,7 +70,10 @@ def test_call_signatures():
         if pop.discrete:
             ms = pop.masses
         else:
-            ms = np.logspace(np.log10(pop.imf.min_mass), np.log10(pop.imf.max_mass), 10)*u.Msun
+            ms = (
+                np.logspace(np.log10(pop.imf.min_mass), np.log10(pop.imf.max_mass), 10)
+                * u.Msun
+            )
         lbol_pop_scal = se.lbol(ms, t_scal)
         lbol_pop_uarr = se.lbol(ms, t_uarr)
         teff_pop_scal = se.teff(ms, t_scal)
@@ -104,11 +109,8 @@ def test_mist_interp():
     test=True in isochrone interpolation to leave out nearest isochrone
     """
     sp = {
-        "track": arsenal_gear.SynthPop(interp_op="track",
-                                       seed=42),
-        "iso": arsenal_gear.SynthPop(interp_op="iso",
-                                     seed=42,
-                                     test=True),
+        "track": arsenal_gear.SynthPop(interp_op="track", seed=42),
+        "iso": arsenal_gear.SynthPop(interp_op="iso", seed=42, test=True),
     }
 
     lmissed = {"track": [], "iso": []}
@@ -120,11 +122,7 @@ def test_mist_interp():
     ais = np.arange(len(se_iso.iset.lages))
     for ai in ais[2::6]:
         ai += 1
-        t = (
-            (1 + 1e-6)
-            * np.power(10, np.array([se_iso.iset.lages[ai]]) - 6)
-            * u.Myr
-        )
+        t = (1 + 1e-6) * np.power(10, np.array([se_iso.iset.lages[ai]]) - 6) * u.Myr
 
         ms = se_iso.iset.isos[ai].qs["initial_mass"] * u.Msun
         xi = sp["iso"].form.subpops[0].imf.pdf(ms)
@@ -183,13 +181,11 @@ def test_lbol_methods_mist():
     discrete_ops = [True, False]
     outs = {}
     # array of times over which to compare bolometric luminosities
-    tlin = np.logspace(5.1,9,20)*u.yr
+    tlin = np.logspace(5.1, 9, 20) * u.yr
     for int_op in int_ops:
         for discrete in discrete_ops:
             key = f"{int_op}_{'discrete' if discrete else 'continuous'}"
-            sp = arsenal_gear.SynthPop(
-                interp_op=int_op, discrete=discrete, seed=42
-            )
+            sp = arsenal_gear.SynthPop(interp_op=int_op, discrete=discrete, seed=42)
             outs[key] = sp.lbol(tlin)
     # compare all combinations of the four methods
     keys = list(outs.keys())
@@ -199,6 +195,7 @@ def test_lbol_methods_mist():
             rel_err = np.abs(1 - outs[keys[i]] / outs[keys[j]])
             # average relative error should be less than 4%
             assert np.average(rel_err) < 0.05
+
 
 def test_lifetime_interp_mist():
     """
@@ -211,9 +208,9 @@ def test_lifetime_interp_mist():
     }
     # make sure we only query the lifetime function where the isochrones have data
     se_iso = sp["iso"].evol.ses[0]
-    mmax = np.array([np.max(iso.mini.value) for iso in se_iso.iset.isos])
+    mmax = np.array([np.max(iso.m0.value) for iso in se_iso.iset.isos])
     # ensure the array is monotonic
-    int_mono = (np.where(np.diff(mmax) > 0)[0]+1)[-1]
+    int_mono = (np.where(np.diff(mmax) > 0)[0] + 1)[-1]
     mmaxes = np.array(mmax)[int_mono:]
     iso_mmin = min(mmaxes)
     iso_mmax = max(mmaxes)
