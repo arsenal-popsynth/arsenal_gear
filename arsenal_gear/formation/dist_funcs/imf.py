@@ -124,6 +124,8 @@ class Salpeter(IMF):
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
 
+    DOI = "10.1086/145971"
+
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
@@ -269,6 +271,8 @@ class Kroupa2001(PiecewisePowerLaw):
 
     """
 
+    DOI = "10.1046/j.1365-8711.2001.04022.x"
+
     def __init__(
         self,
         min_mass: Quantity["mass"] = 0.08 * u.Msun,
@@ -297,6 +301,8 @@ class Kroupa1993(PiecewisePowerLaw):
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
 
     """
+
+    DOI = " 10.1093/mnras/262.3.545"
 
     def __init__(
         self,
