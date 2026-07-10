@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Arsenal Parameter File &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Arsenal Output Formats" href="outputs.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="outputs.html" title="Arsenal Output Formats"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">The Arsenal Parameter File</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section class="tex2jax_ignore mathjax_ignore" id="the-arsenal-parameter-file">
+<h1>The Arsenal Parameter File<a class="headerlink" href="#the-arsenal-parameter-file" title="Link to this heading">¶</a></h1>
+<p>The arsenal parameter file is organized into blocks related to different physical modules
+in the code. We describe each block below. Some of these choices may be more or less
+compatible with one another. Where there is an egregious example of poorly matched
+choices, the code will provide a warning.</p>
+<section id="population-parameters">
+<h2>Population Parameters<a class="headerlink" href="#population-parameters" title="Link to this heading">¶</a></h2>
+<p>This block specifies properties of the population of stars that you would like to
+simulate. This includes the distribution of stars as a function of mass (the IMF) as well
+as distributions over properties of binaries within the population. Right now the code
+only allows for a single metallicity and age for the population or a “simple stellar
+population” (SSP).</p>
+<p>Choices related to these options are detailed below.</p>
+</section>
+<section id="stellar-evolution">
+<h2>Stellar Evolution<a class="headerlink" href="#stellar-evolution" title="Link to this heading">¶</a></h2>
+<p>This block controls options for the stellar evolution code you would like to use for both
+single and binary star evolution. These choices essentially map the initial properties of
+a star (i.e. its mass for a single star or binary properties for a binary) to things like
+its mass, luminosity, and effective temperature as a function of its age.</p>
+<p>Choices related to these parameters are detailed below.</p>
+</section>
+<section id="atmosphere-modeling">
+<h2>Atmosphere Modeling<a class="headerlink" href="#atmosphere-modeling" title="Link to this heading">¶</a></h2>
+<p>This block determines how the properties of a star (its luminosity, mass, radius,
+effective temperature, etc.) lead to radiative emission from its atmosphere.</p>
+</section>
+<section id="mechanical-feedback">
+<h2>Mechanical Feedback<a class="headerlink" href="#mechanical-feedback" title="Link to this heading">¶</a></h2>
+<p>This block gives choices for how stars return mass and energy through both stellar winds
+(of multiple types) and supernovae (of multiple types). Included within these blocks are
+choices for the yields of each feedback mechanism or the mass fraction of each element
+that is returned.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Arsenal Parameter File</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#population-parameters">Population Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#stellar-evolution">Stellar Evolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#atmosphere-modeling">Atmosphere Modeling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mechanical-feedback">Mechanical Feedback</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="quickstart.html"
+                          title="previous chapter">Quickstart</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="outputs.html"
+                          title="next chapter">Arsenal Output Formats</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/parameters.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="outputs.html" title="Arsenal Output Formats"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">The Arsenal Parameter File</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>
