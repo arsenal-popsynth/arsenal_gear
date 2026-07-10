@@ -242,7 +242,7 @@ class SynthPop:
         Returns the bolometric luminosity of each star in the population at time t
         """
         if pop.tform < t:
-            Lbols = se.lbol(pop.masses, t)
+            Lbols = se.lbol(pop.masses, t - pop.tform)
             valid_mask = np.logical_not(Lbols.mask)
             return u.Quantity(Lbols[valid_mask].data, unit=Lbols.unit)
         else:
@@ -255,7 +255,7 @@ class SynthPop:
         Returns the effective temperature of each star in the population at time t
         """
         if pop.tform < t:
-            Teffs = se.teff(pop.masses, t)
+            Teffs = se.teff(pop.masses, t - pop.tform)
             valid_mask = np.logical_not(Teffs.mask)
             return u.Quantity(Teffs[valid_mask].data, unit=Teffs.unit)
         else:
