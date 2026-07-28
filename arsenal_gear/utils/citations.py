@@ -20,6 +20,28 @@ import requests
 DOI_BIBTEX_URL = "https://doi.org/{doi}"
 
 
+def _resolve_name(name, obj):
+    """
+    Try to resolve `name` (a dotted attribute chain's root name) to a live
+    object, using whatever namespaces are reachable from `obj` (a function,
+    method, or class): globals, closure variables, and -- if `obj` is itself
+    a method -- the enclosing class's attributes.
+    """
+    func = inspect.unwrap(obj.__func__) if inspect.ismethod(obj) else obj
+
+    if inspect.isfunction(func):
+        if name in func.__globals__:
+            return func.__globals__[name]
+        closure_names = func.__code__.co_freevars
+        if name in closure_names and func.__closure__:
+            idx = closure_names.index(name)
+            try:
+                return func.__closure__[idx].cell_contents
+            except ValueError:
+                return None
+    return None
+
+
 def _class_methods(cls):
     """Yield every function object defined directly in `cls.__dict__`."""
     for value in vars(cls).values():
