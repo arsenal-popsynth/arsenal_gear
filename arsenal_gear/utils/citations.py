@@ -13,9 +13,20 @@ collects the ``DOI`` class attribute wherever one is defined. It then queries
 doi.org's content-negotiation endpoint for a bibtex entry for each DOI found.
 """
 
+import inspect
+
 import requests
 
 DOI_BIBTEX_URL = "https://doi.org/{doi}"
+
+
+def _class_methods(cls):
+    """Yield every function object defined directly in `cls.__dict__`."""
+    for value in vars(cls).values():
+        if isinstance(value, (staticmethod, classmethod)):
+            value = value.__func__
+        if inspect.isfunction(value):
+            yield value
 
 
 def doi_to_bibtex(doi, timeout=10):
