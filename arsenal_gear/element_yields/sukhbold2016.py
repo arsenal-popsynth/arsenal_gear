@@ -35,6 +35,7 @@ class Sukhbold2016(YieldTables):
 
     """
 
+    DOI = "10.3847/0004-637X/821/1/38"
     base_url = "https://wwwmpa.mpa-garching.mpg.de/ccsnarchive/data/SEWBJ_2015/data/"
     nucleosynthesis_file = "nucleosynthesis_yields.tar.gz"
     energy_file = "explosion_results_PHOTB.tar.gz"

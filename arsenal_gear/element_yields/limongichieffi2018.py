@@ -37,6 +37,7 @@ class LimongiChieffi2018(YieldTables):
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
     """
 
+    DOI = "10.3847/1538-4365/aacb24"
     # hard-coded parameters of the Limongi & Chieffi (2018) tables
     lc_url = "https://orfeo.oa-roma.inaf.it/"
     models = ["F", "I", "M", "R"]
