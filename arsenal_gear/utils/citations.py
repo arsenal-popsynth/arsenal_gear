@@ -19,6 +19,8 @@ import textwrap
 
 import requests
 
+__all__ = ["find_dois", "doi_to_bibtex", "gather_bibtex"]
+
 DOI_BIBTEX_URL = "https://doi.org/{doi}"
 
 
@@ -156,3 +158,25 @@ def doi_to_bibtex(doi, timeout=10):
             f"Failed to fetch bibtex for DOI {doi}: HTTP {response.status_code}"
         )
     return response.text.strip()
+
+
+def gather_bibtex(target, timeout=10):
+    """
+    Find every DOI attached to classes/functions used (directly or
+    indirectly) by `target`, and return a single string containing bibtex
+    entries for all of them.
+
+    :param target: The function, method, or class to start the search from.
+    :param timeout: Per-request timeout in seconds, passed to
+        :func:`doi_to_bibtex`.
+    :return: Newline-separated bibtex entries, one per DOI found.
+    :rtype: str
+    """
+    dois = find_dois(target)
+    entries = []
+    for doi in sorted(dois):
+        try:
+            entries.append(doi_to_bibtex(doi, timeout=timeout))
+        except RuntimeError as e:
+            entries.append(f"% Could not resolve DOI {doi}: {e}")
+    return "\n\n".join(entries)
