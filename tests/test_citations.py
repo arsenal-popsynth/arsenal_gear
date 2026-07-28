@@ -71,6 +71,39 @@ def test_find_dois_follows_indirect_dispatch():
     assert dois == {SALPETER_DOI, KROUPA2001_DOI, KROUPA1993_DOI}
 
 
+def test_find_dois_on_class_with_list_of_dois():
+    """A class may cite several papers by setting DOI to a list; every
+    element should be picked up as its own DOI."""
+
+    class MultiCited:
+        DOI = ["10.1093/mnras/stz2158", "10.3390/universe7020025"]
+
+    assert find_dois(MultiCited) == {
+        "10.1093/mnras/stz2158",
+        "10.3390/universe7020025",
+    }
+
+
+def test_gather_bibtex_fetches_every_doi_in_a_list(monkeypatch):
+    class MultiCited:
+        DOI = ["10.1093/mnras/stz2158", "10.3390/universe7020025"]
+
+    requested = []
+
+    def fake_get(url, **_kwargs):
+        doi = url.removeprefix("https://doi.org/")
+        requested.append(doi)
+        return FakeResponse(f"@article{{{doi}}}")
+
+    monkeypatch.setattr("arsenal_gear.utils.citations.requests.get", fake_get)
+
+    result = gather_bibtex(MultiCited)
+
+    assert sorted(requested) == sorted(MultiCited.DOI)
+    for doi in MultiCited.DOI:
+        assert f"@article{{{doi}}}" in result
+
+
 def test_doi_to_bibtex_requests_correct_url_and_headers(monkeypatch):
     captured = {}
 

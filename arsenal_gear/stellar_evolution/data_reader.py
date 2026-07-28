@@ -51,6 +51,11 @@ class MISTReader(IsochroneDataReader):
     This is an instantiation of the IsochroneDataReader abstract base class.
     """
 
+    DOI = [
+        "10.3847/0067-0049/222/1/8",
+        "10.3847/0004-637X/823/2/102",
+        "10.3847/1538-4365/ae48f3",
+    ]
     # basic options for MIST isochrones
     mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/{}"
     vcrits = ["0.0", "0.4"]

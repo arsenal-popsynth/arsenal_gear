@@ -9,8 +9,10 @@ for them.
 The primary entry point is :func:`gather_bibtex`, which statically walks the
 call graph rooted at a function, method, or class -- following calls made in
 its body, the methods of any classes involved, and their base classes -- and
-collects the ``DOI`` class attribute wherever one is defined. It then queries
-doi.org's content-negotiation endpoint for a bibtex entry for each DOI found.
+collects the ``DOI`` class attribute wherever one is defined. That attribute
+may be a single DOI string or a list/tuple of DOI strings, for work that
+should be credited to more than one paper. It then queries doi.org's
+content-negotiation endpoint for a bibtex entry for each DOI found.
 """
 
 import ast
@@ -68,6 +70,25 @@ def _iter_referenced_names(func):
             yield node.id
 
 
+def _iter_doi_strings(doi):
+    """
+    Normalize a ``DOI`` class attribute into individual DOI strings. The
+    attribute may be a single string, or a list/tuple of strings for work
+    that needs several papers cited. Anything else (or an empty entry) is
+    ignored.
+    """
+    if isinstance(doi, str):
+        candidates = [doi]
+    elif isinstance(doi, (list, tuple, set, frozenset)):
+        candidates = doi
+    else:
+        return
+
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            yield candidate.strip()
+
+
 def _class_methods(cls):
     """Yield every function object defined directly in `cls.__dict__`."""
     for value in vars(cls).values():
@@ -81,7 +102,8 @@ def find_dois(target, _seen=None):
     """
     Recursively walk the call graph rooted at `target` (a function, bound/
     unbound method, or class) and collect every ``DOI`` class attribute
-    encountered along the way.
+    encountered along the way. A ``DOI`` attribute holding a list/tuple of
+    strings contributes each of its elements individually.
 
     A class is "visited" by inspecting its own methods (including
     ``__init__``) and its base classes. A function/method is "visited" by
@@ -114,9 +136,7 @@ def find_dois(target, _seen=None):
         for klass in target.__mro__:
             if klass is object:
                 continue
-            doi = klass.__dict__.get("DOI")
-            if isinstance(doi, str):
-                dois.add(doi.strip())
+            dois |= set(_iter_doi_strings(klass.__dict__.get("DOI")))
         for method in _class_methods(target):
             dois |= find_dois(method, _seen)
         return dois

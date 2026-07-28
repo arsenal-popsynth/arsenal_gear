@@ -129,7 +129,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -159,7 +159,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -189,7 +189,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -216,6 +216,7 @@ class Pignatari2016(YieldTables):
     References: Pignatari et al., 2016, ApJS, 225, 24
     """
 
+    DOI = "10.3847/0067-0049/225/2/24"
     # hard-coded parameters of the Pignatari (2016) tables
     p16_url = "https://download.nugridstars.org/set1/Yield_tables/"
     files = [
@@ -304,7 +305,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -334,7 +335,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -364,7 +365,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -503,6 +504,7 @@ class Ritter2018(YieldTables):
     References:  Ritter et al., 2018, MNRAS, 480, 538
     """
 
+    DOI = "10.1093/mnras/sty1729"
     # hard-coded parameters of the Ritter (2018) tables
     r18_url = "https://download.nugridstars.org/set1ext/Yield_tables/"
     files = [
@@ -601,7 +603,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -631,7 +633,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -661,7 +663,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -809,6 +811,7 @@ class Battino20192021(YieldTables):
     References: Battino et al., 2019, MNRAS, 489, 1082; Battino et al., 2021, Universe, 7, 25
     """
 
+    DOI = ["10.1093/mnras/stz2158", "10.3390/universe7020025"]
     # hard-coded parameters of the Battino (2019,2021) tables
     b19_url = (
         "https://download.nugridstars.org/set1upd/yields_finalabu_tables/Battino2019"
@@ -887,7 +890,7 @@ class Battino20192021(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
