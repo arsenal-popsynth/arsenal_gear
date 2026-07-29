@@ -88,6 +88,15 @@ commit`.  Most of the hooks will automatically apply themselves, so if your
 commit appears to fail, you can just re-run `git commit` and it will usually
 just work.
 
+Two of them can't fix themselves, and want a word from you instead:
+
+- **pylint** reports what static analysis can catch, which you have to go and
+  fix.
+- **citations** checks that `arsenal_gear/utils/citations.bib` still matches the
+  `@cite` decorators in the source, and tells you to regenerate it if not — see
+  _Citations_ below.  The check itself is offline and needs no credentials, so
+  it runs for everyone.
+
 ## Citations
 Arsenal Gear wraps up a lot of other people's work: IMFs, yield tables,
 isochrones, and stellar evolution models all come from published papers whose
@@ -133,17 +142,63 @@ citations), looks up whatever the bibliography is missing, drops entries for
 citations that no longer exist, and rewrites the file.  Pass `--force` to
 re-fetch everything rather than only the missing entries.
 
-The lookup goes to NASA ADS, which has no anonymous API, so you will need a
-free API token: sign in at [ADS](https://ui.adsabs.harvard.edu/), generate a
-token under Account → Settings → API Token, and put it in your environment as
-`ADS_DEV_KEY` (a `.envrc` is a good home for it if you use direnv).  This is a
-maintainer-only requirement — because the generated bibliography ships with the
-package, users never need a token or a network connection.
+You shouldn't have to remember this.  The `citations` pre-commit hook runs
+```
+python -m arsenal_gear.utils.refresh_citations --check
+```
+on every commit that touches a `.py` or `.bib` file, and fails it if the
+bibliography has fallen behind, naming what's wrong:
+```
+arsenal_gear/utils/citations.bib is out of date.
 
-The refresher is also where identifiers are checked.  Nothing validates them at
-import time, so a typo'd DOI will sit quietly in the source until you run the
-refresh, which reports it and exits non-zero.  That's still before anything can
-reach a user, since a citation can't resolve until it's in the bibliography.
+  missing: 10.1093/mnras/stab1234
+```
+`--check` only compares the registered citations against the bibliography.  It
+fetches nothing and writes nothing, so it needs no token and no network — every
+contributor gets the warning, whether or not they can act on it themselves.
+Three things will trip it:
+
+- **missing** — something is cited that the bibliography has no entry for.  This
+  is the one that needs a token to fix, since the entry has to be fetched.
+- **stale** — the bibliography has an entry nothing cites any more, because a
+  `@cite` was deleted.  A plain refresh drops it, no network required.
+- **typo** — an identifier that is neither a DOI nor a bibcode.  Fix it at the
+  `@cite` that spells it; no refresh will ever resolve it.
+
+Nothing validates identifiers at import time, so without this a typo'd DOI would
+sit quietly in the source until someone refreshed.  It still can't reach a user
+— a citation can't resolve until it's in the bibliography — but it's much less
+annoying to find at the commit that caused it.
+
+#### Setting up your ADS token
+Fetching goes to NASA ADS, which has no anonymous API, so *adding* a new
+citation needs a free API token:
+
+1. Sign in at [ADS](https://ui.adsabs.harvard.edu/) (an ORCID, Google or
+   institutional account all work).
+2. Go to Account → Customize Settings → API Token and generate one.
+3. Put it in your environment as `ADS_DEV_KEY`:
+   ```
+   export ADS_DEV_KEY="your-token-here"
+   ```
+
+Where that `export` goes is up to you `direnv` (see _Extra Handy Tools_ below)
+is an easy way to do this if you don't want it in your shell config: add the
+line to the project's `.envrc` and the token is loaded whenever you `cd` in and
+unset when you leave.
+```
+source .venv/bin/activate
+export ADS_DEV_KEY="your-token-here"
+```
+then run `direnv allow`.  `.envrc` is in our `.gitignore`, so a token kept there
+can't be committed by accident.
+
+`ADS_API_TOKEN` is accepted as an alternative name, since that's what some other
+ADS tooling uses.
+
+This is a contributor-only requirement.  Because the generated bibliography
+ships with the package, **users never need a token or a network connection** —
+which is the whole reason the file is committed rather than fetched on demand.
 
 ### Getting a bibliography out
 `gather_bibtex` takes a function, method, or class and returns bibtex for

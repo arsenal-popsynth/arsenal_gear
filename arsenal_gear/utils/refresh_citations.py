@@ -22,6 +22,15 @@ as, in two requests total: one search to turn DOIs into bibcodes, then one
 export. ADS has no anonymous API, so this needs a (free) ADS API token in
 ``$ADS_DEV_KEY``. Without one nothing can be fetched, though entries already
 in the bibliography are kept.
+
+Noticing that the bibliography has fallen behind needs none of that, so
+``--check`` reports it offline, with no token and no network::
+
+    python -m arsenal_gear.utils.refresh_citations --check
+
+That is what the pre-commit hook runs, so a forgotten refresh is caught at
+the commit that caused it rather than by a user with an unresolvable
+citation.
 """
 
 from __future__ import annotations
@@ -229,6 +238,14 @@ def malformed(identifiers) -> list[str]:
     )
 
 
+def _malformed_message(identifier: str) -> str:
+    """Explain why `identifier` is not a usable citation."""
+    return (
+        f"{identifier!r} is neither a DOI (10.xxxx/...) nor a 19 character ADS "
+        f"bibcode (e.g. 1996A&A...315..105R)"
+    )
+
+
 def fetch_entries(citations, timeout: float = 10) -> dict[str, str]:
     """
     Fetch bibtex for a collection of citation identifiers, of either kind, in
@@ -307,6 +324,66 @@ def import_all_modules() -> list[str]:
     return failed
 
 
+def check(path: Path | None = None) -> int:
+    """
+    Report whether the bibliography still matches the citations registered
+    across the package, fetching nothing and writing nothing.
+
+    This is the offline half of :func:`refresh`. Comparing the registry
+    against the bibliography needs neither an ADS token nor a network
+    connection -- only fetching a missing entry does -- so this can run on
+    every commit, for every contributor, which is what the pre-commit hook
+    uses it for. It catches the mistake at the moment it is made rather than
+    leaving it for a user to discover as an unresolvable citation.
+
+    Three things make the bibliography out of date, and the message says
+    which: an identifier missing from it (a new ``@cite`` that was never
+    refreshed), an entry it holds that nothing cites any more (a ``@cite``
+    that was deleted), and a malformed identifier (a typo). Only the first
+    needs a token to put right; the other two are fixed by a refresh with no
+    network at all.
+
+    :param path: Bibliography to check; defaults to the shipped one.
+    :return: Process exit status: 0 if the bibliography is current, 1 otherwise.
+    :rtype: int
+    """
+    for failure in import_all_modules():
+        print(f"warning: could not import {failure}", file=sys.stderr)
+
+    path = BIBLIOGRAPHY_PATH if path is None else path
+    citations = set(REGISTRY)
+    if not citations:
+        print("No citations registered; nothing to check.", file=sys.stderr)
+        return 1
+
+    bibliography = load_bibliography(path)
+    bad = malformed(citations)
+    # A malformed identifier is reported as a typo rather than counted as
+    # missing: no refresh will ever resolve it, so saying it is absent from
+    # the bibliography would point at the wrong fix.
+    missing = sorted(citations - set(bibliography) - set(bad))
+    stale = sorted(set(bibliography) - citations)
+
+    if not (bad or missing or stale):
+        print(f"{path}: up to date ({len(bibliography)} entries)")
+        return 0
+
+    print(f"{path} is out of date.\n", file=sys.stderr)
+    for identifier in bad:
+        print(f"  typo:    {_malformed_message(identifier)}", file=sys.stderr)
+    for identifier in missing:
+        print(f"  missing: {identifier}", file=sys.stderr)
+    for identifier in stale:
+        print(f"  stale:   {identifier} (no longer cited anywhere)", file=sys.stderr)
+    print(
+        "\nFix a typo at the @cite that spells it. Otherwise regenerate the "
+        "bibliography and\ncommit the result alongside your code:\n"
+        "\n    python -m arsenal_gear.utils.refresh_citations\n",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def refresh(force: bool = False, timeout: float = 10) -> int:
     """
     Regenerate the bibliography from the citations registered across the
@@ -347,11 +424,7 @@ def refresh(force: bool = False, timeout: float = 10) -> int:
         except CitationError as e:
             batch_error = str(e)
 
-    failures = [
-        f"{c!r} is neither a DOI (10.xxxx/...) nor a 19 character ADS bibcode "
-        f"(e.g. 1996A&A...315..105R)"
-        for c in bad
-    ]
+    failures = [_malformed_message(c) for c in bad]
     if batch_error:
         failures.append(batch_error)
     for citation in missing:
@@ -384,7 +457,14 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Regenerate the bibliography shipped with arsenal_gear."
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--check",
+        action="store_true",
+        help="only report whether the bibliography is up to date, without "
+        "fetching or writing anything; needs no ADS token",
+    )
+    mode.add_argument(
         "--force",
         action="store_true",
         help="re-fetch every citation instead of only the missing ones",
@@ -393,6 +473,8 @@ def main(argv=None) -> int:
         "--timeout", type=float, default=10, help="per-request timeout in seconds"
     )
     args = parser.parse_args(argv)
+    if args.check:
+        return check()
     return refresh(force=args.force, timeout=args.timeout)
 
 

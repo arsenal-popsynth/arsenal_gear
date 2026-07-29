@@ -563,6 +563,113 @@ def test_refresh_reports_malformed_identifiers(monkeypatch, tmp_path, capsys):
     assert set(written) == {"10.1086/145971"}
 
 
+@pytest.fixture
+def registry(monkeypatch):
+    """Stand in for the citations registered across the package, without
+    importing any of it."""
+
+    def _set(*identifiers):
+        monkeypatch.setattr(refresh_citations, "import_all_modules", lambda *a: [])
+        monkeypatch.setattr(refresh_citations, "REGISTRY", set(identifiers))
+
+    return _set
+
+
+def test_check_passes_when_every_citation_has_an_entry(registry, tmp_path, capsys):
+    """The ordinary case: nothing to say, exit clean."""
+    registry(SALPETER_DOI)
+    path = tmp_path / "citations.bib"
+    save_bibliography({SALPETER_DOI: "@ARTICLE{1955ApJ...121..161S,\n}"}, path=path)
+
+    assert refresh_citations.check(path=path) == 0
+    assert "up to date" in capsys.readouterr().out
+
+
+def test_check_reports_a_citation_the_bibliography_is_missing(
+    registry, tmp_path, capsys
+):
+    """A @cite added without a refresh is exactly what the pre-commit hook
+    exists to catch."""
+    registry(SALPETER_DOI, KROUPA2001_DOI)
+    path = tmp_path / "citations.bib"
+    save_bibliography({SALPETER_DOI: "@ARTICLE{1955ApJ...121..161S,\n}"}, path=path)
+
+    assert refresh_citations.check(path=path) == 1
+    err = capsys.readouterr().err
+    assert f"missing: {KROUPA2001_DOI}" in err
+    assert SALPETER_DOI not in err
+
+
+def test_check_reports_an_entry_nothing_cites_any_more(registry, tmp_path, capsys):
+    """A deleted @cite leaves an orphaned entry behind. Refreshing drops it,
+    and needs no network to do so."""
+    registry(SALPETER_DOI)
+    path = tmp_path / "citations.bib"
+    save_bibliography(
+        {
+            SALPETER_DOI: "@ARTICLE{1955ApJ...121..161S,\n}",
+            KROUPA1993_DOI: "@ARTICLE{1993MNRAS.262..545K,\n}",
+        },
+        path=path,
+    )
+
+    assert refresh_citations.check(path=path) == 1
+    assert f"stale:   {KROUPA1993_DOI}" in capsys.readouterr().err
+
+
+def test_check_calls_a_malformed_identifier_a_typo_not_a_missing_entry(
+    registry, tmp_path, capsys
+):
+    """Reporting a typo as missing would point at the wrong fix: no refresh
+    will ever find an entry for it."""
+    registry("obviously not a DOI")
+    path = tmp_path / "citations.bib"
+    save_bibliography({}, path=path)
+
+    assert refresh_citations.check(path=path) == 1
+    err = capsys.readouterr().err
+    assert "typo:" in err
+    assert "neither a DOI" in err
+    assert "missing:" not in err
+
+
+def test_check_neither_fetches_nor_writes(registry, tmp_path, monkeypatch):
+    """The property the pre-commit hook rests on: the check runs for a
+    contributor with no ADS token and no network, and leaves the
+    bibliography alone."""
+
+    def unreachable(*args, **kwargs):
+        raise AssertionError("check() must not touch the network")
+
+    monkeypatch.setattr(refresh_citations, "fetch_entries", unreachable)
+    monkeypatch.delenv("ADS_DEV_KEY", raising=False)
+    monkeypatch.delenv("ADS_API_TOKEN", raising=False)
+
+    registry(SALPETER_DOI, KROUPA2001_DOI)
+    path = tmp_path / "citations.bib"
+    save_bibliography({SALPETER_DOI: "@ARTICLE{1955ApJ...121..161S,\n}"}, path=path)
+    before = path.read_text(encoding="utf-8")
+
+    assert refresh_citations.check(path=path) == 1
+    assert path.read_text(encoding="utf-8") == before
+
+
+def test_check_is_what_the_pre_commit_hook_runs():
+    """The hook's command has to keep working: it is the only thing standing
+    between a forgotten refresh and an unresolvable citation for a user."""
+    config = Path(__file__).parent.parent / ".pre-commit-config.yaml"
+    entry = "python -m arsenal_gear.utils.refresh_citations --check"
+    assert entry in config.read_text(encoding="utf-8")
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "arsenal_gear.utils.refresh_citations", "--check"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
 needs_ads_token = pytest.mark.skipif(
     not (os.environ.get("ADS_DEV_KEY") or os.environ.get("ADS_API_TOKEN")),
     reason="needs a NASA ADS API token in $ADS_DEV_KEY",
