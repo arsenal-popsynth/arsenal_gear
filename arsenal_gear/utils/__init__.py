@@ -6,7 +6,7 @@ the arsenal_gear package.
 """
 
 from . import array_utils
-from .citations import doi_to_bibtex, find_dois, gather_bibtex
+from .citations import cite, find_citations, gather_bibtex
 from .file_io import extract_one, find_match, get_metstr, is_valid_txz
 from .math_utils import masked_power
 from .scraper import downloader
@@ -19,7 +19,7 @@ __all__ = [
     "masked_power",
     "array_utils",
     "get_metstr",
-    "find_dois",
-    "doi_to_bibtex",
+    "cite",
+    "find_citations",
     "gather_bibtex",
 ]

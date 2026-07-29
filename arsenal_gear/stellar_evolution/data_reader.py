@@ -15,6 +15,7 @@ import astropy.units as u
 import numpy as np
 
 from ..utils import downloader, extract_one, find_match, get_metstr, is_valid_txz
+from ..utils.citations import cite
 from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
 
 
@@ -44,6 +45,11 @@ class IsochroneDataReader(ABC):
         """
 
 
+@cite(
+    "10.3847/0067-0049/222/1/8",
+    "10.3847/0004-637X/823/2/102",
+    "10.3847/1538-4365/ae48f3",
+)
 class MISTReader(IsochroneDataReader):
     """
     Class for reading MIST isochrone and stellar track data.
@@ -51,11 +57,6 @@ class MISTReader(IsochroneDataReader):
     This is an instantiation of the IsochroneDataReader abstract base class.
     """
 
-    DOI = [
-        "10.3847/0067-0049/222/1/8",
-        "10.3847/0004-637X/823/2/102",
-        "10.3847/1538-4365/ae48f3",
-    ]
     # basic options for MIST isochrones
     mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/{}"
     vcrits = ["0.0", "0.4"]

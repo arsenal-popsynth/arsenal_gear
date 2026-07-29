@@ -15,6 +15,7 @@ import numpy as np
 from astropy.units import Quantity
 
 from ..formation import SinglePop
+from ..utils.citations import cite
 from .source import Source
 from .yieldtables import YieldTables
 
@@ -200,6 +201,7 @@ class NuGrid(YieldTables):
         return yields * u.M_sun
 
 
+@cite("10.3847/0067-0049/225/2/24")
 class Pignatari2016(YieldTables):
     """
     Include yields for many elements for stars with masses
@@ -216,7 +218,6 @@ class Pignatari2016(YieldTables):
     References: Pignatari et al., 2016, ApJS, 225, 24
     """
 
-    DOI = "10.3847/0067-0049/225/2/24"
     # hard-coded parameters of the Pignatari (2016) tables
     p16_url = "https://download.nugridstars.org/set1/Yield_tables/"
     files = [
@@ -487,6 +488,7 @@ class Pignatari2016(YieldTables):
             downloader(self.filedir / file, self.p16_url + os.sep + file, message=None)
 
 
+@cite("10.1093/mnras/sty1729")
 class Ritter2018(YieldTables):
     """
     Include yields for many elements for stars with masses
@@ -504,7 +506,6 @@ class Ritter2018(YieldTables):
     References:  Ritter et al., 2018, MNRAS, 480, 538
     """
 
-    DOI = "10.1093/mnras/sty1729"
     # hard-coded parameters of the Ritter (2018) tables
     r18_url = "https://download.nugridstars.org/set1ext/Yield_tables/"
     files = [
@@ -796,6 +797,7 @@ class Ritter2018(YieldTables):
             downloader(self.filedir / file, self.r18_url + os.sep + file, message=None)
 
 
+@cite("10.1093/mnras/stz2158", "10.3390/universe7020025")
 class Battino20192021(YieldTables):
     """
     Include yields for many elements for stars with masses [2.0, 3.0] Msun,
@@ -811,7 +813,6 @@ class Battino20192021(YieldTables):
     References: Battino et al., 2019, MNRAS, 489, 1082; Battino et al., 2021, Universe, 7, 25
     """
 
-    DOI = ["10.1093/mnras/stz2158", "10.3390/universe7020025"]
     # hard-coded parameters of the Battino (2019,2021) tables
     b19_url = (
         "https://download.nugridstars.org/set1upd/yields_finalabu_tables/Battino2019"

@@ -17,14 +17,15 @@ from astropy.units import Quantity
 from tqdm import tqdm
 
 from arsenal_gear.formation import BinaryPop, SinglePop
+from arsenal_gear.utils.citations import cite
 
 
+@cite("10.1017/pasa.2017.51", "10.1093/mnras/sty1353")
 class BPASS_stellar_models:
     """
     Reads in BPASS stellar model files for use with a discrete stellar population.
     """
 
-    DOI = ["10.1017/pasa.2017.51", "10.1093/mnras/sty1353"]
     # basic options for BPASS stellar models
     # bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=0" + \
     #            "&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"

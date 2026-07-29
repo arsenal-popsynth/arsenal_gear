@@ -11,6 +11,8 @@ import scipy.special as sp
 from astropy.units import Quantity
 from scipy.stats import rv_continuous
 
+from ...utils.citations import cite
+
 __all__ = ["IMF", "Salpeter", "Kroupa1993", "Kroupa2001", "MillerScalo", "Chabrier"]
 
 
@@ -109,6 +111,7 @@ class IMF(rv_continuous):
         return np.clip(vals, self.min_mass, self.max_mass) * u.Msun
 
 
+@cite("10.1086/145971")
 class Salpeter(IMF):
     """
     A simple, classic Salpeter 1955 (slope 2.35) IMF.
@@ -123,8 +126,6 @@ class Salpeter(IMF):
     :param seed: Random seed for sampling
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
     """
-
-    DOI = "10.1086/145971"
 
     def __init__(
         self,
@@ -258,6 +259,7 @@ class PiecewisePowerLaw(IMF):
         return res * u.Msun
 
 
+@cite("10.1046/j.1365-8711.2001.04022.x")
 class Kroupa2001(PiecewisePowerLaw):
     """
     Kroupa (2001) IMF implementation
@@ -270,8 +272,6 @@ class Kroupa2001(PiecewisePowerLaw):
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
 
     """
-
-    DOI = "10.1046/j.1365-8711.2001.04022.x"
 
     def __init__(
         self,
@@ -289,6 +289,7 @@ class Kroupa2001(PiecewisePowerLaw):
         )
 
 
+@cite("10.1093/mnras/262.3.545")
 class Kroupa1993(PiecewisePowerLaw):
     """
     Kroupa, Tout & Gilmore (1993) IMF implementation
@@ -301,8 +302,6 @@ class Kroupa1993(PiecewisePowerLaw):
     :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState
 
     """
-
-    DOI = " 10.1093/mnras/262.3.545"
 
     def __init__(
         self,
