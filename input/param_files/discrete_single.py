@@ -1,6 +1,6 @@
 # Build a single-star population with a Salpeter IMF
 population = zams_single(
-    IMF=imf.Salpeter, mass=1e5 * u.Msun, metals=0, rot=0 * u.km / u.s
+    IMF=imf.Salpeter, mass=1e5 * u.Msun, metals=0.
 )
 
 # Select what evolution parameters we want

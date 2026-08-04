@@ -30,5 +30,4 @@ jobs:
         pip install .[all]
     - name: Test with pytest
       run: |
-        cd tests/
-        pytest
+        python -m pytest tests/ -v

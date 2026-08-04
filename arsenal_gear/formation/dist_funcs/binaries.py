@@ -11,8 +11,6 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.stats import loguniform, rv_continuous, uniform
 
-from arsenal_gear.population import StarPopulation
-
 
 class BinaryDistribution:
     """
@@ -253,7 +251,7 @@ class Fraction:
     :param mass_bins: Limit of the mass bins, of length k-1
     :type mass_bins: astropy mass unit
     :param stars: Potential primaries
-    :type stars: StarPopulation
+    :type stars: Quantity["mass"], list of stellar masses
     :param name: Name of the binary fraction function
     :type name: str
 
@@ -263,12 +261,12 @@ class Fraction:
         self,
         fraction: float,
         mass_bins: Quantity["mass"],
-        stars: StarPopulation,
+        stars: Quantity["mass"],
         name="",
     ):
         self.fraction: float = fraction
         self.mass_bins: float = mass_bins.to(u.Msun).value
-        self.stars: float = stars["mass"].to(u.Msun).value
+        self.stars: float = stars.to(u.Msun).value
         assert np.min(self.fraction) >= 0
         assert np.max(self.fraction) <= 1
         assert np.min(self.mass_bins) >= 0
@@ -286,7 +284,7 @@ class StepFraction(Fraction):
     """
 
     def __init__(
-        self, fraction: float, mass_bins: Quantity["mass"], stars: StarPopulation
+        self, fraction: float, mass_bins: Quantity["mass"], stars: Quantity["mass"]
     ):
         self.name = "Step"
         assert len(fraction) == 2
@@ -329,7 +327,7 @@ class MassRatio(rv_continuous):
     :param max_q: Maximum mass ratio
     :type max_q: float
     :param stars: Primaries
-    :type stars: StarPopulation
+    :type stars: Quantity["mass"], list of stellar masses
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
@@ -381,7 +379,7 @@ class Period(rv_continuous):
     :param max_p: Maximum orbital period
     :type max_p: astropy time unit
     :param stars: Primaries
-    :type stars: StarPopulation
+    :type stars: Quantity["mass"], list of stellar masses
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """
@@ -440,7 +438,7 @@ class Semimajor(rv_continuous):
     :param max_a: Maximum semi-major axis
     :type max_a: astropy length unit
     :param stars: Primaries
-    :type stars: StarPopulation
+    :type stars: Quantity["mass"], list of stellar masses
     :param name: Name for the scipy.stats rv_continuous instance
     :type name: str
     """

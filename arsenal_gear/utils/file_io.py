@@ -12,6 +12,25 @@ import os.path as osp
 import tarfile
 
 
+def get_metstr(met:float) -> str:
+    """
+    Convert a metallicity value to a string format suitable for file naming.
+
+    Parameters:
+    - met (float): The metallicity value to convert, assumed to be in log10(Z/Zsun)
+                   (or at least on a log scale)
+
+    Returns:
+    - str: A string representation of the metallicity
+           'p' indicates a postive metallicity (super-solar)
+           'm' indicates a negative metallicity (sub-solar)
+    """
+    if met < 0:
+        metstr = f"m{-1*met:.2f}"
+    else:
+        metstr = f"p{met:.2f}"
+    return metstr
+
 def is_valid_txz(fname):
     """
     Check if a .txz file is valid.

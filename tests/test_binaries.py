@@ -9,8 +9,7 @@ import astropy.units as u
 import numpy as np
 from numpy.testing import assert_allclose
 
-import arsenal_gear
-
+from arsenal_gear.formation import dist_funcs
 
 class TestLogUniformPeriod:
     """Tests for the Log-Uniform Period distribution."""
@@ -18,7 +17,7 @@ class TestLogUniformPeriod:
     N = int(1e6)
     min_p = 1 * u.d
     max_p = 1e4 * u.d
-    period = arsenal_gear.dist_funcs.binaries.LogUniformPeriod(min_p, max_p)
+    period = dist_funcs.binaries.LogUniformPeriod(min_p, max_p)
 
     def test_limits(self):
         """Check that the distribution limits are correct."""
@@ -45,7 +44,7 @@ class TestLogUniformSemimajor:
     N = int(1e6)
     min_a = 0.1 * u.au
     max_a = 100 * u.au
-    sma = arsenal_gear.dist_funcs.binaries.LogUniformSemimajor(min_a, max_a)
+    sma = dist_funcs.binaries.LogUniformSemimajor(min_a, max_a)
 
     def test_limits(self):
         """Check that the distribution limits are correct."""
@@ -72,7 +71,7 @@ class TestUniformMassRatio:
     N = int(1e6)
     min_q = 0.1
     max_q = 1
-    mratio = arsenal_gear.dist_funcs.binaries.UniformMassRatio(min_q, max_q)
+    mratio = dist_funcs.binaries.UniformMassRatio(min_q, max_q)
 
     def test_limits(self):
         """Check that the distribution limits are correct."""

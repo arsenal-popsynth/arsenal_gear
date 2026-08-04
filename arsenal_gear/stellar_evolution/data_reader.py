@@ -14,7 +14,7 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 
-from ..utils import downloader, extract_one, find_match, is_valid_txz
+from ..utils import downloader, extract_one, find_match, get_metstr, is_valid_txz
 from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
 
 
@@ -22,13 +22,14 @@ class IsochroneDataReader(ABC):
     """
     Abstract base class for reading isochrone data from various sources.
     """
+
     def __init__(self, **kwargs) -> None:
         # log10(Z/Zsun)
-        self.met = kwargs.get('met', 0.0)
+        self.met = kwargs.get("met", 0.0)
         # decides on verbose output
-        self.verbose = kwargs.get('verbose', False)
+        self.verbose = kwargs.get("verbose", False)
         # decides whether or not to force a download of the isochrone data
-        self.force_download = kwargs.get('force_download', False)
+        self.force_download = kwargs.get("force_download", False)
 
     @abstractmethod
     def read_iso_data(self) -> IsochroneSet:
@@ -42,17 +43,35 @@ class IsochroneDataReader(ABC):
         Abstract method for reading stellar track data.
         """
 
+
 class MISTReader(IsochroneDataReader):
     """
     Class for reading MIST isochrone and stellar track data.
     makes heavy use of code provided by the MIST team for reading their models.
     This is an instantiation of the IsochroneDataReader abstract base class.
     """
+
     # basic options for MIST isochrones
     mist_url = "https://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/{}"
-    vcrits   = ["0.0", "0.4"]
-    mets     = ["m4.00", "m3.50", "m3.00", "m2.50", "m2.00", "m1.75", "m1.50", "m1.25",\
-                "m1.00", "m0.75", "m0.50", "m0.25", "p0.00", "p0.25", "p0.50"]
+    vcrits = ["0.0", "0.4"]
+    mets = [
+        "m4.00",
+        "m3.50",
+        "m3.00",
+        "m2.50",
+        "m2.00",
+        "m1.75",
+        "m1.50",
+        "m1.25",
+        "m1.00",
+        "m0.75",
+        "m0.50",
+        "m0.25",
+        "p0.00",
+        "p0.25",
+        "p0.50",
+    ]
+
     def __init__(self, **kwargs) -> None:
         """
         Args:
@@ -60,9 +79,9 @@ class MISTReader(IsochroneDataReader):
 
         Usage:
             >> iso = MIST(met=0.0, vvcrit="0.0", interp_op="track")
-            >> mini = np.array([1.0, 5.0, 10.0])*u.Msun
-            >> lbol = iso.lbol(mini, 10*u.Myr)
-            >> teff = iso.teff(mini, 10*u.Myr)
+            >> m0 = np.array([1.0, 5.0, 10.0])*u.Msun
+            >> lbol = iso.lbol(m0, 10*u.Myr)
+            >> teff = iso.teff(m0, 10*u.Myr)
 
         Attributes:
             version     Dictionary containing the MIST and MESA version numbers.
@@ -86,10 +105,7 @@ class MISTReader(IsochroneDataReader):
         self.rot = None
         self.abun = None
 
-        if self.met<0:
-            self.metstr = f"m{-1*self.met:.2f}"
-        else:
-            self.metstr = f"p{self.met:.2f}"
+        self.metstr = get_metstr(self.met)
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
         if self.vvcrit not in ["0.0", "0.4"]:
@@ -128,7 +144,7 @@ class MISTReader(IsochroneDataReader):
         # make data storage directory if it doesn't exist
         rootdir = self.rootdir
         if rootdir is None:
-            rootdir = Path(__file__).parent.absolute() / 'data/mist'
+            rootdir = Path(__file__).parent.absolute() / "data/mist"
             if not rootdir.is_dir():
                 rootdir.mkdir(parents=True, exist_ok=True)
         self.rootdir = Path(rootdir)
@@ -149,8 +165,9 @@ class MISTReader(IsochroneDataReader):
                 else:
                     # tarfile exists and is valid -> extract it
                     extract_one(tarfile_path, self.rootdir, delete_txz=True)
-            elif ((self.interp_op == "iso") and
-                  (not (modeldir_path / self.isofile).is_file())):
+            elif (self.interp_op == "iso") and (
+                not (modeldir_path / self.isofile).is_file()
+            ):
                 # model directory exists but isochrone file doesn't -> force download
                 force_download = True
         self.force_download = force_download
@@ -164,39 +181,110 @@ class MISTReader(IsochroneDataReader):
             downloader(self.rootdir / self.tarfile, url, message)
             extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
 
+    @staticmethod
+    def _process_elem_label(label):
+        """
+        Helper function to process element labels in the MIST data.
+
+        MIST surfface abundance labels are of the form "surface_{elem}{num}"
+        where {elem} is the element symbol and {num} is the isotope number.
+        This function extracts the element symbol from the label.
+        """
+        # takes the part without "surface_" and removes the isotope number at the end
+        elem = label[8:].rstrip("0123456789")
+        if len(elem) == 1:
+            elem = elem.upper()
+            return elem
+        # make sure two-letter elements have the first capitalized (He, Li, Be, etc.)
+        elif len(elem) == 2:
+            elem = elem[0].upper() + elem[1].lower()
+            return elem
+        else:
+            raise ValueError(f"Could not parse element name from label {label}")
+
+    def _dictionary_to_qs_elems(self, props, keys):
+        """
+        Takes a dictionary of existing properties and separates out the abundances of
+        surface elements, concatenating together different isotopes and returns the
+        resulting dictionary along with the list of elements.
+        """
+        (qs, elems) = ({}, [])
+        for label in keys:
+            if label.startswith("surface_"):
+                elem = self._process_elem_label(label)
+                if elem in qs:
+                    # this adds together different isotopes
+                    qs[elem] += props[label]
+                else:
+                    qs[elem] = props[label]
+                    elems.append(elem)
+            elif label != "log10_isochrone_age_yr":
+                qs[label] = props[label]
+        return qs, elems
+
     def read_iso_data(self) -> IsochroneSet:
         """
         Reads in isochrone data for MIST
         """
+        # reads in isochrone data from files
         lages, hdr_list, isos_mist = self.read_iso_file()
         isos = []
+        # this loop turns the read-in data into the Isochrone data structure that
+        # we usee elsewhere in the code. This concatenates all isotopes of surface
+        # abundances and separates a list of the elements tracked at the surface.
         for iso in isos_mist:
-            age = np.power(10, iso["log10_isochrone_age_yr"][0])*u.yr
-            qs = {}
-            for label in hdr_list:
-                if label != "log10_isochrone_age_yr":
-                    qs[label] = iso[label]
-            iso_data = Isochrone(age=age,
-                                    eep_name='EEP',
-                                    mini_name='initial_mass',
-                                    lteff_name='log_Teff',
-                                    llbol_name='log_L',
-                                    qs=qs)
+            age = np.power(10, iso["log10_isochrone_age_yr"][0]) * u.yr
+            (qs, elems) = self._dictionary_to_qs_elems(iso, hdr_list)
+            iso_data = Isochrone(
+                age=age,
+                eep_name="EEP",
+                m0_name="initial_mass",
+                lteff_name="log_Teff",
+                llbol_name="log_L",
+                lrad_name="log_R",
+                lgrav_name="log_g",
+                elems=elems,
+                qs=qs,
+            )
             isos.append(iso_data)
         self.hdr_list = hdr_list
-        # get the maximum mass still alive for each isochrone
-        max_mass = np.max(isos_mist[0]['initial_mass'])
-        iset = IsochroneSet(lages=lages,
-                            hdr_list=self.hdr_list,
-                            isos=isos,
-                            max_mass=max_mass*u.Msun)
+
+        # the mass-age relationship for MIST isochrones is non-monotonic at very early times
+        # (less than a few Myr) we just ignore this portion of evolution in order to assure
+        # that we have a monotonic mass-age relationship for interpolation purposes.
+        mmaxes = np.array([np.max(iso.m0.value) for iso in isos])
+        # ensure the array is monotonic
+        int_mono = (np.where(np.diff(mmaxes) > 0)[0] + 1)[-1]
+        mmaxes = np.array(mmaxes)[int_mono:]
+        # get the maximum mass tracekd overall
+        max_mass = np.max(mmaxes)
+        # get the m0mum mass for the isochrones
+        mmins = np.array([np.min(iso.m0.value) for iso in isos])
+        min_mass = np.min(mmins)
+        iset = IsochroneSet(
+            lages=lages,
+            hdr_list=self.hdr_list,
+            isos=isos,
+            min_mass=min_mass * u.Msun,
+            max_mass=max_mass * u.Msun,
+            metallicity=self.met,
+            eep_name="EEP",
+            m0_name="initial_mass",
+            lteff_name="log_Teff",
+            llbol_name="log_L",
+            lrad_name="log_R",
+            lgrav_name="log_g",
+            elems=isos[0].elems,
+        )
         return iset
 
     def read_track_data(self) -> TrackSet:
         """
         Reads in stellar track data for MIST
         """
-        eep_file_pattern = [("?????M.track.eep",),]
+        eep_file_pattern = [
+            ("?????M.track.eep",),
+        ]
         mass_file_list = find_match(eep_file_pattern, self.rootdir / self.modeldir)
 
         masses = []
@@ -206,28 +294,46 @@ class MISTReader(IsochroneDataReader):
         max_eep = 0
         for f in mass_file_list:
             # read in the EEP file
-            minit, eeps, min_age, max_age, data = self.read_eep_file(f)
+            m0_t, eeps, min_age, max_age, data = self.read_eep_file(f)
             # store the mass and EEP data
             max_eep = max(max_eep, np.max(eeps))
-            masses.append(minit)
+            masses.append(m0_t)
             min_ages.append(min_age)
             max_ages.append(max_age)
-            tracks.append(StellarTrack(mass=minit*u.Msun,
-                                        eeps=eeps,
-                                        age_name='star_age',
-                                        lteff_name='log_Teff',
-                                        llbol_name='log_L',
-                                        qs=data))
-        masses = np.array(masses)*u.Msun
-        min_ages = np.array(min_ages)*u.yr
-        max_ages = np.array(max_ages)*u.yr
+            (qs, elems) = self._dictionary_to_qs_elems(data, data.keys())
+
+            tracks.append(
+                StellarTrack(
+                    mass=m0_t * u.Msun,
+                    eeps=eeps,
+                    age_name="star_age",
+                    lteff_name="log_Teff",
+                    llbol_name="log_L",
+                    lrad_name="log_R",
+                    lgrav_name="log_g",
+                    qs=qs,
+                    elems=elems,
+                )
+            )
+        masses = np.array(masses) * u.Msun
+        min_ages = np.array(min_ages) * u.yr
+        max_ages = np.array(max_ages) * u.yr
         self.hdr_list = data.keys()
-        tset = TrackSet(masses=masses,
-                                min_ages=min_ages,
-                                max_ages=max_ages,
-                                hdr_list=self.hdr_list,
-                                tracks=tracks,
-                                max_eep=max_eep)
+        tset = TrackSet(
+            masses=masses,
+            min_ages=min_ages,
+            max_ages=max_ages,
+            hdr_list=self.hdr_list,
+            tracks=tracks,
+            max_eep=max_eep,
+            eep_name="EEP",
+            age_name="star_age",
+            lteff_name="log_Teff",
+            llbol_name="log_L",
+            lrad_name="log_R",
+            lgrav_name="log_g",
+            elems=elems,
+        )
         return tset
 
     def read_iso_file(self):
@@ -241,15 +347,15 @@ class MISTReader(IsochroneDataReader):
 
         # open file and read it in
         fname = self.rootdir / self.modeldir / self.isofile
-        with open(fname, encoding='utf-8') as f:
+        with open(fname, encoding="utf-8") as f:
             content = [line.split() for line in f]
-        if not hasattr(self, 'version'):
-            self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
-            self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
+        if not hasattr(self, "version"):
+            self.version = {"MIST": content[0][-1], "MESA": content[1][-1]}
+            self.abun = {content[3][i]: float(content[4][i]) for i in range(1, 5)}
             self.rot = float(content[4][-1])
         self.num_ages = int(content[6][-1])
 
-        #read one block for each isochrone
+        # read one block for each isochrone
         iso_set = []
         ages = []
         counter = 0
@@ -258,20 +364,21 @@ class MISTReader(IsochroneDataReader):
             # grab info for each isochrone
             num_eeps = int(data[counter][-2])
             num_cols = int(data[counter][-1])
-            hdr_list = data[counter+2][1:]
-            formats = tuple([np.int32]+[np.float64 for i in range(num_cols-1)])
-            iso = np.zeros((num_eeps),{'names':tuple(hdr_list),'formats':tuple(formats)})
+            hdr_list = data[counter + 2][1:]
+            formats = tuple([np.int32] + [np.float64 for i in range(num_cols - 1)])
+            iso = np.zeros(
+                (num_eeps), {"names": tuple(hdr_list), "formats": tuple(formats)}
+            )
             # read through EEPs for each isochrone
             for eep in range(num_eeps):
-                iso_chunk = data[3+counter+eep]
+                iso_chunk = data[3 + counter + eep]
                 iso[eep] = tuple(iso_chunk)
             iso_set.append(iso)
             ages.append(iso[0][1])
-            counter+= 3+num_eeps+2
+            counter += 5 + num_eeps
         return ages, hdr_list, iso_set
 
     def read_eep_file(self, fname):
-
         """
         Reads in an EEP file.
 
@@ -281,21 +388,20 @@ class MISTReader(IsochroneDataReader):
         """
 
         evol = np.loadtxt(fname, skiprows=11).T
-        with open(fname, encoding='utf-8') as f:
+        with open(fname, encoding="utf-8") as f:
             content = [line.split() for line in f]
 
-        if not hasattr(self, 'version'):
-            self.version = {'MIST': content[0][-1], 'MESA': content[1][-1]}
-            self.abun = {content[3][i]:float(content[4][i]) for i in range(1,5)}
+        if not hasattr(self, "version"):
+            self.version = {"MIST": content[0][-1], "MESA": content[1][-1]}
+            self.abun = {content[3][i]: float(content[4][i]) for i in range(1, 5)}
             self.rot = float(content[4][-1])
             self.hdr_list = content[11][1:]
-        minit = float(content[7][1])
+        m0_t = float(content[7][1])
         hdr_list = content[11][1:]
         eeps = [int(j) for j in content[8][2:]]
 
-
-        data = {hdr_list[i]:evol[i] for i in range(len(hdr_list))}
+        data = {hdr_list[i]: evol[i] for i in range(len(hdr_list))}
         min_age = min(data["star_age"])
         max_age = max(data["star_age"])
 
-        return minit, eeps, min_age, max_age, data
+        return m0_t, eeps, min_age, max_age, data
