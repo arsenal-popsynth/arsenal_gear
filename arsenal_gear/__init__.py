@@ -21,6 +21,7 @@ from .stellar_evolution.se_data_structures import Isochrone
 
 __version__ = "0.0.1"
 __all__ = [
+    "binary_evolution",
     "element_yields",
     "feedbacks",
     "stellar_evolution",
