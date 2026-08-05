@@ -556,7 +556,7 @@ class MPAConverter(BinaryEvolutionConverter):
 
         pool.close()
 
-        data = pd.concat(frames)
+        data = pd.concat(frames, ignore_index=True)
 
         if ("singles_" + self.met + ".pkl.gz") not in os.listdir(
             self.output_dir
@@ -642,7 +642,7 @@ class MPAConverter(BinaryEvolutionConverter):
 
         pool.close()
 
-        data = pd.concat(frames)
+        data = pd.concat(frames, ignore_index=True)
         print(data)
 
         if ("binaries_" + self.met + ".pkl.gz") not in os.listdir(
