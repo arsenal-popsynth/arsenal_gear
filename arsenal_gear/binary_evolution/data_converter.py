@@ -16,7 +16,7 @@ import pandas as pd
 import tqdm
 import xarray as xr
 
-from .be_data_structures import BinaryStarTable, SingleStarTable
+from .be_data_structures import BinaryStarTrackSet, SingleStarTrackSet
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
@@ -37,17 +37,17 @@ class BinaryEvolutionConverter(ABC):
         self.overwrite = kwargs.get("overwrite", False)
 
     @abstractmethod
-    def convert_single_data(self) -> SingleStarTable:
+    def convert_single_data(self) -> SingleStarTrackSet:
         """
         Abstract method for converting single star evolutionary tracks
-        into an Arsenal stellar evolution table.
+        into an Arsenal stellar evolution track set.
         """
 
     @abstractmethod
-    def convert_binary_data(self) -> BinaryStarTable:
+    def convert_binary_data(self) -> BinaryStarTrackSet:
         """
         Abstract method for converting binary evolutionary tracks into
-        an Arsenal binary evolution table.
+        an Arsenal binary evolution track set.
         """
 
 
@@ -79,8 +79,8 @@ class BPASSConverter(BinaryEvolutionConverter):
             kwargs: Keyword arguments for the binary evolution table.
 
         Methods:
-            convert_single_data     Processes single stellar track data into a SingleStarTable
-            convert_binary_data     Processes binary stellar track data into a BinaryStarTable
+            convert_single_data     Processes single stellar track data into a SingleStarTrackSet
+            convert_binary_data     Processes binary stellar track data into a BinaryStarTrackSet
         """
         # set input parameters
         super().__init__(**kwargs)
@@ -105,7 +105,7 @@ class BPASSConverter(BinaryEvolutionConverter):
     def convert_single_data(self):
         """
         Converts BPASS data for single stars into an Arsenal-readable
-        SingleStarTable.
+        SingleStarTrackSet.
         """
 
         # Create directory if it does not already exists
@@ -221,7 +221,7 @@ class BPASSConverter(BinaryEvolutionConverter):
     def convert_binary_data(self):
         """
         Converts BPASS data for binary stars into an Arsenal-readable
-        BinaryStarTable.
+        BinaryStarTrackSet.
         """
 
         # Create directory if it does not already exists
@@ -491,8 +491,8 @@ class MPAConverter(BinaryEvolutionConverter):
             kwargs: Keyword arguments for the binary evolution table.
 
         Methods:
-            convert_single_data     Processes single stellar track data into a SingleStarTable
-            convert_binary_data     Processes binary stellar track data into a BinaryStarTable
+            convert_single_data     Processes single stellar track data into a SingleStarTrackSet
+            convert_binary_data     Processes binary stellar track data into a BinaryStarTrackSet
         """
         # set input parameters
         super().__init__(**kwargs)
@@ -513,7 +513,7 @@ class MPAConverter(BinaryEvolutionConverter):
     def convert_single_data(self):
         """
         Converts MPA/Bonn stellar model data for single stars into an Arsenal-readable
-        SingleStarTable.
+        SingleStarTrackSet.
         """
 
         # Create directory if it does not already exists
@@ -613,7 +613,7 @@ class MPAConverter(BinaryEvolutionConverter):
     def convert_binary_data(self):
         """
         Converts MPA/Bonn stellar model data for binary stars into an Arsenal-readable
-        BinaryStarTable.
+        BinaryStarTrackSet.
         """
 
         # Create directory if it does not already exists

@@ -7,15 +7,17 @@ properties derived from binary evolution models.
 """
 
 from dataclasses import dataclass
-from astropy.units import Quantity
+
 import numpy as np
+from astropy.units import Quantity
+
 
 @dataclass
-class SingleStarTable:
+class SingleStarTrackSet:
     """
     Data class for storing evolutionary data for single stars evolved
-    with binary evolution codes. 
-    
+    with binary evolution codes.
+
     Attributes:
         masses: list of initial masses of the stars
         logA_name: variable name for log_10(age/yr)
@@ -26,6 +28,7 @@ class SingleStarTable:
         qs: Dictionary of stellar track quantities. These should minimally include
             logA, mass, logT, logL, and logR but can include others.
     """
+
     masses: np.ndarray[Quantity["mass"]]
     logA_name: str
     mass_name: str
@@ -34,12 +37,13 @@ class SingleStarTable:
     logR_name: str
     qs: dict
 
+
 @dataclass
-class BinaryStarTable:
+class BinaryStarTrackSet:
     """
     Data class for storing evolutionary data for binary stars evolved
-    with binary evolution codes. 
-    
+    with binary evolution codes.
+
     Attributes:
         masses: list of initial masses of the primaries
         mass_ratios: list of initial mass ratios companion mass/primary mass
@@ -54,9 +58,10 @@ class BinaryStarTable:
         logL2_name: variable name for log_10(bolometric luminosities/Lsun) for the companion
         logR2_name: variable name for log_10(stelalr radius/Rsun) for the companion
         qs: Dictionary of stellar track quantities. These should minimally include
-            logA, mass1, logT1, logL1, logR1, mass2, logT2, logL2, and logR2 
+            logA, mass1, logT1, logL1, logR1, mass2, logT2, logL2, and logR2
             but can include others.
     """
+
     masses: np.ndarray[Quantity["mass"]]
     mass_ratios: np.ndarray[np.float64]
     periods: np.ndarray[Quantity["time"]]
