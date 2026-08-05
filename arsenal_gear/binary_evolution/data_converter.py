@@ -519,7 +519,7 @@ class MPAConverter(BinaryEvolutionConverter):
         # Create directory if it does not already exists
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
-        model_directory = self.input_dir + self.met + "/single/"
+        model_directory = self.input_dir + "single_" + self.met
         files = []
 
         # Scan directory
@@ -528,82 +528,44 @@ class MPAConverter(BinaryEvolutionConverter):
                 if model.is_file() and model.name.endswith("_0_compressed.pkl.gz"):
                     files.append(model.name)
 
-        # Create the zero array
-        num_files = len(files)
-        # Times for time array
-        num_times = int(1e5)  # Assume there are at most 1e5 outputs
-        # Save properties as a function of time: (1) time, (2) mass,
-        # (3) bolometric luminosity, (4) surface temperature, (5) radius
-        data = np.zeros((num_files, 5, num_times))
-
         # Function to extract the data
         def extract_data(model):
 
             df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
 
-            _data = np.vstack(
-                (
-                    df.star_age.values.astype("float"),  # time in yr
-                    df.star_mass.values.astype("float"),  # mass in Msun
-                    df.log_L.values.astype("float"),  # log Lbol in Lsun
-                    df.log_Teff.values.astype("float"),  # log Teff in K
-                    df.log_R.values.astype("float"),  # log R in Rsun
-                )
-            )
+            d = {
+                "model": str(int(float(model[:5]) * 100)),  # model name as 100*log10(M)
+                "time": df.star_age.values.astype("float"),  # time in yr
+                "mass": df.star_mass.values.astype("float"),  # mass in MSun
+                "logL": df.log_L.values.astype("float"),  # log Lbol in Lsun
+                "logT": df.log_Teff.values.astype("float"),  # log Teff in K
+                "logR": df.log_R.values.astype("float"),  # log R in Rsun
+            }
 
-            return _data
+            small_df = pd.DataFrame(data=d, dtype=float)
+
+            return small_df
 
         pool = Pool()
         results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
-        i = 0
-        for result in results:
-            data[i, :, : len(result[0, :])] = result
-            i += 1
+        frames = []
+
+        for i in range(len(results)):
+            frames.append(results[i])
 
         pool.close()
 
-        # Remove superfluous model numbers
-        first_empty = 0
-        j = 0
-        while j < num_times:
-            if len(np.nonzero(data[:, 1, j])[0]) > 0:
-                first_empty += 1
-                j += 1
-            else:
-                first_empty += 1
-                j = num_times
+        data = pd.concat(frames)
 
-        data = data[:, :, :first_empty]
-
-        # Sort by mass
-        _sort = np.argsort(data[:, 1, 0])
-        data = data[_sort, :, :]
-
-        if ("singles_" + self.met + ".h5") not in os.listdir(
+        if ("singles_" + self.met + ".pkl.gz") not in os.listdir(
             self.output_dir
         ) or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            masses = data[:, 1, 0]
-
-            ds = xr.Dataset(
-                data_vars=dict(
-                    time=(["model", "step"], data[:, 0, :]),
-                    mass=(["model", "step"], data[:, 1, :]),
-                    log_Lbol=(["model", "step"], data[:, 2, :]),
-                    log_Teff=(["model", "step"], data[:, 3, :]),
-                    log_R=(["model", "step"], data[:, 4, :]),
-                ),
-                coords=dict(
-                    model=("model", masses), step=("step", np.arange(first_empty))
-                ),
-                attrs=dict(
-                    description="MPA/Bonn evolution data for single stars at Z="
-                    + str(self.met)
-                ),
+            data.to_pickle(
+                self.output_dir + "/singles_" + self.met + ".pkl.gz", compression="gzip"
             )
-            ds.to_netcdf(self.output_dir + "/singles_" + self.met + ".h5")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
@@ -635,17 +597,6 @@ class MPAConverter(BinaryEvolutionConverter):
                         ):
                             files.append(subdirectory.name + "/" + model.name)
 
-        # Create the zero array
-        num_files = len(files)
-        # Times for time array
-        num_times = int(1e5)  # Assume there are at most 1e5 outputs
-        # Save properties as a function of time: (1) time,
-        # (2) primary mass, (3) primary bolometric luminosity,
-        # (4) primary surface temperature, (5) primary radius, (6)-(9) for the companion
-        data = np.zeros((num_files, 9, num_times))
-
-        model_orbits = np.zeros(num_files)
-
         # Function to extract the data
         def extract_data(model):
 
@@ -658,139 +609,51 @@ class MPAConverter(BinaryEvolutionConverter):
                 compression="gzip",
             )
 
-            pad_length = len(df_2.star_age.values) - len(df_1.star_age.values)
+            d = {
+                "model": str(int(float(model[5:10]) * 100))
+                + "_"
+                + str(int(float(model[11:16]) * 100))
+                + "_"
+                + str(int(float(model[17:22] * 100))),  # model name as 100*log10(M)
+                "time": df_2.star_age.values.astype("float"),  # time in yr
+                "p_mass": df_1.star_mass.values.astype("float"),  # mass in MSun
+                "p_logL": df_1.log_L.values.astype("float"),  # log Lbol in Lsun
+                "p_logT": df_1.log_Teff.values.astype("float"),  # log Teff in K
+                "p_logR": df_1.log_R.values.astype("float"),  # log R in Rsun
+                "s_mass": df_2.star_mass.values.astype("float"),  # mass in MSun
+                "s_logL": df_2.log_L.values.astype("float"),  # log Lbol in Lsun
+                "s_logT": df_2.log_Teff.values.astype("float"),  # log Teff in K
+                "s_logR": df_2.log_R.values.astype("float"),  # log R in Rsun
+            }
 
-            if pad_length > 0:
-                _data = np.vstack(
-                    (
-                        df_2.star_age.values.astype("float"),  # time in yr
-                        np.pad(
-                            df_1.star_mass.values.astype("float"),
-                            (0, pad_length),
-                            "edge",
-                        ),  # mass in Msun
-                        np.pad(
-                            df_1.log_L.values.astype("float"),
-                            (0, pad_length),
-                            "constant",
-                            constant_values=(0, 0),
-                        ),  # log Lbol in Lsun
-                        np.pad(
-                            df_1.log_Teff.values.astype("float"),
-                            (0, pad_length),
-                            "constant",
-                            constant_values=(0, 0),
-                        ),  # log Teff in K
-                        np.pad(
-                            df_1.log_R.values.astype("float"), (0, pad_length), "edge"
-                        ),  # log R in Rsun
-                        df_2.star_mass.values.astype("float"),  # mass in Msun
-                        df_2.log_L.values.astype("float"),  # log Lbol in Lsun
-                        df_2.log_Teff.values.astype("float"),  # log Teff in K
-                        df_2.log_R.values.astype("float"),  # log R in Rsun
-                    )
-                )
+            combined_df = pd.DataFrame(data=d, dtype=float)
 
-            else:
-                _data = np.vstack(
-                    (
-                        df_1.star_age.values.astype("float"),  # time in yr
-                        df_1.star_mass.values.astype("float"),  # mass in Msun
-                        df_1.log_L.values.astype("float"),  # log Lbol in Lsun
-                        df_1.log_Teff.values.astype("float"),  # log Teff in K
-                        df_1.log_R.values.astype("float"),  # log R in Rsun
-                        np.pad(
-                            df_2.star_mass.values.astype("float"),
-                            (0, -1 * pad_length),
-                            "edge",
-                        ),  # mass in Msun
-                        np.pad(
-                            df_2.log_L.values.astype("float"),
-                            (0, -1 * pad_length),
-                            "constant",
-                            constant_values=(0, 0),
-                        ),  # log Lbol in Lsun
-                        np.pad(
-                            df_2.log_Teff.values.astype("float"),
-                            (0, -1 * pad_length),
-                            "constant",
-                            constant_values=(0, 0),
-                        ),  # log Teff in K
-                        np.pad(
-                            df_2.log_R.values.astype("float"),
-                            (0, -1 * pad_length),
-                            "edge",
-                        ),  # log R in Rsun
-                    )
-                )
-
-            model_split = model.split("/")
-            model_split = model_split[1].split("_")
-
-            return _data, model_split
+            return combined_df
 
         print("Starting to extract data...")
 
-        i = 0
-        for file in tqdm.tqdm(files, total=len(files)):
-            # Use Pool to avoid overflowing memory
-            with Pool(1) as pool:
-                result = pool.map(extract_data, [file])[0]
-                extracted_data, model_split = result
-                data[i, :, : len(extracted_data[0, :])] = extracted_data
-                model_orbits[i] = int(
-                    round(10 ** float(model_split[0]), 1) * 1e6
-                    + float(model_split[1]) * 1e5
-                    + float(model_split[2]) * 100
-                )
-                i += 1
+        pool = Pool()
+        results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
-        # Sort by model
-        sorted_models = np.argsort(model_orbits)[::-1]
-        data = data[sorted_models, :, :]
-        model_orbits = model_orbits[sorted_models]
+        frames = []
 
-        # Remove superfluous model numbers
-        first_empty = 0
-        j = 0
-        while j < num_times:
-            if len(np.nonzero(data[:, 1, j])[0]) > 0:
-                first_empty += 1
-                j += 1
-            else:
-                first_empty += 1
-                j = num_times
+        for i in range(len(results)):
+            frames.append(results[i])
 
-        data = data[:, :, :first_empty]
+        pool.close()
 
-        if ("binaries_" + self.met + ".h5") not in os.listdir(
+        data = pd.concat(frames)
+        print(data)
+
+        if ("binaries_" + self.met + ".pkl.gz") not in os.listdir(
             self.output_dir
         ) or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            ds = xr.Dataset(
-                data_vars=dict(
-                    time=(["model", "step"], data[:, 0, :]),
-                    mass1=(["model", "step"], data[:, 1, :]),
-                    log_Lbol1=(["model", "step"], data[:, 2, :]),
-                    log_Teff1=(["model", "step"], data[:, 3, :]),
-                    log_R1=(["model", "step"], data[:, 4, :]),
-                    mass2=(["model", "step"], data[:, 5, :]),
-                    log_Lbol2=(["model", "step"], data[:, 6, :]),
-                    log_Teff2=(["model", "step"], data[:, 7, :]),
-                    log_R2=(["model", "step"], data[:, 8, :]),
-                ),
-                coords=dict(
-                    model=(["model"], model_orbits),
-                    step=("step", np.arange(first_empty)),
-                ),
-                attrs=dict(
-                    description="MPA/Bonn evolution data for binary stars at Z="
-                    + str(self.met)
-                ),
+            data.to_pickle(
+                self.output_dir + "/binaries_" + self.met + ".pkl.gz",
+                compression="gzip",
             )
-
-            ds.to_netcdf(self.output_dir + "/binaries_" + self.met + ".h5")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
