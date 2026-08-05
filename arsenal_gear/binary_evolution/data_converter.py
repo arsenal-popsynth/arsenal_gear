@@ -107,111 +107,62 @@ class BPASSConverter(BinaryEvolutionConverter):
         Converts BPASS data for single stars into an Arsenal-readable
         SingleStarTrackSet.
         """
-
         # Create directory if it does not already exists
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
-        model_directory = self.input_dir + "/NEWSINMODS/" + self.metstr
+        model_directory = self.input_dir + "NEWSINMODS/" + self.metstr
+        files = []
 
-        # Create the zero array
-        # Number of files depends on the choice of mass limits for the IMF
-        files = os.listdir(model_directory)
-        num_files = len(files)
-        # Times for time array
-        num_times = int(1e4)  # Assume there are at most 1e4 outputs
-        # Save properties as a function of time: (1) time, (2) mass,
-        # (3) bolometric luminosity, (4) surface temperature, (5) radius
-        data = np.zeros((num_files, 5, num_times))
+        # Scan directory
+        with os.scandir(model_directory) as all_models:
+            for model in all_models:
+                if model.is_file() and model.name.startswith("sneplot"):
+                    files.append(model.name)
+        files.sort()
 
         # Function to extract the data
         def extract_data(model):
 
-            if model.startswith("sneplot"):
+            model_split = model.split("-")
 
-                _data = np.genfromtxt(model_directory + "/" + model)
-                # Replace NaNs by 0s --> What about files without a companion?
-                _data = np.nan_to_num(_data)
-                # We want to extract the following values
-                _num = np.arange(len(_data[:, 1]))
+            data = np.genfromtxt(model_directory + "/" + model)
 
-                # Indices for time in yr, mass in Msun, log Lbol in Lsun,
-                # log Teff in K, log R in Rsun
-                return_ids = [1, 5, 4, 3, 2]
+            d = {
+                "model": str(
+                    int(np.log10(float(model_split[-1])) * 100)
+                ),  # model name as 100*log10(M)
+                "time": data[:, 1].astype("float"),  # time in yr
+                "mass": data[:, 5].astype("float"),  # mass in MSun
+                "logL": data[:, 4].astype("float"),  # log Lbol in Lsun
+                "logT": data[:, 3].astype("float"),  # log Teff in K
+                "logR": data[:, 2].astype("float"),  # log R in Rsun
+            }
 
-                return np.transpose(_data[:, return_ids])  # log R in Rsun
+            small_df = pd.DataFrame(data=d, dtype=float)
+
+            return small_df
 
         pool = Pool()
         results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
-        i = 0
-        for result in results:
-            if result is not None:
-                data[i, :, : len(result[0, :])] = result
-                i += 1
+        frames = []
+
+        for i in range(len(results)):
+            frames.append(results[i])
 
         pool.close()
 
-        # Remove superfluous model numbers
-        first_empty = 0
-        j = 0
-        while j < num_times:
-            if len(np.nonzero(data[:, 1, j])[0]) > 0:
-                first_empty += 1
-                j += 1
-            else:
-                first_empty += 1
-                j = num_times
+        data = pd.concat(frames, ignore_index=True)
 
-        data = data[:, :, :first_empty]
-
-        # If fewer models, fill with sensible values
-        for i in range(len(data[:, 0, 0])):
-            _zeros = np.where(data[i, 0, :] == 0)[0]
-            if len(_zeros) > 1:  # if not longest
-                data[i, 0, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 0, _zeros[1] - 1]
-                )
-                data[i, 1, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 1, _zeros[1] - 1]
-                )
-                data[i, 2, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 2, _zeros[1] - 1]
-                )
-                data[i, 3, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 3, _zeros[1] - 1]
-                )
-                data[i, 4, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 4, _zeros[1] - 1]
-                )
-
-        # Sort by mass
-        _sort = np.argsort(data[:, 1, 0])
-        data = data[_sort, :, :]
-
-        if ("singles_" + self.metstr + ".h5") not in os.listdir(
+        if ("singles_" + self.metstr + ".pkl.gz") not in os.listdir(
             self.output_dir
         ) or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            masses = data[:, 1, 0]
-
-            ds = xr.Dataset(
-                data_vars=dict(
-                    time=(["model", "step"], data[:, 0, :]),
-                    mass=(["model", "step"], data[:, 1, :]),
-                    log_Lbol=(["model", "step"], data[:, 2, :]),
-                    log_Teff=(["model", "step"], data[:, 3, :]),
-                    log_R=(["model", "step"], data[:, 4, :]),
-                ),
-                coords=dict(
-                    model=("model", masses), step=("step", np.arange(first_empty))
-                ),
-                attrs=dict(
-                    description="BPASS evolution data for single stars at Z="
-                    + str(self.met)
-                ),
+            data.to_pickle(
+                self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
+                compression="gzip",
             )
-            ds.to_netcdf(self.output_dir + "/singles_" + self.metstr + ".h5")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
@@ -527,6 +478,7 @@ class MPAConverter(BinaryEvolutionConverter):
             for model in all_models:
                 if model.is_file() and model.name.endswith("_0_compressed.pkl.gz"):
                     files.append(model.name)
+        files.sort()
 
         # Function to extract the data
         def extract_data(model):
@@ -596,6 +548,7 @@ class MPAConverter(BinaryEvolutionConverter):
                             "_compressed.pkl.gz"
                         ):
                             files.append(subdirectory.name + "/" + model.name)
+        files.sort()
 
         # Function to extract the data
         def extract_data(model):
