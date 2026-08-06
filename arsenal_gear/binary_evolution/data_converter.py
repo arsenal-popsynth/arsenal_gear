@@ -14,7 +14,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import tqdm
-import xarray as xr
 
 from .be_data_structures import BinaryStarTrackSet, SingleStarTrackSet
 
@@ -123,14 +122,13 @@ class BPASSConverter(BinaryEvolutionConverter):
         # Function to extract the data
         def extract_data(model):
 
+            data = np.genfromtxt(model_directory + "/" + model)
             model_split = model.split("-")
 
-            data = np.genfromtxt(model_directory + "/" + model)
-
             d = {
-                "model": str(
-                    int(np.log10(float(model_split[-1])) * 100)
-                ),  # model name as 100*log10(M)
+                "model": str(int(float(model_split[-1]) * 100)).zfill(
+                    5
+                ),  # model name as 100*M
                 "time": data[:, 1].astype("float"),  # time in yr
                 "mass": data[:, 5].astype("float"),  # mass in MSun
                 "logL": data[:, 4].astype("float"),  # log Lbol in Lsun
@@ -138,7 +136,7 @@ class BPASSConverter(BinaryEvolutionConverter):
                 "logR": data[:, 2].astype("float"),  # log R in Rsun
             }
 
-            small_df = pd.DataFrame(data=d, dtype=float)
+            small_df = pd.DataFrame(data=d)
 
             return small_df
 
@@ -180,243 +178,96 @@ class BPASSConverter(BinaryEvolutionConverter):
 
         model_directory = self.input_dir + "/NEWBINMODS/NEWBINMODS/" + self.metstr
 
-        # Values for disrupted or modified systems, when looking for new systems
-        m_single = np.concatenate(
-            (np.arange(0.1, 10.0, 0.1), np.arange(10, 100, 1), np.arange(100, 325, 25))
-        )
-
-        # Create the zero array
-        # Number of files depends on the choice of mass limits for the IMF
-        files = os.listdir(model_directory)
-        num_files = len(files)
-        # Times for time array
-        num_times = int(1e4)  # Assume there are at most 1e4 outputs
-        # Save properties as a function of time: (1) time,
-        # (2) primary mass, (3) primary bolometric luminosity,
-        # (4) primary surface temperature, (5) primary radius, (6)-(9) for the companion
-        data = np.zeros((num_files, 9, num_times))
-
-        model_orbits = np.zeros(num_files)
+        files = []
+        # Scan directory
+        with os.scandir(model_directory) as all_models:
+            for model in all_models:
+                if model.is_file() and model.name.startswith("sneplot"):
+                    files.append(model.name)
+        files.sort()
 
         # Function to extract the data
         def extract_data(model):
 
-            if model.startswith("sneplot"):
+            data = np.genfromtxt(model_directory + "/" + model)
+            model_split = model.split("-")
 
-                _data = np.genfromtxt(model_directory + "/" + model)
-                # Replace NaNs by 0s --> What about files without a companion?
-                _data = np.nan_to_num(_data)
-                # We want to extract the following values
-                _num = np.arange(len(_data[:, 1]))
+            d = {
+                "model": str(int(float(model_split[-3]) * 100)).zfill(5)
+                + "_"
+                + str(int(float(model_split[-2]) * 100)).zfill(3)
+                + "_"
+                + str(int(float(model_split[-1]) * 100)).zfill(
+                    3
+                ),  # model name as 100*M
+                "time": data[:, 1].astype("float"),  # time in yr
+                "p_mass": data[:, 5].astype("float"),  # mass in MSun
+                "p_logL": data[:, 4].astype("float"),  # log Lbol in Lsun
+                "p_logT": data[:, 3].astype("float"),  # log Teff in K
+                "p_logR": data[:, 2].astype("float"),  # log R in Rsun
+                "s_mass": data[:, 37].astype("float"),  # mass in MSun
+                "s_logL": data[:, 48].astype("float"),  # log Lbol in Lsun
+                "s_logT": data[:, 47].astype("float"),  # log Teff in K
+                "s_logR": data[:, 46].astype("float"),  # log R in Rsun
+            }
 
-                # Indices for time in yr, mass in Msun, log Lbol in Lsun,
-                # log Teff in K, log R in Rsun, then same for companion
-                return_ids = [1, 5, 4, 3, 2, 37, 48, 47, 46]
+            combined_df = pd.DataFrame(data=d)
 
-                model_split = model.split("-")
+            p_dm = combined_df.p_mass.values[1:] - combined_df.p_mass.values[:-1]
+            s_dm = combined_df.s_mass.values[1:] - combined_df.s_mass.values[:-1]
+            # Check for mergers and rejuvenation
+            merged = np.where((p_dm > 0) & (s_dm == 0))[0]
+            # rejuvenated = np.where(s_dm > 0)[0]
+            if len(merged) > 0:
+                merger = merged[0]
+                merged_star = {
+                    "model": combined_df.model.values[merger:],
+                    "time": combined_df.time.values[merger:],
+                    "s_mass": np.zeros(len(combined_df.time.values[merger:])).astype(
+                        "float"
+                    ),
+                    "s_logL": np.zeros(len(combined_df.time.values[merger:])).astype(
+                        "float"
+                    ),
+                    "s_logT": np.zeros(len(combined_df.time.values[merger:])).astype(
+                        "float"
+                    ),
+                    "s_logR": np.zeros(len(combined_df.time.values[merger:])).astype(
+                        "float"
+                    ),
+                }
+                merger = pd.DataFrame(
+                    data=merged_star,
+                    index=range(merger, merger + len(combined_df.time.values[merger:])),
+                )
+                combined_df.update(merger)
 
-                return np.transpose(_data[:, return_ids]), model_split  # log R in Rsun
+            return combined_df
 
         pool = Pool()
+        results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
-        i = 0
+        frames = []
 
-        for result in pool.imap_unordered(extract_data, files):
-            if result is not None:
-                extracted_data, model_split = result
-                data[i, :, : len(extracted_data[0, :])] = extracted_data
-                model_orbits[i] = int(
-                    float(model_split[2]) * 1e6
-                    + float(model_split[3]) * 1e5
-                    + float(model_split[4]) * 100
-                )
-                i += 1
+        for i in range(len(results)):
+            frames.append(results[i])
 
         pool.close()
+        data = pd.concat(frames, ignore_index=True)
 
-        # Sort by model
-        sorted_models = np.argsort(model_orbits)[::-1]
-        data = data[sorted_models, :, :]
-        model_orbits = model_orbits[sorted_models]
+        ## Meets the criteria for rejuvenation
+        # if (m_eff >= 1.05 * data[system, 5, 0]) and (m_eff > 2):
+        # m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
 
-        print("Pre-SN evolution done. Now checking for rejuvenation...")
-
-        # Check for mergers and rejuvenation
-        dm1 = data[:, 1, 1:] - data[:, 1, :-1]
-        dm2 = data[:, 5, 1:] - data[:, 5, :-1]
-        # Look for first instance of primary accreting without mass loss in companion
-        # This is done because the companion properties are "frozen" at the start of the merger
-        merged_systems, merged_steps = np.where((dm1 > 0) & (dm2 == 0))
-        unique_systems, unique_ids = np.unique(merged_systems, return_index=True)
-        unique_steps = merged_steps[unique_ids]
-        for j in range(len(unique_systems)):
-            data[unique_systems[j], 5, unique_steps[j] :] = 0
-            data[unique_systems[j], 6, unique_steps[j] :] = -1 * np.inf
-            data[unique_systems[j], 7, unique_steps[j] :] = -1 * np.inf
-            data[unique_systems[j], 8, unique_steps[j] :] = -1 * np.inf
-
-        # Evolution of companion after SN
-        sn_systems = np.where(data[:, 1, 0] >= 8)[0]
-        # Look for rejuventated systems
-        # Here, use the last value for the subsequent evolution
-        rejuv_systems, rejuv_steps = np.where(dm2 > 0)
-        for system in sn_systems:
-            # Has the system been rejuvenated?
-            if system in rejuv_systems:
-
-                step = rejuv_steps[np.where(rejuv_systems == system)][-1]
-                time = data[system, 0, :][step]
-                m_eff = data[system, 5, :][step]
-
-                # Meets the criteria for rejuvenation
-                if (m_eff >= 1.05 * data[system, 5, 0]) and (m_eff > 2):
-                    m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
-
-                # Does not meet the criteria; update time to match SN time
-                else:
-                    m_eff = data[system, 5, 0]
-                    m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
-                    step = np.where(data[system, 0, :] != 0)[0][-1]
-                    time = data[system, 0, :][step]
-
-            else:
-                if len(np.where(data[system, 0, :] != 0)[0]) == 0:
-                    # Use as failsafe for broken files; ignore for now by looping over
-                    # Example is sneplot=z040-35-0.9-4
-                    m_closest = 0
-                    # Also set time = 0 to avoid linter error; this will be ignored
-                    time = 0
-
-                else:
-                    step = np.where(data[system, 0, :] != 0)[0][-1]
-                    time = data[system, 0, :][step]
-                    m_eff = data[system, 5, 0]
-                    if m_eff > 0.8:  # If actual companion, and not empty array
-                        m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
-                    else:
-                        m_closest = 0
-
-            # Now use mass and time for subsequent evolution
-            # Name-match the single BPASS files
-            if m_closest == 0:
-                pass
-            else:
-                if np.round(m_closest, 1) == np.round(m_closest, 0):
-                    m_closest = str(int(m_closest))
-                elif m_closest < 10:
-                    m_closest = str(np.round(m_closest, 1))
-                else:
-                    m_closest = str(int(m_closest))
-                c_file = (
-                    self.input_dir
-                    + "/NEWSINMODS/"
-                    + self.metstr
-                    + "/sneplot-"
-                    + self.metstr
-                    + "-"
-                    + m_closest
-                )
-                c_data = np.genfromtxt(c_file)
-                c_data = np.nan_to_num(c_data)
-                # Number of data points
-                nearest_num = np.argsort(np.abs(c_data[:, 1] - time))
-                if c_data[nearest_num[0], 1] < (time - 1e5):
-                    start_num = nearest_num[1]
-                elif (time - 1e5) < c_data[nearest_num[0], 1] < time:
-                    start_num = nearest_num[0]
-                    c_data[nearest_num[0], 1] = time
-                else:
-                    start_num = nearest_num[0]
-                _num = len(c_data[start_num:, 1])
-                data[system, 0, step : step + _num] = c_data[
-                    start_num:, 1
-                ]  # time in yr
-                data[system, 5, step : step + _num] = c_data[
-                    start_num:, 37
-                ]  # companion mass in Msun
-                data[system, 6, step : step + _num] = c_data[
-                    start_num:, 48
-                ]  # companion log Lbol in Lsun
-                data[system, 7, step : step + _num] = c_data[
-                    start_num:, 47
-                ]  # companion log Teff in K
-                data[system, 8, step : step + _num] = c_data[
-                    start_num:, 46
-                ]  # companion log R in Rsun
-
-        # Remove superfluous model numbers
-        first_empty = 0
-        j = 0
-        while j < num_times:
-            if len(np.nonzero(data[:, 1, j])[0]) > 0:
-                first_empty += 1
-                j += 1
-            else:
-                first_empty += 1
-                j = num_times
-
-        data = data[:, :, :first_empty]
-
-        # If fewer models, fill with sensible values
-        for i in range(len(data[:, 0, 0])):
-            _zeros = np.where(data[i, 0, :] == 0)[0]
-            if len(_zeros) > 1:  # if not longest
-                data[i, 0, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 0, _zeros[1] - 1]
-                )
-                data[i, 1, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 1, _zeros[1] - 1]
-                )
-                data[i, 2, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 2, _zeros[1] - 1]
-                )
-                data[i, 3, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 3, _zeros[1] - 1]
-                )
-                data[i, 4, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 4, _zeros[1] - 1]
-                )
-                data[i, 5, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 5, _zeros[1] - 1]
-                )
-                data[i, 6, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 6, _zeros[1] - 1]
-                )
-                data[i, 7, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 7, _zeros[1] - 1]
-                )
-                data[i, 8, _zeros[1:]] = (
-                    np.ones(len(_zeros) - 1) * data[i, 8, _zeros[1] - 1]
-                )
-
-        if ("binaries_" + self.metstr + ".h5") not in os.listdir(
+        if ("binaries_" + self.metstr + ".pkl.gz") not in os.listdir(
             self.output_dir
         ) or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            ds = xr.Dataset(
-                data_vars=dict(
-                    time=(["model", "step"], data[:, 0, :]),
-                    mass1=(["model", "step"], data[:, 1, :]),
-                    log_Lbol1=(["model", "step"], data[:, 2, :]),
-                    log_Teff1=(["model", "step"], data[:, 3, :]),
-                    log_R1=(["model", "step"], data[:, 4, :]),
-                    mass2=(["model", "step"], data[:, 5, :]),
-                    log_Lbol2=(["model", "step"], data[:, 6, :]),
-                    log_Teff2=(["model", "step"], data[:, 7, :]),
-                    log_R2=(["model", "step"], data[:, 8, :]),
-                ),
-                coords=dict(
-                    model=(["model"], model_orbits),
-                    step=("step", np.arange(first_empty)),
-                ),
-                attrs=dict(
-                    description="BPASS evolution data for binary stars at Z="
-                    + str(self.met)
-                ),
+            data.to_pickle(
+                self.output_dir + "/binaries_" + self.metstr + ".pkl.gz",
+                compression="gzip",
             )
-
-            ds.to_netcdf(self.output_dir + "/binaries_" + self.metstr + ".h5")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
@@ -486,7 +337,9 @@ class MPAConverter(BinaryEvolutionConverter):
             df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
 
             d = {
-                "model": str(int(float(model[:5]) * 100)),  # model name as 100*log10(M)
+                "model": str(int(10 ** float(model[:5]) * 100)).zfill(
+                    5
+                ),  # model name as 100*M
                 "time": df.star_age.values.astype("float"),  # time in yr
                 "mass": df.star_mass.values.astype("float"),  # mass in MSun
                 "logL": df.log_L.values.astype("float"),  # log Lbol in Lsun
@@ -494,7 +347,7 @@ class MPAConverter(BinaryEvolutionConverter):
                 "logR": df.log_R.values.astype("float"),  # log R in Rsun
             }
 
-            small_df = pd.DataFrame(data=d, dtype=float)
+            small_df = pd.DataFrame(data=d)
 
             return small_df
 
@@ -563,11 +416,13 @@ class MPAConverter(BinaryEvolutionConverter):
             )
 
             d = {
-                "model": str(int(float(model[5:10]) * 100))
+                "model": str(int(10 ** float(model[5:10]) * 100)).zfill(5)
                 + "_"
-                + str(int(float(model[11:16]) * 100))
+                + str(int(float(model[11:16]) * 100)).zfill(3)
                 + "_"
-                + str(int(float(model[17:22] * 100))),  # model name as 100*log10(M)
+                + str(int(float(model[17:22] * 100))).zfill(
+                    3
+                ),  # model name as 100*log10(M)
                 "time": df_2.star_age.values.astype("float"),  # time in yr
                 "p_mass": df_1.star_mass.values.astype("float"),  # mass in MSun
                 "p_logL": df_1.log_L.values.astype("float"),  # log Lbol in Lsun
@@ -579,7 +434,7 @@ class MPAConverter(BinaryEvolutionConverter):
                 "s_logR": df_2.log_R.values.astype("float"),  # log R in Rsun
             }
 
-            combined_df = pd.DataFrame(data=d, dtype=float)
+            combined_df = pd.DataFrame(data=d)
 
             return combined_df
 
