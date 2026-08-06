@@ -185,11 +185,11 @@ class BPASSConverter(BinaryEvolutionConverter):
                 f"Single star data file '{singles_fname}' not found. Please run convert_single_data() first."
             )
         else:
-            singles = pd.read_pickle(
-                self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
-                compression="gzip",
-            )
-        print(singles)
+            pass
+            # singles = pd.read_pickle(
+            #    self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
+            #    compression="gzip",
+            # )
 
         # Create directory if it does not already exists
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -265,11 +265,17 @@ class BPASSConverter(BinaryEvolutionConverter):
         results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
         frames = []
+        models = []
 
         for i in range(len(results)):
             frames.append(results[i])
+            models.append((results[i].model.values[0]).zfill(5))
 
         pool.close()
+
+        # Sort the data by model name with leading zeros to ensure correct order
+        sorted_indices = np.argsort(models)
+        frames = [frames[i] for i in sorted_indices]
         data = pd.concat(frames, ignore_index=True)
 
         ## Meets the criteria for rejuvenation
