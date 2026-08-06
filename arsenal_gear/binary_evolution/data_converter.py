@@ -144,12 +144,17 @@ class BPASSConverter(BinaryEvolutionConverter):
         results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
 
         frames = []
+        models = []
 
         for i in range(len(results)):
             frames.append(results[i])
+            models.append((results[i].model.values[0]).zfill(5))
 
         pool.close()
 
+        # Sort the data by model name with leading zeros to ensure correct order
+        sorted_indices = np.argsort(models)
+        frames = [frames[i] for i in sorted_indices]
         data = pd.concat(frames, ignore_index=True)
 
         if ("singles_" + self.metstr + ".pkl.gz") not in os.listdir(
@@ -172,6 +177,19 @@ class BPASSConverter(BinaryEvolutionConverter):
         Converts BPASS data for binary stars into an Arsenal-readable
         BinaryStarTrackSet.
         """
+
+        # Load single star data for secondary star evolution
+        singles_fname = self.output_dir + "/singles_" + self.metstr + ".pkl.gz"
+        if not os.path.exists(singles_fname):
+            raise FileNotFoundError(
+                f"Single star data file '{singles_fname}' not found. Please run convert_single_data() first."
+            )
+        else:
+            singles = pd.read_pickle(
+                self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
+                compression="gzip",
+            )
+        print(singles)
 
         # Create directory if it does not already exists
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -215,9 +233,8 @@ class BPASSConverter(BinaryEvolutionConverter):
 
             p_dm = combined_df.p_mass.values[1:] - combined_df.p_mass.values[:-1]
             s_dm = combined_df.s_mass.values[1:] - combined_df.s_mass.values[:-1]
-            # Check for mergers and rejuvenation
+            # Check for mergers
             merged = np.where((p_dm > 0) & (s_dm == 0))[0]
-            # rejuvenated = np.where(s_dm > 0)[0]
             if len(merged) > 0:
                 merger = merged[0]
                 merged_star = {
