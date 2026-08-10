@@ -124,9 +124,8 @@ class BPASSConverter(BinaryEvolutionConverter):
 
             data = np.genfromtxt(model_directory + "/" + model)
             model_split = model.split("-")
-
             d = {
-                "model": str(int(float(model_split[-1]) * 100)).zfill(
+                "model": str(int(round(float(model_split[-1]) * 100))).zfill(
                     5
                 ),  # model name as 100*M
                 "time": data[:, 1].astype("float"),  # time in yr
@@ -185,11 +184,14 @@ class BPASSConverter(BinaryEvolutionConverter):
                 f"Single star data file '{singles_fname}' not found. Please run convert_single_data() first."
             )
         else:
-            pass
-            # singles = pd.read_pickle(
-            #    self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
-            #    compression="gzip",
-            # )
+            singles = pd.read_pickle(
+                self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
+                compression="gzip",
+            )
+
+        single_masses = np.empty(len(singles.model.values))
+        for i in range(len(single_masses)):
+            single_masses[i] = int(round(float(singles.model.values[i]))) / 100
 
         # Create directory if it does not already exists
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -253,11 +255,53 @@ class BPASSConverter(BinaryEvolutionConverter):
                         "float"
                     ),
                 }
-                merger = pd.DataFrame(
+                merger_df = pd.DataFrame(
                     data=merged_star,
                     index=range(merger, merger + len(combined_df.time.values[merger:])),
                 )
-                combined_df.update(merger)
+                combined_df.update(merger_df)
+            else:
+                # Get companion effective mass
+                m_init = combined_df.s_mass.values[0]
+                m_max = np.max(combined_df.s_mass.values)
+                if (m_max > m_init) and (m_max >= 2):
+                    m_eff = m_max
+                else:
+                    m_eff = m_init
+                # Make sure to select this system
+                t_ind = np.where(combined_df.s_mass.values == m_max)[0][0]
+                t_eff = combined_df.time.values[-1] - combined_df.time.values[t_ind]
+                # Match to model
+                m_ind = np.argmin(np.abs(single_masses - m_eff))
+                _star = np.where(
+                    singles.model
+                    == str(int(round(single_masses[m_ind] * 100))).zfill(5)
+                )[0]
+                _time = np.argmin(np.abs(singles.time[_star] - t_eff))
+
+                evolved_star = {
+                    "model": combined_df.model.values[t_ind],
+                    "time": singles.time.values[_star[0] : _star[0] + _time + 1]
+                    + t_eff,
+                    "p_mass": combined_df.p_mass.values[-1],
+                    "p_logL": float("NaN"),
+                    "p_logT": float("NaN"),
+                    "p_logR": float("NaN"),
+                    "s_mass": singles.mass.values[
+                        _star[0] : _star[0] + _time + 1
+                    ].astype("float"),
+                    "s_logL": singles.logL.values[
+                        _star[0] : _star[0] + _time + 1
+                    ].astype("float"),
+                    "s_logT": singles.logT.values[
+                        _star[0] : _star[0] + _time + 1
+                    ].astype("float"),
+                    "s_logR": singles.logR.values[
+                        _star[0] : _star[0] + _time + 1
+                    ].astype("float"),
+                }
+                evolved_df = pd.DataFrame(data=evolved_star)
+                pd.concat([combined_df, evolved_df], ignore_index=True)
 
             return combined_df
 
@@ -474,7 +518,6 @@ class MPAConverter(BinaryEvolutionConverter):
         pool.close()
 
         data = pd.concat(frames, ignore_index=True)
-        print(data)
 
         if ("binaries_" + self.met + ".pkl.gz") not in os.listdir(
             self.output_dir
