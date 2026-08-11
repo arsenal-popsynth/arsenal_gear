@@ -221,8 +221,14 @@ class MPADownloader:
         """
 
         model_sets = [
+            "MW/primary",
+            "MW/secondary",
             "single_MW/single_MW",
+            "LMC/primary",
+            "LMC/secondary",
             "single_LMC/single_LMC",
+            "SMC/primary",
+            "SMC/secondary",
             "single_SMC/single_SMC",
         ]
 
