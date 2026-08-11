@@ -23,7 +23,6 @@ dependencies = [
     "pyyaml",
     "tqdm",
     "myst-parser",
-    "xarray",
     "pandas",
     "pyerf",
     ]
