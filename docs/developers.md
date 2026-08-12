@@ -88,6 +88,160 @@ commit`.  Most of the hooks will automatically apply themselves, so if your
 commit appears to fail, you can just re-run `git commit` and it will usually
 just work.
 
+Two of them can't fix themselves, and want a word from you instead:
+
+- **pylint** reports what static analysis can catch, which you have to go and
+  fix.
+- **citations** checks that `arsenal_gear/utils/citations.bib` still matches the
+  `@cite` decorators in the source, and tells you to regenerate it if not — see
+  _Citations_ below.  The check itself is offline and needs no credentials, so
+  it runs for everyone.
+
+## Citations
+Arsenal Gear wraps up a lot of other people's work: IMFs, yield tables,
+isochrones, and stellar evolution models all come from published papers whose
+authors deserve to be cited.  Rather than leaving users to work out which
+papers a given calculation actually depended on, the code carries that
+information itself, and can emit a bibtex bibliography for any entry point.
+
+### Citing a paper in your code
+Attach citations with the `cite` decorator, giving it one or more identifiers.
+It works on classes and on individual functions or methods:
+```python
+from arsenal_gear.utils import cite
+
+@cite("10.1086/145971")
+class Salpeter(IMF):
+    ...
+```
+Two kinds of identifier are accepted, and the code works out which is which
+from the shape of the string, so you never have to say:
+
+- a **DOI**, e.g. `"10.1086/145971"`;
+- a **NASA ADS bibcode**, e.g. `"1996A&A...315..105R"`, for papers old enough
+  to predate DOIs.  Write the bibcode literally, with a plain `&` and no URL
+  escaping.
+
+Pass several identifiers if a class rests on more than one paper, e.g.
+`@cite("10.1093/mnras/stz2158", "10.3390/universe7020025")`.  Stacking the
+decorator works too, and accumulates rather than replaces.
+
+If a paper is in neither form, it can't be cited here.  Anything NASA ADS
+doesn't index isn't really part of the published literature, so there is
+deliberately no way to paste in bibtex by hand.
+
+### Regenerating the bibliography
+The bibtex itself lives in `arsenal_gear/utils/citations.bib`, which is
+generated, not hand-written.  **After adding or changing a `@cite`, regenerate
+it and commit the result alongside your code:**
+```
+python -m arsenal_gear.utils.refresh_citations
+```
+This imports every `arsenal_gear` module (which is what registers the
+citations), looks up whatever the bibliography is missing, drops entries for
+citations that no longer exist, and rewrites the file.  Pass `--force` to
+re-fetch everything rather than only the missing entries.
+
+You shouldn't have to remember this.  The `citations` pre-commit hook runs
+```
+python -m arsenal_gear.utils.refresh_citations --check
+```
+on every commit that touches a `.py` or `.bib` file, and fails it if the
+bibliography has fallen behind, naming what's wrong:
+```
+arsenal_gear/utils/citations.bib is out of date.
+
+  missing: 10.1093/mnras/stab1234
+```
+`--check` only compares the registered citations against the bibliography.  It
+fetches nothing and writes nothing, so it needs no token and no network — every
+contributor gets the warning, whether or not they can act on it themselves.
+Three things will trip it:
+
+- **missing** — something is cited that the bibliography has no entry for.  This
+  is the one that needs a token to fix, since the entry has to be fetched.
+- **stale** — the bibliography has an entry nothing cites any more, because a
+  `@cite` was deleted.  A plain refresh drops it, no network required.
+- **typo** — an identifier that is neither a DOI nor a bibcode.  Fix it at the
+  `@cite` that spells it; no refresh will ever resolve it.
+
+Nothing validates identifiers at import time, so without this a typo'd DOI would
+sit quietly in the source until someone refreshed.  It still can't reach a user
+— a citation can't resolve until it's in the bibliography — but it's much less
+annoying to find at the commit that caused it.
+
+#### Setting up your ADS token
+Fetching goes to NASA ADS, which has no anonymous API, so *adding* a new
+citation needs a free API token:
+
+1. Sign in at [ADS](https://ui.adsabs.harvard.edu/) (an ORCID, Google or
+   institutional account all work).
+2. Go to Account → Customize Settings → API Token and generate one.
+3. Put it in your environment as `ADS_DEV_KEY`:
+   ```
+   export ADS_DEV_KEY="your-token-here"
+   ```
+
+Where that `export` goes is up to you `direnv` (see _Extra Handy Tools_ below)
+is an easy way to do this if you don't want it in your shell config: add the
+line to the project's `.envrc` and the token is loaded whenever you `cd` in and
+unset when you leave.
+```
+source .venv/bin/activate
+export ADS_DEV_KEY="your-token-here"
+```
+then run `direnv allow`.  `.envrc` is in our `.gitignore`, so a token kept there
+can't be committed by accident.
+
+`ADS_API_TOKEN` is accepted as an alternative name, since that's what some other
+ADS tooling uses.
+
+This is a contributor-only requirement.  Because the generated bibliography
+ships with the package, **users never need a token or a network connection** —
+which is the whole reason the file is committed rather than fetched on demand.
+
+### Getting a bibliography out
+`gather_bibtex` takes a function, method, or class and returns bibtex for
+everything it cites:
+```python
+from arsenal_gear.utils import gather_bibtex
+from arsenal_gear.formation.dist_funcs.imf import Salpeter
+
+print(gather_bibtex(Salpeter))
+```
+```
+@ARTICLE{1955ApJ...121..161S,
+       author = {{Salpeter}, Edwin E.},
+        title = "{The Luminosity Function and Stellar Evolution.}",
+      journal = {\apj},
+         year = 1955,
+...
+```
+It finds far more than the citations sitting directly on the target.  Starting
+from the target it walks the call graph — the names referenced in a function's
+body, the methods a class defines, and everything in its MRO — so citations
+attached to a base class, to an inherited method, or to a class only reached
+indirectly all get collected.  A citation the bibliography is missing becomes a
+`% Could not resolve ...` comment rather than an exception, so one stale
+reference doesn't cost you the rest of the bibliography.
+
+### How it fits together
+The system is split across two modules, and the split is worth preserving:
+
+- `arsenal_gear/utils/citations.py` is what the package uses at runtime.  It
+  holds the `cite` decorator, the `REGISTRY` of every identifier seen, the
+  call-graph walk in `find_citations`, and the bibliography reader.  It performs
+  **no network access** and never writes `citations.bib` — it only reads it.
+- `arsenal_gear/utils/refresh_citations.py` is the maintainer tool.  It is the
+  only part of the package that talks to NASA ADS, checks identifier shapes, and
+  writes the bibliography.
+
+`citations.bib` is an ordinary `.bib` file — you can point LaTeX straight at it
+— with a `%%ID <identifier>` comment before each entry recording which citation
+it answers.  Bibtex ignores text outside an entry, so those markers cost
+nothing.  Note that ADS exports use journal macros (`\apj`, `\mnras`), which
+need `aastex` or a similar package to compile.
+
 ## GitHub Actions
 We use GitHub Actions to run our automated tests on every pull request and push
 to the main branch. Currently, we have three workflows:

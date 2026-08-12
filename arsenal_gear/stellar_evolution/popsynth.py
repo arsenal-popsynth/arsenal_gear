@@ -16,9 +16,11 @@ import requests
 from astropy.units import Quantity
 from tqdm import tqdm
 
-from arsenal_gear.formation import SinglePop, BinaryPop
+from arsenal_gear.formation import BinaryPop, SinglePop
+from arsenal_gear.utils.citations import cite
 
 
+@cite("10.1017/pasa.2017.51", "10.1093/mnras/sty1353")
 class BPASS_stellar_models:
     """
     Reads in BPASS stellar model files for use with a discrete stellar population.
@@ -82,7 +84,7 @@ class BPASS_stellar_models:
         self.time: Quantity["time"] = time
 
         self.s_mass: list = singles.masses.to(u.Msun).value
-        # TO DO: this may be a interpreted differently once 
+        # TO DO: this may be a interpreted differently once
         self.b_mass: list = binaries.masses.to(u.Msun).value
         self.mratio: list = binaries.mrats.to(u.dimensionless_unscaled).value
         self.logp: list = np.log10(binaries.periods.to(u.d).value)
@@ -123,8 +125,13 @@ class BPASS_stellar_models:
         # Get file size
         total_size = int(response.headers.get("content-length", 0))
         # create a progress bar
-        tqdm_args = {'desc': 'Downloading', 'total': total_size, 'unit': 'B',
-                        'unit_scale': True, 'unit_divisor': 1024}
+        tqdm_args = {
+            "desc": "Downloading",
+            "total": total_size,
+            "unit": "B",
+            "unit_scale": True,
+            "unit_divisor": 1024,
+        }
         # write the file
         with open(fname, "wb") as f, tqdm(**tqdm_args) as prog_bar:
             for chunk in response.iter_content(chunk_size=1024):

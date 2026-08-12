@@ -15,6 +15,7 @@ import numpy as np
 from astropy.units import Quantity
 
 from ..formation import SinglePop
+from ..utils.citations import cite
 from .source import Source
 from .yieldtables import YieldTables
 
@@ -129,7 +130,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -159,7 +160,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -189,7 +190,7 @@ class NuGrid(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
 
@@ -200,6 +201,7 @@ class NuGrid(YieldTables):
         return yields * u.M_sun
 
 
+@cite("10.3847/0067-0049/225/2/24")
 class Pignatari2016(YieldTables):
     """
     Include yields for many elements for stars with masses
@@ -304,7 +306,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -334,7 +336,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -364,7 +366,7 @@ class Pignatari2016(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -486,6 +488,7 @@ class Pignatari2016(YieldTables):
             downloader(self.filedir / file, self.p16_url + os.sep + file, message=None)
 
 
+@cite("10.1093/mnras/sty1729")
 class Ritter2018(YieldTables):
     """
     Include yields for many elements for stars with masses
@@ -601,7 +604,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -631,7 +634,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -661,7 +664,7 @@ class Ritter2018(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (
@@ -794,6 +797,7 @@ class Ritter2018(YieldTables):
             downloader(self.filedir / file, self.r18_url + os.sep + file, message=None)
 
 
+@cite("10.1093/mnras/stz2158", "10.3390/universe7020025")
 class Battino20192021(YieldTables):
     """
     Include yields for many elements for stars with masses [2.0, 3.0] Msun,
@@ -887,7 +891,7 @@ class Battino20192021(YieldTables):
 
         """
         args = [
-            starPop.metallicity.value*starPop.ones_like,
+            starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
         return (

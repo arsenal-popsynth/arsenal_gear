@@ -16,6 +16,7 @@ from scipy.interpolate import pchip_interpolate
 
 # local imports
 from ..utils import array_utils, masked_power
+from ..utils.citations import cite
 from .data_reader import MISTReader
 from .se_data_structures import Isochrone
 
@@ -74,6 +75,7 @@ class AbstractIsochrone(ABC):
         """
 
 
+@cite("1996A&A...315..105R")
 class RaiteriLifetime(AbstractIsochrone):
     """
     Abstract class that represents the mapping from a population's initial parameters
