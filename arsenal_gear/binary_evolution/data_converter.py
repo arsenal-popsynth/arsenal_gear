@@ -404,7 +404,7 @@ class MPAConverter(BinaryEvolutionConverter):
             df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
 
             d = {
-                "model": str(int(10 ** float(model[:5]) * 100)).zfill(
+                "model": str(int(round(10 ** float(model[:5]) * 100))).zfill(
                     5
                 ),  # model name as 100*M
                 "time": df.star_age.values.astype("float"),  # time in yr
@@ -461,7 +461,7 @@ class MPAConverter(BinaryEvolutionConverter):
         with os.scandir(primary_directory) as subdirectories:
             for subdirectory in subdirectories:
                 with os.scandir(
-                    primary_directory + "/" + subdirectory.name
+                    primary_directory + "/" + subdirectory.name + "/"
                 ) as all_models:
                     for model in all_models:
                         if model.is_file() and model.name.endswith(
@@ -482,30 +482,84 @@ class MPAConverter(BinaryEvolutionConverter):
                 compression="gzip",
             )
 
-            d = {
-                "model": str(int(10 ** float(model[5:10]) * 100)).zfill(5)
-                + "_"
-                + str(int(float(model[11:16]) * 100)).zfill(3)
-                + "_"
-                + str(int(float(model[17:22] * 100))).zfill(
-                    3
-                ),  # model name as 100*log10(M)
-                "time": df_2.star_age.values.astype("float"),  # time in yr
-                "p_mass": df_1.star_mass.values.astype("float"),  # mass in MSun
-                "p_logL": df_1.log_L.values.astype("float"),  # log Lbol in Lsun
-                "p_logT": df_1.log_Teff.values.astype("float"),  # log Teff in K
-                "p_logR": df_1.log_R.values.astype("float"),  # log R in Rsun
-                "s_mass": df_2.star_mass.values.astype("float"),  # mass in MSun
-                "s_logL": df_2.log_L.values.astype("float"),  # log Lbol in Lsun
-                "s_logT": df_2.log_Teff.values.astype("float"),  # log Teff in K
-                "s_logR": df_2.log_R.values.astype("float"),  # log R in Rsun
-            }
+            pad = len(df_2.star_age.values) - len(df_1.star_age.values)
+
+            if pad > 0:
+
+                d = {
+                    "model": str(int(round(10 ** float(model[6:11]) * 100))).zfill(5)
+                    + "_"
+                    + str(int(float(model[12:17]) * 100)).zfill(3)
+                    + "_"
+                    + str(int(float(model[18:23]) * 100)).zfill(3),
+                    "time": df_2.star_age.values.astype("float"),  # time in yr
+                    "p_mass": np.concatenate(
+                        (
+                            df_1.star_mass.values.astype("float"),
+                            df_1.star_mass.values.astype("float")[-1] * np.ones(pad),
+                        )
+                    ),
+                    "p_logL": np.concatenate(
+                        (df_1.log_L.values.astype("float"), float("NaN") * np.ones(pad))
+                    ),
+                    "p_logT": np.concatenate(
+                        (
+                            df_1.log_Teff.values.astype("float"),
+                            float("NaN") * np.ones(pad),
+                        )
+                    ),
+                    "p_logR": np.concatenate(
+                        (df_1.log_R.values.astype("float"), float("NaN") * np.ones(pad))
+                    ),
+                    "s_mass": df_2.star_mass.values.astype("float"),  # mass in MSun
+                    "s_logL": df_2.log_L.values.astype("float"),  # log Lbol in Lsun
+                    "s_logT": df_2.log_Teff.values.astype("float"),  # log Teff in K
+                    "s_logR": df_2.log_R.values.astype("float"),  # log R in Rsun
+                }
+
+            # If merger
+            else:
+
+                d = {
+                    "model": str(int(round(10 ** float(model[6:11]) * 100))).zfill(5)
+                    + "_"
+                    + str(int(float(model[12:17]) * 100)).zfill(3)
+                    + "_"
+                    + str(int(float(model[18:23]) * 100)).zfill(3),
+                    "time": df_1.star_age.values.astype("float"),  # time in yr
+                    "p_mass": df_1.star_mass.values.astype("float"),  # mass in MSun
+                    "p_logL": df_1.log_L.values.astype("float"),  # log Lbol in Lsun
+                    "p_logT": df_1.log_Teff.values.astype("float"),  # log Teff in K
+                    "p_logR": df_1.log_R.values.astype("float"),  # log R in Rsun
+                    "s_mass": np.concatenate(
+                        (
+                            df_2.star_mass.values.astype("float"),
+                            float("NaN") * np.ones(-1 * pad),
+                        )
+                    ),
+                    "s_logL": np.concatenate(
+                        (
+                            df_2.log_L.values.astype("float"),
+                            float("NaN") * np.ones(-1 * pad),
+                        )
+                    ),
+                    "s_logT": np.concatenate(
+                        (
+                            df_2.log_Teff.values.astype("float"),
+                            float("NaN") * np.ones(-1 * pad),
+                        )
+                    ),
+                    "s_logR": np.concatenate(
+                        (
+                            df_2.log_R.values.astype("float"),
+                            float("NaN") * np.ones(-1 * pad),
+                        )
+                    ),
+                }
 
             combined_df = pd.DataFrame(data=d)
 
             return combined_df
-
-        print("Starting to extract data...")
 
         pool = Pool()
         results = list(tqdm.tqdm(pool.map(extract_data, files), total=len(files)))
