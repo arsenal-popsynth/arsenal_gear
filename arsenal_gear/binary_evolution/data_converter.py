@@ -189,9 +189,10 @@ class BPASSConverter(BinaryEvolutionConverter):
                 compression="gzip",
             )
 
-        single_masses = np.empty(len(singles.model.values))
-        for i in range(len(single_masses)):
-            single_masses[i] = int(round(float(singles.model.values[i]))) / 100
+        single_masses = (
+            np.unique(np.round(singles.model.values.astype("float")).astype("int"))
+            / 100
+        )
 
         # Create directory if it does not already exists
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -242,9 +243,20 @@ class BPASSConverter(BinaryEvolutionConverter):
                 merged_star = {
                     "model": combined_df.model.values[merger:],
                     "time": combined_df.time.values[merger:],
-                    "s_mass": np.zeros(len(combined_df.time.values[merger:])).astype(
-                        "float"
-                    ),
+                    "s_mass": np.concatenate(
+                        (
+                            (
+                                combined_df.s_mass.values[merged]
+                                - (
+                                    combined_df.p_mass.values[merged]
+                                    - combined_df.p_mass.values[merger]
+                                )
+                            ),
+                            np.zeros(
+                                len(combined_df.model.values[merger:]) - len(merged)
+                            ),
+                        )
+                    ).astype("float"),
                     "s_logL": np.zeros(len(combined_df.time.values[merger:])).astype(
                         "float"
                     ),
@@ -264,44 +276,43 @@ class BPASSConverter(BinaryEvolutionConverter):
                 # Get companion effective mass
                 m_init = combined_df.s_mass.values[0]
                 m_max = np.max(combined_df.s_mass.values)
-                if (m_max > m_init) and (m_max >= 2):
+                if (m_max > 1.05 * m_init) and (m_max >= 2):
                     m_eff = m_max
                 else:
                     m_eff = m_init
                 # Make sure to select this system
-                t_ind = np.where(combined_df.s_mass.values == m_max)[0][0]
+                t_ind = np.where(combined_df.s_mass.values == m_eff)[0][0]
                 t_eff = combined_df.time.values[-1] - combined_df.time.values[t_ind]
                 # Match to model
                 m_ind = np.argmin(np.abs(single_masses - m_eff))
-                _star = np.where(
+                star = np.where(
                     singles.model
                     == str(int(round(single_masses[m_ind] * 100))).zfill(5)
                 )[0]
-                _time = np.argmin(np.abs(singles.time[_star] - t_eff))
-
+                star_end = star[-1]
+                star_time = np.argmin(np.abs(singles.time[star] - t_eff)) + star[0]
                 evolved_star = {
                     "model": combined_df.model.values[t_ind],
-                    "time": singles.time.values[_star[0] : _star[0] + _time + 1]
-                    + t_eff,
+                    "time": singles.time.values[star_time : star_end + 1],
                     "p_mass": combined_df.p_mass.values[-1],
                     "p_logL": float("NaN"),
                     "p_logT": float("NaN"),
                     "p_logR": float("NaN"),
-                    "s_mass": singles.mass.values[
-                        _star[0] : _star[0] + _time + 1
-                    ].astype("float"),
-                    "s_logL": singles.logL.values[
-                        _star[0] : _star[0] + _time + 1
-                    ].astype("float"),
-                    "s_logT": singles.logT.values[
-                        _star[0] : _star[0] + _time + 1
-                    ].astype("float"),
-                    "s_logR": singles.logR.values[
-                        _star[0] : _star[0] + _time + 1
-                    ].astype("float"),
+                    "s_mass": singles.mass.values[star_time : star_end + 1].astype(
+                        "float"
+                    ),
+                    "s_logL": singles.logL.values[star_time : star_end + 1].astype(
+                        "float"
+                    ),
+                    "s_logT": singles.logT.values[star_time : star_end + 1].astype(
+                        "float"
+                    ),
+                    "s_logR": singles.logR.values[star_time : star_end + 1].astype(
+                        "float"
+                    ),
                 }
                 evolved_df = pd.DataFrame(data=evolved_star)
-                pd.concat([combined_df, evolved_df], ignore_index=True)
+                combined_df = pd.concat([combined_df, evolved_df], ignore_index=True)
 
             return combined_df
 
