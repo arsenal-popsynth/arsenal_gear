@@ -10,7 +10,7 @@ import os
 import tarfile
 from zipfile import ZipFile
 
-from arsenal_gear.utils.scraper import downloader, downloader_with_password
+from arsenal_gear.utils.scraper import downloader
 
 
 class BPASSDownloader:
@@ -22,10 +22,7 @@ class BPASSDownloader:
     # bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=0" + \
     #            "&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
     # Change dl=0 to dl=1 to force download
-    bpass_url = (
-        "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1"
-        + "&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
-    )
+    bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
 
     def __init__(
         self,
@@ -240,6 +237,4 @@ class MPADownloader:
             else:
                 fname = self.dir + "/" + model_set + ".tar"
 
-            downloader_with_password(
-                fname, download_url, self.username, self.password, message
-            )
+            downloader(fname, download_url, message, self.username, self.password)
