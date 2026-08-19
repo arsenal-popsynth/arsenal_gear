@@ -24,7 +24,7 @@ class SingleStarTrackSet:
         mass_name: variable name for stellar mass/Msun
         logT_name: variable name for log_10(effective temperature/K)
         logL_name: variable name for log_10(bolometric luminosities/Lsun)
-        logR_name: variable name for log_10(stelalr radius/Rsun)
+        logR_name: variable name for log_10(stellar radius/Rsun)
         qs: Dictionary of stellar track quantities. These should minimally include
             logA, mass, logT, logL, and logR but can include others.
     """
@@ -52,11 +52,11 @@ class BinaryStarTrackSet:
         mass1_name: variable name for stellar mass/Msun for the primary
         logT1_name: variable name for log_10(effective temperature/K) for the primary
         logL1_name: variable name for log_10(bolometric luminosities/Lsun) for the primary
-        logR1_name: variable name for log_10(stelalr radius/Rsun) for the primary
+        logR1_name: variable name for log_10(stellar radius/Rsun) for the primary
         mass2_name: variable name for stellar mass/Msun for the companion
         logT2_name: variable name for log_10(effective temperature/K) for the companion
         logL2_name: variable name for log_10(bolometric luminosities/Lsun) for the companion
-        logR2_name: variable name for log_10(stelalr radius/Rsun) for the companion
+        logR2_name: variable name for log_10(stellar radius/Rsun) for the companion
         qs: Dictionary of stellar track quantities. These should minimally include
             logA, mass1, logT1, logL1, logR1, mass2, logT2, logL2, and logR2
             but can include others.
