@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-from .be_data_structures import BinaryStarTrackSet, SingleStarTrackSet
+from ..stellar_evolution.se_data_structures import TrackSet
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
@@ -36,14 +36,14 @@ class BinaryEvolutionConverter(ABC):
         self.overwrite = kwargs.get("overwrite", False)
 
     @abstractmethod
-    def convert_single_data(self) -> SingleStarTrackSet:
+    def convert_single_data(self) -> TrackSet:
         """
         Abstract method for converting single star evolutionary tracks
         into an Arsenal stellar evolution track set.
         """
 
     @abstractmethod
-    def convert_binary_data(self) -> BinaryStarTrackSet:
+    def convert_binary_data(self) -> TrackSet:
         """
         Abstract method for converting binary evolutionary tracks into
         an Arsenal binary evolution track set.
