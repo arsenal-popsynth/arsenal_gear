@@ -85,9 +85,9 @@ class BPASSConverter(BinaryEvolutionConverter):
         super().__init__(**kwargs)
 
         if self.met >= 1e-3:
-            self.metstr = "z" + str(int(self.met * 1000)).zfill(3)
+            self.metstr = f"z{round(self.met * 1000):02d}"
         else:
-            self.metstr = "zem" + str(-1 * int(np.log10(self.met)))
+            self.metstr = f"zem{(-1 * round(np.log10(self.met))):01d}"
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
 
