@@ -7,11 +7,9 @@ evolution models.
 """
 
 import os
-import tarfile
 from pathlib import Path
-from zipfile import ZipFile
 
-from arsenal_gear.utils.scraper import downloader
+from arsenal_gear.utils.scraper import downloader, untar, unzip
 
 
 class BPASSDownloader:
@@ -58,60 +56,6 @@ class BPASSDownloader:
 
         downloader(fname, url, message)
 
-    def unzip(
-        self, zip_name: str, target_file=None, delete_zip=False, inspect=False
-    ) -> None:
-        """
-        Un-compress the zip file downloaded from the BPASS dropbox.
-
-        Args:
-            zip_name    (str): Name of expected zip file
-            target_file (str): Name of expected tar file in zip file
-                               If none, extract all tar files
-            delete_zip (bool): Delete the zip file after extracting the tar file
-            inspect    (bool): Print the names of the tar files in the zip file
-        """
-        fname = Path(self.dir + "/" + zip_name)
-
-        with ZipFile(fname, "r") as zip_archive:
-            file_names = zip_archive.namelist()
-            if inspect:
-                for name in file_names:
-                    print(name)
-            else:
-                if target_file in file_names:
-
-                    zip_archive.extract(target_file, path=self.dir)
-                elif target_file is None:
-                    zip_archive.extractall(path=self.dir)
-
-        if delete_zip and fname.exists():
-            print("Deleting", fname)
-            fname.unlink()
-
-    def untar(self, tar_name: str, delete_tar=False) -> None:
-        """
-        Un-compress the tar file extracted from the BPASS zip file.
-
-        Args:
-            tar_name    (str): Name of expected tar file
-            delete_tar (bool): Delete the tar file after extracting
-        """
-        fname = Path(self.dir + "/" + tar_name)
-
-        if not tarfile.is_tarfile(fname):
-            raise OSError(
-                f"{fname} is not a valid tar.gz file. "
-                "Try again with `force_download=True`"
-            )
-        with tarfile.open(fname, "r:gz") as tar:
-            print(f"Extracting {fname}...")
-            tar.extractall(path=self.dir)
-
-        if delete_tar and fname.exists():
-            print("Deleting", fname)
-            fname.unlink()
-
     def get_stellar_models(
         self,
         tar_name="bpass-v2.2-newmodels.tar.gz",
@@ -128,30 +72,35 @@ class BPASSDownloader:
             print("BPASS data not available at", self.dir + "NEWBINMODS")
             print("Looking for a tar file...")
             if os.path.isfile(self.dir + tar_name):
-                self.untar(tar_name, delete_tar=False)
+                untar(tar_file=tar_name, target_dir=self.dir, delete_tar=False)
                 print("BPASS data now available. Ready to start converting.")
 
             else:
                 print("tar file not available at", self.dir)
                 print("Looking for a zip file...")
                 if os.path.isfile(self.dir + zip_name):
-                    self.unzip(
-                        zip_name, target_file=tar_name, delete_zip=False, inspect=False
+                    unzip(
+                        zip_file=zip_name,
+                        target_dir=self.dir,
+                        target_file=tar_name,
+                        delete_zip=False,
+                        inspect=False,
                     )
-                    self.untar(tar_name, delete_tar=False)
+                    untar(tar_file=tar_name, target_dir=self.dir, delete_tar=False)
                     print("BPASS data now available. Ready to start converting.")
 
                 else:
                     print("zip file not available at", self.dir)
                     if self.force_download:
                         self.download(url)
-                        self.unzip(
-                            zip_name,
+                        unzip(
+                            zip_file=zip_name,
+                            target_dir=self.dir,
                             target_file=tar_name,
                             delete_zip=False,
                             inspect=False,
                         )
-                        self.untar(tar_name, delete_tar=False)
+                        untar(tar_file=tar_name, target_dir=self.dir, delete_tar=False)
                         print("BPASS data now available. Ready to start converting.")
 
                     else:

@@ -7,6 +7,10 @@ Functions:
     downloader: Method for downloading data from the web
 """
 
+import tarfile
+from pathlib import Path
+from zipfile import ZipFile
+
 import requests
 from tqdm import tqdm
 
@@ -66,3 +70,60 @@ def downloader(fname, url, message, username=None, password=None):
         for chunk in response.iter_content(chunk_size=1024):
             f.write(chunk)
             prog_bar.update(len(chunk))
+
+
+def unzip(
+    zip_file: str, target_dir: str, target_file=None, delete_zip=False, inspect=False
+) -> None:
+    """
+    Un-compress a zip file.
+
+    Args:
+        zip_file    (str): Name of expected zip file
+        target_dir  (str): Directory in which to un-compress the zip file
+        target_file (str): Name of expected target file in zip file
+                            If none, extract all files
+        delete_zip (bool): Delete the zip file after extracting the target file(s)
+        inspect    (bool): Print the names of the files in the zip file
+    """
+    fname = Path(target_dir + "/" + zip_file)
+
+    with ZipFile(fname, "r") as zip_archive:
+        file_names = zip_archive.namelist()
+        if inspect:
+            for name in file_names:
+                print(name)
+        else:
+            if target_file in file_names:
+                zip_archive.extract(target_file, path=target_dir)
+            elif target_file is None:
+                zip_archive.extractall(path=target_dir)
+
+    if delete_zip and fname.exists():
+        print("Deleting", fname)
+        fname.unlink()
+
+
+def untar(tar_file: str, target_dir: str, delete_tar=False) -> None:
+    """
+    Un-compress a tar file.
+
+    Args:
+        tar_file    (str): Name of expected tar file
+        target_dir  (str): Directory in which to un-compress the tar file
+        delete_tar (bool): Delete the tar file after extracting
+    """
+    fname = Path(target_dir + "/" + tar_file)
+
+    if not tarfile.is_tarfile(fname):
+        raise OSError(
+            f"{fname} is not a valid tar.gz file. "
+            "Try again with `force_download=True`"
+        )
+    with tarfile.open(fname, "r:gz") as tar:
+        print(f"Extracting {fname}...")
+        tar.extractall(path=target_dir)
+
+    if delete_tar and fname.exists():
+        print("Deleting", fname)
+        fname.unlink()
