@@ -8,6 +8,7 @@ evolution models.
 
 import os
 import tarfile
+from pathlib import Path
 from zipfile import ZipFile
 
 from arsenal_gear.utils.scraper import downloader
@@ -36,11 +37,7 @@ class BPASSDownloader:
         """
 
         self.force_download = force_download
-
-        if bpass_dir[-1] == "/":
-            self.dir: str = bpass_dir
-        else:
-            self.dir: str = bpass_dir + "/"
+        self.dir = Path(bpass_dir)
 
         super().__init__()
 
@@ -57,10 +54,7 @@ class BPASSDownloader:
 
         """
 
-        if self.dir[-1] == "/":
-            fname = self.dir + "bpass_v2.2.zip"
-        else:
-            fname = self.dir + "/bpass_v2.2.zip"
+        fname = Path(self.dir + "/bpass_v2.2.zip")
 
         downloader(fname, url, message)
 
@@ -77,10 +71,7 @@ class BPASSDownloader:
             delete_zip (bool): Delete the zip file after extracting the tar file
             inspect    (bool): Print the names of the tar files in the zip file
         """
-        if self.dir[-1] == "/":
-            fname = self.dir + zip_name
-        else:
-            fname = self.dir + "/" + zip_name
+        fname = Path(self.dir + "/" + zip_name)
 
         with ZipFile(fname, "r") as zip_archive:
             file_names = zip_archive.namelist()
@@ -106,10 +97,7 @@ class BPASSDownloader:
             tar_name    (str): Name of expected tar file
             delete_tar (bool): Delete the tar file after extracting
         """
-        if self.dir[-1] == "/":
-            fname = self.dir + tar_name
-        else:
-            fname = self.dir + "/" + tar_name
+        fname = Path(self.dir + "/" + tar_name)
 
         if not tarfile.is_tarfile(fname):
             raise OSError(
@@ -193,14 +181,9 @@ class MPADownloader:
         """
 
         self.force_download = force_download
-
         self.username = username
         self.password = password
-
-        if mpa_dir[-1] == "/":
-            self.dir: str = mpa_dir
-        else:
-            self.dir: str = mpa_dir + "/"
+        self.dir = Path(mpa_dir)
 
         super().__init__()
 
@@ -232,9 +215,6 @@ class MPADownloader:
         for model_set in model_sets:
 
             download_url = url + model_set + ".tar"
-            if self.dir[-1] == "/":
-                fname = self.dir + model_set + ".tar"
-            else:
-                fname = self.dir + "/" + model_set + ".tar"
+            fname = Path(self.dir + "/" + model_set + ".tar")
 
             downloader(fname, download_url, message, self.username, self.password)
