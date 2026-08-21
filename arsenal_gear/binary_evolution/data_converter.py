@@ -6,7 +6,6 @@ This file defines the interface to various binary evolution models
 through downloading, reorganzing and interpreting their outputs.
 """
 
-import os
 from abc import ABC, abstractmethod
 from multiprocessing.pool import ThreadPool as Pool
 from pathlib import Path
@@ -16,8 +15,6 @@ import pandas as pd
 import tqdm
 
 from ..stellar_evolution.se_data_structures import TrackSet
-
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 
 class BinaryEvolutionConverter(ABC):
@@ -30,10 +27,13 @@ class BinaryEvolutionConverter(ABC):
         # [Fe/H]
         self.met = kwargs.get("met", 0.014)
         # Directories to read and write data
-        self.input_dir = kwargs.get("input_dir", None)
-        self.output_dir = kwargs.get("output_dir", None)
+        self.input_dir = Path(kwargs.get("input_dir", None))
+        self.output_dir = Path(kwargs.get("output_dir", None))
         # Output times
         self.overwrite = kwargs.get("overwrite", False)
+
+        # Create output directory if it does not already exists
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
     @abstractmethod
     def convert_single_data(self) -> TrackSet:
@@ -78,8 +78,8 @@ class BPASSConverter(BinaryEvolutionConverter):
             kwargs: Keyword arguments for the binary evolution table.
 
         Methods:
-            convert_single_data     Processes single stellar track data into a SingleStarTrackSet
-            convert_binary_data     Processes binary stellar track data into a BinaryStarTrackSet
+            convert_single_data     Processes single stellar track data into a TrackSet
+            convert_binary_data     Processes binary stellar track data into a TrackSet
         """
         # set input parameters
         super().__init__(**kwargs)
@@ -91,32 +91,18 @@ class BPASSConverter(BinaryEvolutionConverter):
         if self.metstr not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
 
-        # Consistent format for directories
-        if self.input_dir[-1] == "/":
-            self.input_dir: str = self.input_dir
-        else:
-            self.intput_dir: str = self.input_dir + "/"
-        if self.output_dir[-1] == "/":
-            self.output_dir: str = self.output_dir
-        else:
-            self.output_dir: str = self.output_dir + "/"
-
     def convert_single_data(self):
         """
-        Converts BPASS data for single stars into an Arsenal-readable
-        SingleStarTrackSet.
+        Converts BPASS data for single stars into an Arsenal-readable TrackSet.
         """
-        # Create directory if it does not already exists
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
-        model_directory = self.input_dir + "NEWSINMODS/" + self.metstr
+        model_directory = Path(self.input_dir + "/NEWSINMODS/" + self.metstr)
         files = []
 
         # Scan directory
-        with os.scandir(model_directory) as all_models:
-            for model in all_models:
-                if model.is_file() and model.name.startswith("sneplot"):
-                    files.append(model.name)
+        for model in model_directory.iterdir():
+            if model.is_file() and model.name.startswith("sneplot"):
+                files.append(model.name)
         files.sort()
 
         # Function to extract the data
@@ -156,9 +142,9 @@ class BPASSConverter(BinaryEvolutionConverter):
         frames = [frames[i] for i in sorted_indices]
         data = pd.concat(frames, ignore_index=True)
 
-        if ("singles_" + self.metstr + ".pkl.gz") not in os.listdir(
-            self.output_dir
-        ) or self.overwrite:
+        if (
+            "singles_" + self.metstr + ".pkl.gz"
+        ) not in self.output_dir.iterdir() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
             data.to_pickle(
@@ -173,19 +159,18 @@ class BPASSConverter(BinaryEvolutionConverter):
 
     def convert_binary_data(self):
         """
-        Converts BPASS data for binary stars into an Arsenal-readable
-        BinaryStarTrackSet.
+        Converts BPASS data for binary stars into an Arsenal-readable TrackSet.
         """
 
         # Load single star data for secondary star evolution
-        singles_fname = self.output_dir + "/singles_" + self.metstr + ".pkl.gz"
-        if not os.path.exists(singles_fname):
+        singles_fname = Path(self.output_dir + "/singles_" + self.metstr + ".pkl.gz")
+        if not singles_fname.exists():
             raise FileNotFoundError(
                 f"Single star data file '{singles_fname}' not found. Please run convert_single_data() first."
             )
         else:
             singles = pd.read_pickle(
-                self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
+                singles_fname,
                 compression="gzip",
             )
 
@@ -194,17 +179,13 @@ class BPASSConverter(BinaryEvolutionConverter):
             / 100
         )
 
-        # Create directory if it does not already exists
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-
-        model_directory = self.input_dir + "/NEWBINMODS/NEWBINMODS/" + self.metstr
+        model_directory = Path(self.input_dir + "/NEWBINMODS/NEWBINMODS/" + self.metstr)
 
         files = []
         # Scan directory
-        with os.scandir(model_directory) as all_models:
-            for model in all_models:
-                if model.is_file() and model.name.startswith("sneplot"):
-                    files.append(model.name)
+        for model in model_directory.iterdir():
+            if model.is_file() and model.name.startswith("sneplot"):
+                files.append(model.name)
         files.sort()
 
         # Function to extract the data
@@ -337,9 +318,9 @@ class BPASSConverter(BinaryEvolutionConverter):
         # if (m_eff >= 1.05 * data[system, 5, 0]) and (m_eff > 2):
         # m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
 
-        if ("binaries_" + self.metstr + ".pkl.gz") not in os.listdir(
-            self.output_dir
-        ) or self.overwrite:
+        if (
+            "binaries_" + self.metstr + ".pkl.gz"
+        ) not in self.output_dir.iterdir() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
             data.to_pickle(
@@ -380,33 +361,18 @@ class MPAConverter(BinaryEvolutionConverter):
         if self.met not in self.mets:
             raise ValueError("Metallicity must be one of: " + str(self.mets))
 
-        # Consistent format for directories
-        if self.input_dir[-1] == "/":
-            self.input_dir: str = self.input_dir
-        else:
-            self.intput_dir: str = self.input_dir + "/"
-        if self.output_dir[-1] == "/":
-            self.output_dir: str = self.output_dir
-        else:
-            self.output_dir: str = self.output_dir + "/"
-
     def convert_single_data(self):
         """
-        Converts MPA/Bonn stellar model data for single stars into an Arsenal-readable
-        SingleStarTrackSet.
+        Converts MPA/Bonn stellar model data for single stars into an Arsenal-readable TrackSet.
         """
 
-        # Create directory if it does not already exists
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-
-        model_directory = self.input_dir + "single_" + self.met
+        model_directory = Path(self.input_dir + "single_" + self.met)
         files = []
 
         # Scan directory
-        with os.scandir(model_directory) as all_models:
-            for model in all_models:
-                if model.is_file() and model.name.endswith("_0_compressed.pkl.gz"):
-                    files.append(model.name)
+        for model in model_directory.iterdir():
+            if model.is_file() and model.name.endswith("_0_compressed.pkl.gz"):
+                files.append(model.name)
         files.sort()
 
         # Function to extract the data
@@ -441,9 +407,9 @@ class MPAConverter(BinaryEvolutionConverter):
 
         data = pd.concat(frames, ignore_index=True)
 
-        if ("singles_" + self.met + ".pkl.gz") not in os.listdir(
-            self.output_dir
-        ) or self.overwrite:
+        if (
+            "singles_" + self.met + ".pkl.gz"
+        ) not in self.output_dir.iterdir() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
             data.to_pickle(
@@ -457,28 +423,18 @@ class MPAConverter(BinaryEvolutionConverter):
 
     def convert_binary_data(self):
         """
-        Converts MPA/Bonn stellar model data for binary stars into an Arsenal-readable
-        BinaryStarTrackSet.
+        Converts MPA/Bonn stellar model data for binary stars into an Arsenal-readable TrackSet.
         """
 
-        # Create directory if it does not already exists
-        # Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-
-        primary_directory = self.input_dir + self.met + "/primary/"
-        secondary_directory = self.input_dir + self.met + "/secondary/"
+        primary_directory = Path(self.input_dir + "/" + self.met + "/primary/")
+        secondary_directory = Path(self.input_dir + "/" + self.met + "/secondary/")
         files = []
 
         # Scan directory
-        with os.scandir(primary_directory) as subdirectories:
-            for subdirectory in subdirectories:
-                with os.scandir(
-                    primary_directory + "/" + subdirectory.name + "/"
-                ) as all_models:
-                    for model in all_models:
-                        if model.is_file() and model.name.endswith(
-                            "_compressed.pkl.gz"
-                        ):
-                            files.append(subdirectory.name + "/" + model.name)
+        for subdirectory in primary_directory.iterdir():
+            for model in subdirectory.iterdir():
+                if model.is_file() and model.name.endswith("_compressed.pkl.gz"):
+                    files.append(subdirectory.name + "/" + model.name)
         files.sort()
 
         # Function to extract the data
@@ -584,9 +540,9 @@ class MPAConverter(BinaryEvolutionConverter):
 
         data = pd.concat(frames, ignore_index=True)
 
-        if ("binaries_" + self.met + ".pkl.gz") not in os.listdir(
-            self.output_dir
-        ) or self.overwrite:
+        if (
+            "binaries_" + self.met + ".pkl.gz"
+        ) not in self.output_dir.iterdir() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
             data.to_pickle(
