@@ -97,7 +97,14 @@ class MISTReader(IsochroneDataReader):
         # set input parameters
         super().__init__(**kwargs)
         self.vvcrit = kwargs.get("vvcrit", "0.0")
+        # make data storage directory if it doesn't exist
         self.rootdir = kwargs.get("rootdir", None)
+        rootdir = self.rootdir
+        if rootdir is None:
+            rootdir = Path(__file__).parent.absolute() / "data/mist"
+            if not rootdir.is_dir():
+                rootdir.mkdir(parents=True, exist_ok=True)
+        self.rootdir = Path(rootdir)
         # Fill out dummy attributes
         self.hdr_list = None
         self.num_ages = None
@@ -141,13 +148,6 @@ class MISTReader(IsochroneDataReader):
             self.modeldir = mod_temp.format(self.metstr, self.vvcrit)
             tar_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS.txz"
             self.tarfile = tar_temp.format(self.metstr, self.vvcrit)
-        # make data storage directory if it doesn't exist
-        rootdir = self.rootdir
-        if rootdir is None:
-            rootdir = Path(__file__).parent.absolute() / "data/mist"
-            if not rootdir.is_dir():
-                rootdir.mkdir(parents=True, exist_ok=True)
-        self.rootdir = Path(rootdir)
 
         # check if the file exists and download otherwise
         force_download = self.force_download
