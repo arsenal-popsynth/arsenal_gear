@@ -264,7 +264,7 @@ class LimongiChieffi2018(YieldTables):
     ## Function for downloading data from the web
     def download_yields(self, table: str) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        from ..utils import downloader
 
         downloader(
             self.filedir / f"{table}.tgz",

@@ -14,7 +14,7 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 
-from ..utils import downloader, extract_one, find_match, get_metstr, is_valid_txz
+from ..utils import downloader, find_match, get_metstr, is_valid_tar, untar
 from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
 
 
@@ -159,12 +159,12 @@ class MISTReader(IsochroneDataReader):
                 if not tarfile_path.is_file():
                     # if it doesn't exist, download it
                     force_download = True
-                elif not is_valid_txz(tarfile_path):
+                elif not is_valid_tar(tarfile_path):
                     # if it's not a valid tar file, download it again
                     force_download = True
                 else:
                     # tarfile exists and is valid -> extract it
-                    extract_one(tarfile_path, self.rootdir, delete_txz=True)
+                    untar(tarfile_path, self.rootdir, delete_tar=True)
             elif (self.interp_op == "iso") and (
                 not (modeldir_path / self.isofile).is_file()
             ):
@@ -179,7 +179,7 @@ class MISTReader(IsochroneDataReader):
             message = "Downloading MIST data"
             # download the tarfile
             downloader(self.rootdir / self.tarfile, url, message)
-            extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
+            untar(self.rootdir / self.tarfile, self.rootdir, delete_tar=True)
 
     @staticmethod
     def _process_elem_label(label):

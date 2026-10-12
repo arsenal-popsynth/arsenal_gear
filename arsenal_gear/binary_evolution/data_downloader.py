@@ -6,10 +6,9 @@ This file defines the interface to download output from various binary
 evolution models.
 """
 
-import os
 from pathlib import Path
 
-from arsenal_gear.utils.scraper import downloader, untar, unzip
+from arsenal_gear.utils import downloader, untar, unzip
 
 
 class BPASSDownloader:
@@ -52,7 +51,8 @@ class BPASSDownloader:
 
         """
 
-        fname = Path(self.dir + "/bpass_v2.2.zip")
+        self.dir.mkdir(parents=True, exist_ok=True)
+        fname = self.dir / "bpass_v2.2.zip"
 
         downloader(fname, url, message)
 
@@ -66,27 +66,27 @@ class BPASSDownloader:
         Look for the stellar models for the stellar population
         and download/unzip/untar them if they are not available.
         """
-        if os.path.isdir(self.dir + "NEWBINMODS"):
+        if (self.dir / "NEWBINMODS").is_dir():
             print("BPASS data already available. Ready to start converting.")
         else:
-            print("BPASS data not available at", self.dir + "NEWBINMODS")
+            print("BPASS data not available at", self.dir / "NEWBINMODS")
             print("Looking for a tar file...")
-            if os.path.isfile(self.dir + tar_name):
-                untar(tar_file=tar_name, target_dir=self.dir, delete_tar=False)
+            if (self.dir / tar_name).is_file():
+                untar(self.dir / tar_name, self.dir, delete_tar=False)
                 print("BPASS data now available. Ready to start converting.")
 
             else:
                 print("tar file not available at", self.dir)
                 print("Looking for a zip file...")
-                if os.path.isfile(self.dir + zip_name):
+                if (self.dir / zip_name).is_file():
                     unzip(
-                        zip_file=zip_name,
-                        target_dir=self.dir,
+                        self.dir / zip_name,
+                        self.dir,
                         target_file=tar_name,
                         delete_zip=False,
                         inspect=False,
                     )
-                    untar(tar_file=tar_name, target_dir=self.dir, delete_tar=False)
+                    untar(self.dir / tar_name, self.dir, delete_tar=False)
                     print("BPASS data now available. Ready to start converting.")
 
                 else:
@@ -94,13 +94,13 @@ class BPASSDownloader:
                     if self.force_download:
                         self.download(url)
                         unzip(
-                            zip_file=zip_name,
-                            target_dir=self.dir,
+                            self.dir / zip_name,
+                            self.dir,
                             target_file=tar_name,
                             delete_zip=False,
                             inspect=False,
                         )
-                        untar(tar_file=tar_name, target_dir=self.dir, delete_tar=False)
+                        untar(self.dir / tar_name, self.dir, delete_tar=False)
                         print("BPASS data now available. Ready to start converting.")
 
                     else:
@@ -164,6 +164,7 @@ class MPADownloader:
         for model_set in model_sets:
 
             download_url = url + model_set + ".tar"
-            fname = Path(self.dir + "/" + model_set + ".tar")
+            fname = self.dir / f"{model_set}.tar"
+            fname.parent.mkdir(parents=True, exist_ok=True)
 
             downloader(fname, download_url, message, self.username, self.password)

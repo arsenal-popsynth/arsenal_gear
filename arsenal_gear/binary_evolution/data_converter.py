@@ -27,8 +27,11 @@ class BinaryEvolutionConverter(ABC):
         # [Fe/H]
         self.met = kwargs.get("met", 0.014)
         # Directories to read and write data
-        self.input_dir = Path(kwargs.get("input_dir", None))
-        self.output_dir = Path(kwargs.get("output_dir", None))
+        for dir_arg in ("input_dir", "output_dir"):
+            if kwargs.get(dir_arg) is None:
+                raise ValueError(f"{dir_arg} must be specified")
+        self.input_dir = Path(kwargs["input_dir"])
+        self.output_dir = Path(kwargs["output_dir"])
         # Output times
         self.overwrite = kwargs.get("overwrite", False)
 
@@ -85,7 +88,7 @@ class BPASSConverter(BinaryEvolutionConverter):
         super().__init__(**kwargs)
 
         if self.met >= 1e-3:
-            self.metstr = f"z{round(self.met * 1000):02d}"
+            self.metstr = f"z{round(self.met * 1000):03d}"
         else:
             self.metstr = f"zem{(-1 * round(np.log10(self.met))):01d}"
         if self.metstr not in self.mets:
@@ -96,7 +99,7 @@ class BPASSConverter(BinaryEvolutionConverter):
         Converts BPASS data for single stars into an Arsenal-readable TrackSet.
         """
 
-        model_directory = Path(self.input_dir + "/NEWSINMODS/" + self.metstr)
+        model_directory = self.input_dir / "NEWSINMODS" / self.metstr
         files = []
 
         # Scan directory
@@ -108,7 +111,7 @@ class BPASSConverter(BinaryEvolutionConverter):
         # Function to extract the data
         def extract_data(model):
 
-            data = np.genfromtxt(model_directory + "/" + model)
+            data = np.genfromtxt(model_directory / model)
             model_split = model.split("-")
             d = {
                 "model": str(int(round(float(model_split[-1]) * 100))).zfill(
@@ -142,15 +145,11 @@ class BPASSConverter(BinaryEvolutionConverter):
         frames = [frames[i] for i in sorted_indices]
         data = pd.concat(frames, ignore_index=True)
 
-        if (
-            "singles_" + self.metstr + ".pkl.gz"
-        ) not in self.output_dir.iterdir() or self.overwrite:
+        out_path = self.output_dir / f"singles_{self.metstr}.pkl.gz"
+        if not out_path.exists() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            data.to_pickle(
-                self.output_dir + "/singles_" + self.metstr + ".pkl.gz",
-                compression="gzip",
-            )
+            data.to_pickle(out_path, compression="gzip")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
@@ -163,7 +162,7 @@ class BPASSConverter(BinaryEvolutionConverter):
         """
 
         # Load single star data for secondary star evolution
-        singles_fname = Path(self.output_dir + "/singles_" + self.metstr + ".pkl.gz")
+        singles_fname = self.output_dir / f"singles_{self.metstr}.pkl.gz"
         if not singles_fname.exists():
             raise FileNotFoundError(
                 f"Single star data file '{singles_fname}' not found. Please run convert_single_data() first."
@@ -179,7 +178,7 @@ class BPASSConverter(BinaryEvolutionConverter):
             / 100
         )
 
-        model_directory = Path(self.input_dir + "/NEWBINMODS/NEWBINMODS/" + self.metstr)
+        model_directory = self.input_dir / "NEWBINMODS" / "NEWBINMODS" / self.metstr
 
         files = []
         # Scan directory
@@ -191,7 +190,7 @@ class BPASSConverter(BinaryEvolutionConverter):
         # Function to extract the data
         def extract_data(model):
 
-            data = np.genfromtxt(model_directory + "/" + model)
+            data = np.genfromtxt(model_directory / model)
             model_split = model.split("-")
 
             d = {
@@ -318,15 +317,11 @@ class BPASSConverter(BinaryEvolutionConverter):
         # if (m_eff >= 1.05 * data[system, 5, 0]) and (m_eff > 2):
         # m_closest = m_single[np.argmin(np.abs(m_single - m_eff))]
 
-        if (
-            "binaries_" + self.metstr + ".pkl.gz"
-        ) not in self.output_dir.iterdir() or self.overwrite:
+        out_path = self.output_dir / f"binaries_{self.metstr}.pkl.gz"
+        if not out_path.exists() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            data.to_pickle(
-                self.output_dir + "/binaries_" + self.metstr + ".pkl.gz",
-                compression="gzip",
-            )
+            data.to_pickle(out_path, compression="gzip")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
@@ -366,7 +361,7 @@ class MPAConverter(BinaryEvolutionConverter):
         Converts MPA/Bonn stellar model data for single stars into an Arsenal-readable TrackSet.
         """
 
-        model_directory = Path(self.input_dir + "single_" + self.met)
+        model_directory = self.input_dir / f"single_{self.met}"
         files = []
 
         # Scan directory
@@ -378,7 +373,7 @@ class MPAConverter(BinaryEvolutionConverter):
         # Function to extract the data
         def extract_data(model):
 
-            df = pd.read_pickle(model_directory + "/" + model, compression="gzip")
+            df = pd.read_pickle(model_directory / model, compression="gzip")
 
             d = {
                 "model": str(int(round(10 ** float(model[:5]) * 100))).zfill(
@@ -407,14 +402,11 @@ class MPAConverter(BinaryEvolutionConverter):
 
         data = pd.concat(frames, ignore_index=True)
 
-        if (
-            "singles_" + self.met + ".pkl.gz"
-        ) not in self.output_dir.iterdir() or self.overwrite:
+        out_path = self.output_dir / f"singles_{self.met}.pkl.gz"
+        if not out_path.exists() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            data.to_pickle(
-                self.output_dir + "/singles_" + self.met + ".pkl.gz", compression="gzip"
-            )
+            data.to_pickle(out_path, compression="gzip")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")
@@ -426,8 +418,8 @@ class MPAConverter(BinaryEvolutionConverter):
         Converts MPA/Bonn stellar model data for binary stars into an Arsenal-readable TrackSet.
         """
 
-        primary_directory = Path(self.input_dir + "/" + self.met + "/primary/")
-        secondary_directory = Path(self.input_dir + "/" + self.met + "/secondary/")
+        primary_directory = self.input_dir / self.met / "primary"
+        secondary_directory = self.input_dir / self.met / "secondary"
         files = []
 
         # Scan directory
@@ -441,11 +433,11 @@ class MPAConverter(BinaryEvolutionConverter):
         def extract_data(model):
 
             df_1 = pd.read_pickle(
-                primary_directory + "/" + model,
+                primary_directory / model,
                 compression="gzip",
             )
             df_2 = pd.read_pickle(
-                secondary_directory + "/" + model,
+                secondary_directory / model,
                 compression="gzip",
             )
 
@@ -540,15 +532,11 @@ class MPAConverter(BinaryEvolutionConverter):
 
         data = pd.concat(frames, ignore_index=True)
 
-        if (
-            "binaries_" + self.met + ".pkl.gz"
-        ) not in self.output_dir.iterdir() or self.overwrite:
+        out_path = self.output_dir / f"binaries_{self.met}.pkl.gz"
+        if not out_path.exists() or self.overwrite:
             print("Saving processed data to", self.output_dir)
 
-            data.to_pickle(
-                self.output_dir + "/binaries_" + self.met + ".pkl.gz",
-                compression="gzip",
-            )
+            data.to_pickle(out_path, compression="gzip")
 
         else:
             print("Cannot save model. Try setting overwrite=True...")

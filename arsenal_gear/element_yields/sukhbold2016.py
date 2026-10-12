@@ -66,7 +66,7 @@ class Sukhbold2016(YieldTables):
         self.load_from_archives()
 
     def download_sukhbold_table(self, filename):
-        from ..utils.scraper import downloader
+        from ..utils import downloader
 
         downloader(
             str(self.filedir / filename),
