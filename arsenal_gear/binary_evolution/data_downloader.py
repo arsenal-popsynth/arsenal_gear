@@ -13,7 +13,7 @@ from arsenal_gear.utils import downloader, untar, unzip
 
 class BPASSDownloader:
     """
-    Reads in BPASS stellar model files for use with a discrete stellar population.
+    Downloads and extracts the BPASS stellar models needed for conversion.
     """
 
     # basic options for BPASS stellar models
@@ -21,27 +21,35 @@ class BPASSDownloader:
     #            "&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
     # Change dl=0 to dl=1 to force download
     bpass_url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
+    # name of the release on the server, and the only member of it that we need
+    zip_name = "BPASSv2.2.1_release-07-18-Tuatara.zip"
+    tar_name = "bpass-v2.2-newmodels.tar.gz"
+    # directory created by extracting tar_name
+    models_name = "NEWBINMODS"
 
     def __init__(
         self,
         bpass_dir: str,
         force_download: bool = False,
+        delete_zip: bool = True,
     ) -> None:
         """
         Args:
             bpass_dir: the directory for the BPASS models
-
+            force_download: download the release if no local copy is found
+            delete_zip: delete the (~13 GB) release zip once the models
+                        tar file has been extracted from it
         """
 
         self.force_download = force_download
+        self.delete_zip = delete_zip
         self.dir = Path(bpass_dir)
 
-    def download(self, url=bpass_url, message="Downloading stellar models...") -> None:
+    def download(self, message="Downloading stellar models...") -> None:
         """
-        Method for downloading BPASS stellar models from the web.
+        Method for downloading the BPASS release from the web.
 
         Args:
-            url (str): The URL of the BPASS repository.
             message (str): Optional message to display before downloading.
 
         Raises:
@@ -50,61 +58,39 @@ class BPASSDownloader:
         """
 
         self.dir.mkdir(parents=True, exist_ok=True)
-        fname = self.dir / "bpass_v2.2.zip"
+        downloader(self.dir / self.zip_name, self.bpass_url, message)
 
-        downloader(fname, url, message)
+    def get_stellar_models(self) -> None:
+        """
+        Look for the stellar models for the stellar population and
+        download/unzip/untar them if they are not available.
+        """
+        models_dir = self.dir / self.models_name
+        tar_path = self.dir / self.tar_name
+        zip_path = self.dir / self.zip_name
 
-    def get_stellar_models(
-        self,
-        tar_name="bpass-v2.2-newmodels.tar.gz",
-        zip_name="bpass_v2.2.zip",
-        url=bpass_url,
-    ) -> tuple:
-        """
-        Look for the stellar models for the stellar population
-        and download/unzip/untar them if they are not available.
-        """
-        if (self.dir / "NEWBINMODS").is_dir():
+        if models_dir.is_dir():
             print("BPASS data already available. Ready to start converting.")
-        else:
-            print("BPASS data not available at", self.dir / "NEWBINMODS")
-            print("Looking for a tar file...")
-            if (self.dir / tar_name).is_file():
-                untar(self.dir / tar_name, self.dir, delete_tar=False)
-                print("BPASS data now available. Ready to start converting.")
-
-            else:
-                print("tar file not available at", self.dir)
-                print("Looking for a zip file...")
-                if (self.dir / zip_name).is_file():
-                    unzip(
-                        self.dir / zip_name,
-                        self.dir,
-                        target_file=tar_name,
-                        delete_zip=False,
-                        inspect=False,
+            return
+        if not tar_path.is_file():
+            if not zip_path.is_file():
+                if not self.force_download:
+                    print(
+                        f"BPASS data not found in {self.dir}, "
+                        "set force_download = True to download"
                     )
-                    untar(self.dir / tar_name, self.dir, delete_tar=False)
-                    print("BPASS data now available. Ready to start converting.")
-
-                else:
-                    print("zip file not available at", self.dir)
-                    if self.force_download:
-                        self.download(url)
-                        unzip(
-                            self.dir / zip_name,
-                            self.dir,
-                            target_file=tar_name,
-                            delete_zip=False,
-                            inspect=False,
-                        )
-                        untar(self.dir / tar_name, self.dir, delete_tar=False)
-                        print("BPASS data now available. Ready to start converting.")
-
-                    else:
-                        print("BPASS data not downloaded, set force_download = True to download")
-
-        return
+                    return
+                self.download()
+            unzip(
+                zip_path, self.dir, target_file=self.tar_name, delete_zip=self.delete_zip
+            )
+        untar(tar_path, self.dir)
+        if not models_dir.is_dir():
+            raise FileNotFoundError(
+                f"Extracting {tar_path} did not produce {models_dir}. "
+                "The layout of the BPASS release may have changed."
+            )
+        print("BPASS data now available. Ready to start converting.")
 
 
 class MPADownloader:
