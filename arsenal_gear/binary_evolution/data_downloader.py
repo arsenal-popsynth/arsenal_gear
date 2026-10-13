@@ -36,8 +36,6 @@ class BPASSDownloader:
         self.force_download = force_download
         self.dir = Path(bpass_dir)
 
-        super().__init__()
-
     def download(self, url=bpass_url, message="Downloading stellar models...") -> None:
         """
         Method for downloading BPASS stellar models from the web.
@@ -133,8 +131,6 @@ class MPADownloader:
         self.username = username
         self.password = password
         self.dir = Path(mpa_dir)
-
-        super().__init__()
 
     def download(self, url=mpa_url, message="Downloading stellar models...") -> None:
         """
