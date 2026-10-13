@@ -216,42 +216,22 @@ class BPASSConverter(BinaryEvolutionConverter):
 
             p_dm = combined_df.p_mass.values[1:] - combined_df.p_mass.values[:-1]
             s_dm = combined_df.s_mass.values[1:] - combined_df.s_mass.values[:-1]
-            # Check for mergers
-            merged = np.where((p_dm > 0) & (s_dm == 0))[0]
-            if len(merged) > 0:
-                merger = merged[0]
-                merged_star = {
-                    "model": combined_df.model.values[merger:],
-                    "time": combined_df.time.values[merger:],
-                    "s_mass": np.concatenate(
-                        (
-                            (
-                                combined_df.s_mass.values[merged]
-                                - (
-                                    combined_df.p_mass.values[merged]
-                                    - combined_df.p_mass.values[merger]
-                                )
-                            ),
-                            np.zeros(
-                                len(combined_df.model.values[merger:]) - len(merged)
-                            ),
-                        )
-                    ).astype("float"),
-                    "s_logL": np.zeros(len(combined_df.time.values[merger:])).astype(
-                        "float"
-                    ),
-                    "s_logT": np.zeros(len(combined_df.time.values[merger:])).astype(
-                        "float"
-                    ),
-                    "s_logR": np.zeros(len(combined_df.time.values[merger:])).astype(
-                        "float"
-                    ),
-                }
-                merger_df = pd.DataFrame(
-                    data=merged_star,
-                    index=range(merger, merger + len(combined_df.time.values[merger:])),
+            # Check for mergers: the primary grows while the secondary's mass column is frozen
+            merging = (p_dm > 0) & (s_dm == 0)
+            if merging.any():
+                first, last = np.flatnonzero(merging)[[0, -1]]
+                # mass gained by the primary during merger steps, up to each row
+                # (row i + 1 follows step i, hence the leading zero)
+                gain = np.concatenate(([0.0], np.cumsum(p_dm * merging)))
+                s_mass = combined_df.s_mass.to_numpy().copy()
+                # the secondary loses what the primary gains, until it is fully absorbed
+                s_mass[first : last + 1] = np.clip(
+                    s_mass[first : last + 1] - gain[first : last + 1], 0.0, None
                 )
-                combined_df.update(merger_df)
+                s_mass[last + 1 :] = 0.0
+                combined_df["s_mass"] = s_mass
+                # the secondary no longer exists as a separate star
+                combined_df.loc[first:, ["s_logL", "s_logT", "s_logR"]] = np.nan
             else:
                 # Get companion effective mass
                 m_init = combined_df.s_mass.values[0]
