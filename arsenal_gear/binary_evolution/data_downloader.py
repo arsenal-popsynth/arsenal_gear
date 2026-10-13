@@ -102,7 +102,7 @@ class BPASSDownloader:
                         print("BPASS data now available. Ready to start converting.")
 
                     else:
-                        print("Set force_download = True to download the files")
+                        print("BPASS data not downloaded, set force_download = True to download")
 
         return
 
