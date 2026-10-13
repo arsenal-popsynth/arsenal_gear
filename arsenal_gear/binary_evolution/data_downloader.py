@@ -29,13 +29,14 @@ class BPASSDownloader:
 
     def __init__(
         self,
-        bpass_dir: str,
+        bpass_dir: str | None = None,
         force_download: bool = False,
         delete_zip: bool = True,
     ) -> None:
         """
         Args:
             bpass_dir: the directory for the BPASS models
+                       (default: binary_evolution/data/BPASS)
             force_download: download the release if no local copy is found
             delete_zip: delete the (~13 GB) release zip once the models
                         tar file has been extracted from it
@@ -43,6 +44,10 @@ class BPASSDownloader:
 
         self.force_download = force_download
         self.delete_zip = delete_zip
+        # make data storage directory if it doesn't exist
+        if bpass_dir is None:
+            bpass_dir = Path(__file__).parent.absolute() / "data/BPASS"
+            bpass_dir.mkdir(parents=True, exist_ok=True)
         self.dir = Path(bpass_dir)
 
     def download(self, message="Downloading stellar models...") -> None:
@@ -84,7 +89,7 @@ class BPASSDownloader:
             unzip(
                 zip_path, self.dir, target_file=self.tar_name, delete_zip=self.delete_zip
             )
-        untar(tar_path, self.dir)
+        untar(tar_path, self.dir, delete_tar=self.delete_zip)
         if not models_dir.is_dir():
             raise FileNotFoundError(
                 f"Extracting {tar_path} did not produce {models_dir}. "
@@ -102,20 +107,27 @@ class MPADownloader:
 
     def __init__(
         self,
-        mpa_dir: str,
-        username: str,
-        password: str,
+        mpa_dir: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
         force_download: bool = False,
     ) -> None:
         """
         Args:
             mpa_dir: the directory for the MPA/Bonn models
+                     (default: binary_evolution/data/MPA)
+            username, password: credentials for the MPA/Bonn data server,
+                                only needed to download
 
         """
 
         self.force_download = force_download
         self.username = username
         self.password = password
+        # make data storage directory if it doesn't exist
+        if mpa_dir is None:
+            mpa_dir = Path(__file__).parent.absolute() / "data/MPA"
+            mpa_dir.mkdir(parents=True, exist_ok=True)
         self.dir = Path(mpa_dir)
 
     def download(self, url=mpa_url, message="Downloading stellar models...") -> None:
