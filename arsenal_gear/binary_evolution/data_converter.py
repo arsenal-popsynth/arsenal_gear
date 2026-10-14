@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 import tqdm
 
+from arsenal_gear.utils.citations import cite
+
 from ..stellar_evolution.se_data_structures import TrackSet
 
 
@@ -53,6 +55,7 @@ class BinaryEvolutionConverter(ABC):
         """
 
 
+@cite("10.1017/pasa.2017.51", "10.1093/mnras/sty1353")
 class BPASSConverter(BinaryEvolutionConverter):
     """
     Class for reading BPASS data and converting it to the Arsenal binary evolution
