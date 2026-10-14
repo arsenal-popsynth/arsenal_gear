@@ -7,8 +7,9 @@ Functions:
     downloader: Method for downloading data from the web
 """
 
-from astropy.units import Quantity, Unit
 import numpy as np
+from astropy.units import Quantity, Unit
+
 
 def make_scalar_quantity(x: Quantity, unit: Unit = None) -> Quantity:
     """
