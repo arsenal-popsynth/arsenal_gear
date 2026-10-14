@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.se\_data\_structures.StellarTrack
+==================================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.se_data_structures
+
+.. autoclass:: StellarTrack
+   :members:
+   :show-inheritance:

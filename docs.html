@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Arsenal Sphinx Documentation &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Arsenal Gear API" href="api.html" />
+    <link rel="prev" title="Developers Guide" href="developers.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api.html" title="Arsenal Gear API"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="developers.html" title="Developers Guide"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Arsenal Sphinx Documentation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section class="tex2jax_ignore mathjax_ignore" id="arsenal-sphinx-documentation">
+<h1>Arsenal Sphinx Documentation<a class="headerlink" href="#arsenal-sphinx-documentation" title="Link to this heading">¶</a></h1>
+<p>Arsenal gear uses the <a class="reference external" href="http://sphinx-doc.org/">Sphinx</a> documentation
+engine to generate its documentation. The documentation is written in
+<a class="reference external" href="https://www.commonmark.org/">markdown</a> (md) and is located in the
+<code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory of the
+<a class="reference external" href="https://github.com/arsenal-popsynth/arsenal_gear">repository</a>.</p>
+<section id="testing-the-documentation-locally">
+<h2>Testing the Documentation Locally<a class="headerlink" href="#testing-the-documentation-locally" title="Link to this heading">¶</a></h2>
+<p>Before deploying a change to the documentation, you may want to test the
+build locally. This is a fairly straightforward, four-step process.</p>
+<ol class="arabic simple">
+<li><p>Make sure you’ve actually installed arsenal gear. From the root
+directory of the repository, run <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">.[all]</span></code></p></li>
+<li><p>Use the Makefile in the <code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory to build the
+documentation: <code class="docutils literal notranslate"><span class="pre">cd</span> <span class="pre">docs/</span> <span class="pre">&amp;&amp;</span> <span class="pre">make</span> <span class="pre">html</span></code></p></li>
+<li><p>Spin up an HTTP server in the directory containing the compiled
+documentation: <code class="docutils literal notranslate"><span class="pre">cd</span> <span class="pre">_build/html</span> <span class="pre">&amp;&amp;</span> <span class="pre">python</span> <span class="pre">-m</span> <span class="pre">http.server</span> <span class="pre">1337</span></code></p></li>
+<li><p>Open a web browser and navigate to <code class="docutils literal notranslate"><span class="pre">http://localhost:1337</span></code> to view
+the documentation.</p></li>
+</ol>
+</section>
+<section id="deploying-documentation-to-github-pages">
+<h2>Deploying Documentation to GitHub Pages<a class="headerlink" href="#deploying-documentation-to-github-pages" title="Link to this heading">¶</a></h2>
+<p>Arsenal gear uses GitHub actions to automatically deploy the
+documentation to
+<a class="reference external" href="https://arsenal-popsynth.github.io/arsenal_gear">arsenal-popsynth.github.io/arsenal_gear</a>
+whenever a change is merged to the <code class="docutils literal notranslate"><span class="pre">main</span></code> branch. The actions workflow
+is defined in <code class="docutils literal notranslate"><span class="pre">.github/workflows/docs.yml</span></code>.</p>
+<p>The workflow is triggered by a push to the <code class="docutils literal notranslate"><span class="pre">main</span></code> branch, and will
+ultimately put the html documents produced by Sphinx in the <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code>
+branch of the repository.</p>
+<p>GitHub Pages is configured to serve the documentation from the
+<code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> branch automatically, so you shouldn’t need to do anything
+manually to deploy the documentation.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers.html">Developers Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Arsenal Sphinx Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#testing-the-documentation-locally">Testing the Documentation Locally</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#deploying-documentation-to-github-pages">Deploying Documentation to GitHub Pages</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="developers.html"
+                          title="previous chapter">Developers Guide</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="api.html"
+                          title="next chapter">Arsenal Gear API</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/docs.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api.html" title="Arsenal Gear API"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="developers.html" title="Developers Guide"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Arsenal Sphinx Documentation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

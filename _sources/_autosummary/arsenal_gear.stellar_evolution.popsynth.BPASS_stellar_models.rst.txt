@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.popsynth.BPASS\_stellar\_models
+================================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.popsynth
+
+.. autoclass:: BPASS_stellar_models
+   :members:
+   :show-inheritance:
