@@ -5,9 +5,9 @@ binary_evolution
 Submodule to handle binary evolution codes and their output
 """
 
-from . import data_converter
+from . import be_data_structures, data_reader
 
 __all__ = [
-    "data_converter",
-    "data_downloader",
+    "be_data_structures",
+    "data_reader",
 ]
