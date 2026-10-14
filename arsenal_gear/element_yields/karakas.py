@@ -15,11 +15,13 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..formation import SinglePop
+from ..utils.citations import cite
 from .source import Source
 from .yieldtables import YieldTables
 
 
+@cite("10.1111/j.1365-2966.2009.16198.x")
 class Karakas2010(YieldTables):
     """
     Yields available at https://cdsarc.cds.unistra.fr/viz-bin/cat/J/MNRAS/403/1413#/browse
@@ -41,7 +43,7 @@ class Karakas2010(YieldTables):
             >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
             >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
             >> plt.plot(mass, k10.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -76,7 +78,7 @@ class Karakas2010(YieldTables):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -199,12 +201,13 @@ class Karakas2010(YieldTables):
             raise ValueError("Model does not exist.")
 
 
+@cite("10.3847/0004-637X/825/1/26")
 class Karakas2016(YieldTables):
     """
 
     Yields available at
 
-    References:
+    References: Karakas, 2016, ApJ, 825, 1
     """
 
     k16_url = "https://content.cld.iop.org/journals/0004-637X/825/1/26/revision1/"
@@ -245,7 +248,7 @@ class Karakas2016(YieldTables):
             >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
             >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
             >> plt.plot(mass, k16.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -281,7 +284,7 @@ class Karakas2016(YieldTables):
     def agb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:

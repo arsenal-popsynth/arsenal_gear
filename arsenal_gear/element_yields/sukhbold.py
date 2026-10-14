@@ -56,7 +56,7 @@ class Sukhbold2016(YieldTables):
             >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.02
             >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
             >> plt.plot(mass, s16.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -99,7 +99,7 @@ class Sukhbold2016(YieldTables):
     def wind_yields(
         self,
         elements,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate="nearest",
         extrapolate=False,
     ) -> dict[str, Quantity["mass"]]:
@@ -108,7 +108,7 @@ class Sukhbold2016(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
@@ -132,7 +132,7 @@ class Sukhbold2016(YieldTables):
     def ccsn_yields(
         self,
         elements,
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate="nearest",
         extrapolate=False,
     ) -> dict[str, Quantity["mass"]]:
@@ -141,7 +141,7 @@ class Sukhbold2016(YieldTables):
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: StarPopulation object
+            starPop: SinglePop object
             interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
             extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:

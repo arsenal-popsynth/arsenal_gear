@@ -14,11 +14,13 @@ import astropy.units as u
 import numpy as np
 from astropy.units import Quantity
 
-from ..population import StarPopulation
+from ..formation import SinglePop
+from ..utils.citations import cite
 from .source import Source
 from .yieldtables import YieldTables
 
 
+@cite("10.1093/mnras/stt1877")
 class Doherty2014a(YieldTables):
     """
     Yields available in suplementary material of Doherty et al. (2014a)
@@ -43,7 +45,7 @@ class Doherty2014a(YieldTables):
             >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
             >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
             >> plt.plot(mass, d14a.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -84,7 +86,7 @@ class Doherty2014a(YieldTables):
     def sagb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
@@ -187,6 +189,7 @@ class Doherty2014a(YieldTables):
         # downloader(self.filedir / self.file, self.d14_url, message=None)
 
 
+@cite("10.1093/mnras/stu571")
 class Doherty2014b(YieldTables):
     """
     Yields available in suplementary material of Doherty et al. (2014b)
@@ -211,7 +214,7 @@ class Doherty2014b(YieldTables):
             >> mass = np.linspace(8, 120, 100)*u.M_sun
             >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
             >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.StarPopulation(mass=mass, metals=metals, tform=tform)
+            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
             >> plt.plot(mass, d14b.ccsn_yields('H', stars, interpolate='nearest'), '-')
 
         Attributes:
@@ -252,7 +255,7 @@ class Doherty2014b(YieldTables):
     def sagb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:

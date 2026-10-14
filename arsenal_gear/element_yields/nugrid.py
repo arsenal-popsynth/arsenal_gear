@@ -268,6 +268,7 @@ class Pignatari2016(YieldTables):
             wind             Source object for stellar winds (massive stars)
             ccsn             Source object for core-collapse SNe
         """
+
         super().__init__()
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Pignatari et al. (2016)"
@@ -872,6 +873,7 @@ class Battino20192021(YieldTables):
             atomic_num       Atomic numbers of available elements
             agb              Source object for stellar winds (asymptotic giant branch)
         """
+
         super().__init__()
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Battino et al. (2019, 2021)"
