@@ -294,19 +294,20 @@ class MISTReader(IsochroneDataReader):
         max_eep = 0
         for f in mass_file_list:
             # read in the EEP file
-            m0_t, eeps, min_age, max_age, data = self.read_eep_file(f)
+            track_m0, eeps, min_age, max_age, data = self.read_eep_file(f)
             # store the mass and EEP data
             max_eep = max(max_eep, np.max(eeps))
-            masses.append(m0_t)
+            masses.append(track_m0)
             min_ages.append(min_age)
             max_ages.append(max_age)
             (qs, elems) = self._dictionary_to_qs_elems(data, data.keys())
 
             tracks.append(
                 StellarTrack(
-                    mass=m0_t * u.Msun,
+                    m0=track_m0 * u.Msun,
                     eeps=eeps,
                     age_name="star_age",
+                    mass_name="star_mass",
                     lteff_name="log_Teff",
                     llbol_name="log_L",
                     lrad_name="log_R",
@@ -396,7 +397,7 @@ class MISTReader(IsochroneDataReader):
             self.abun = {content[3][i]: float(content[4][i]) for i in range(1, 5)}
             self.rot = float(content[4][-1])
             self.hdr_list = content[11][1:]
-        m0_t = float(content[7][1])
+        track_m0 = float(content[7][1])
         hdr_list = content[11][1:]
         eeps = [int(j) for j in content[8][2:]]
 
@@ -404,4 +405,4 @@ class MISTReader(IsochroneDataReader):
         min_age = min(data["star_age"])
         max_age = max(data["star_age"])
 
-        return m0_t, eeps, min_age, max_age, data
+        return track_m0, eeps, min_age, max_age, data
