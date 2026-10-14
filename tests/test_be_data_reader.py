@@ -6,6 +6,9 @@ This file contains tests for the binary evolution data readers, run on small
 fake BPASS and MPA/Bonn model trees (no downloads).
 """
 
+# the tests read the converted tables through the readers' _load
+# pylint: disable=protected-access
+
 import io
 import tarfile
 import zipfile
@@ -58,16 +61,13 @@ def fixture_bpass_dir(tmp_path):
 
 @pytest.fixture(name="bpass")
 def fixture_bpass(bpass_dir):
-    """BPASS reader with both tables converted."""
-    reader = BPASSReader(met=0.014, rootdir=bpass_dir)
-    reader.convert_single_data()
-    reader.convert_binary_data()
-    return reader
+    """BPASS reader; constructing it converts both tables."""
+    return BPASSReader(met=0.014, rootdir=bpass_dir)
 
 
 def _model(reader, kind, name):
     """Rows of one model in a converted table."""
-    table = reader._load(kind)  # pylint: disable=protected-access
+    table = reader._load(kind)
     return table[table.model == name].reset_index(drop=True)
 
 
@@ -76,8 +76,8 @@ class TestBPASSConversion:
 
     def test_tables(self, bpass):
         """Both tables have the shared schema and the expected model names."""
-        singles = bpass._load("singles")  # pylint: disable=protected-access
-        binaries = bpass._load("binaries")  # pylint: disable=protected-access
+        singles = bpass._load("singles")
+        binaries = bpass._load("binaries")
         star = ["mass", "logL", "logT", "logR"]
         assert list(singles.columns) == ["model", "time"] + star
         assert list(binaries.columns) == (
@@ -108,55 +108,95 @@ class TestBPASSConversion:
         assert np.all(np.diff(system.time) > 0)
         assert system.p_logL[N_BIN:].isna().all()
 
-    def test_overwrite(self, bpass_dir):
-        """Existing tables are only replaced with overwrite=True."""
+
+
+class TestConstruction:
+    """Creating a reader produces the converted tables."""
+
+    def test_builds_tables_and_keeps_raw_files(self, bpass_dir):
+        """Both tables are written, and the raw model files stay in place."""
         reader = BPASSReader(met=0.014, rootdir=bpass_dir)
-        reader.convert_single_data()
-        path = reader.output_dir / "singles_z014.pkl.gz"
-        mtime = path.stat().st_mtime_ns
-        reader.convert_single_data()
-        assert path.stat().st_mtime_ns == mtime
-        BPASSReader(met=0.014, rootdir=bpass_dir, overwrite=True).convert_single_data()
-        assert path.stat().st_mtime_ns != mtime
+        for kind in ("singles", "binaries"):
+            assert (reader.output_dir / f"{kind}_z014.pkl.gz").exists()
+        assert len(list((bpass_dir / "NEWSINMODS/z014").iterdir())) == 6
+        assert len(list((bpass_dir / "NEWBINMODS/NEWBINMODS/z014").iterdir())) == 4
+
+    def test_existing_tables_reused(self, bpass_dir):
+        """Existing tables are kept, unless overwrite=True rebuilds them."""
+        reader = BPASSReader(met=0.014, rootdir=bpass_dir)
+        paths = [reader.output_dir / f"{k}_z014.pkl.gz" for k in ("singles", "binaries")]
+        mtimes = [path.stat().st_mtime_ns for path in paths]
+        BPASSReader(met=0.014, rootdir=bpass_dir)
+        assert [path.stat().st_mtime_ns for path in paths] == mtimes
+        BPASSReader(met=0.014, rootdir=bpass_dir, overwrite=True)
+        assert all(
+            path.stat().st_mtime_ns != mtime for path, mtime in zip(paths, mtimes)
+        )
+
+    def test_convert_false(self, bpass_dir):
+        """With convert=False, no tables are written."""
+        reader = BPASSReader(met=0.014, rootdir=bpass_dir, convert=False)
+        assert not list(reader.output_dir.iterdir())
+
+    def test_no_model_files(self, tmp_path):
+        """Model directories without model files are reported clearly."""
+        for sub in ("NEWSINMODS/z014", "NEWBINMODS/NEWBINMODS/z014"):
+            (tmp_path / sub).mkdir(parents=True)
+        with pytest.raises(FileNotFoundError, match="NEWSINMODS"):
+            BPASSReader(met=0.014, rootdir=tmp_path)
 
 
 class TestBPASSGetData:
     """The download/unzip/untar cascade, with tiny archives."""
 
     @staticmethod
-    def _release(root, models=True):
-        """A fake release zip holding the models tar file and an unneeded member."""
+    def _release(root, models=True, tree=None):
+        """
+        A fake release zip holding the models tar file and an unneeded member.
+        The tar holds the files of tree if given, otherwise a placeholder.
+        """
         root.mkdir(parents=True, exist_ok=True)
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-            member = "NEWBINMODS/NEWBINMODS/z014/x" if models else "OTHER/x"
-            info = tarfile.TarInfo(member)
-            info.size = 1
-            tar.addfile(info, io.BytesIO(b"1"))
+            if tree is not None:
+                for sub in ("NEWSINMODS", "NEWBINMODS"):
+                    tar.add(tree / sub, arcname=sub)
+            else:
+                member = "NEWBINMODS/NEWBINMODS/z014/x" if models else "OTHER/x"
+                info = tarfile.TarInfo(member)
+                info.size = 1
+                tar.addfile(info, io.BytesIO(b"1"))
         with zipfile.ZipFile(root / BPASSReader.zip_name, "w") as zf:
             zf.writestr(BPASSReader.tar_name, buf.getvalue())
             zf.writestr("bpass_v2.2.1_imf135_300.tar.gz", b"unneeded")
 
-    def test_zip_to_models(self, tmp_path):
-        """Only the models tar is extracted, and the archives are deleted."""
-        self._release(tmp_path)
-        BPASSReader(rootdir=tmp_path)
-        assert (tmp_path / "NEWBINMODS").is_dir()
-        assert not (tmp_path / BPASSReader.zip_name).exists()
-        assert not (tmp_path / BPASSReader.tar_name).exists()
-        assert not (tmp_path / "bpass_v2.2.1_imf135_300.tar.gz").exists()
+    def test_zip_to_tables(self, tmp_path, bpass_dir):
+        """
+        From the release zip alone: only the models tar is extracted, the
+        archives are deleted, the tables are built and the raw files are kept.
+        """
+        root = tmp_path / "release"
+        self._release(root, tree=bpass_dir)
+        reader = BPASSReader(met=0.014, rootdir=root)
+        assert not (root / BPASSReader.zip_name).exists()
+        assert not (root / BPASSReader.tar_name).exists()
+        assert not (root / "bpass_v2.2.1_imf135_300.tar.gz").exists()
+        assert len(list((root / "NEWBINMODS/NEWBINMODS/z014").iterdir())) == 4
+        expected = BPASSReader(met=0.014, rootdir=bpass_dir)._load("binaries")
+        pd.testing.assert_frame_equal(reader._load("binaries"), expected)
 
     def test_keep_archives(self, tmp_path):
         """delete_zip=False keeps the zip."""
         self._release(tmp_path)
-        BPASSReader(rootdir=tmp_path, delete_zip=False)
+        BPASSReader(rootdir=tmp_path, delete_zip=False, convert=False)
         assert (tmp_path / BPASSReader.zip_name).exists()
+        assert (tmp_path / "NEWBINMODS").is_dir()
 
     def test_bad_layout(self, tmp_path):
         """A release without the models directory is reported clearly."""
         self._release(tmp_path, models=False)
-        with pytest.raises(FileNotFoundError):
-            BPASSReader(rootdir=tmp_path)
+        with pytest.raises(FileNotFoundError, match="layout"):
+            BPASSReader(rootdir=tmp_path, convert=False)
 
     def test_no_download_by_default(self, tmp_path, monkeypatch):
         """Without local data, nothing is downloaded unless force_download=True."""
@@ -165,7 +205,8 @@ class TestBPASSGetData:
             raise AssertionError("downloader should not be called")
 
         monkeypatch.setattr(data_reader, "downloader", fail)
-        BPASSReader(rootdir=tmp_path)
+        with pytest.raises(FileNotFoundError, match="force_download"):
+            BPASSReader(rootdir=tmp_path)
 
 
 def _write_mpa(path, n, m0):
@@ -193,9 +234,7 @@ def fixture_mpa(tmp_path):
     ]:
         _write_mpa(root / "MW/primary/grid1" / name, n1, 20.0)
         _write_mpa(root / "MW/secondary/grid1" / name, n2, 10.0)
-    reader = MPAReader(met="MW", rootdir=root)
-    reader.convert_binary_data()
-    return reader
+    return MPAReader(met="MW", rootdir=root)
 
 
 class TestMPAConversion:
@@ -225,8 +264,8 @@ def test_invalid_metallicity(tmp_path):
         MPAReader(met="M31", rootdir=tmp_path)
 
 
-def test_load_before_convert(tmp_path):
+def test_load_before_convert(bpass_dir):
     """Loading a table that hasn't been converted names the method to run."""
-    reader = BPASSReader(rootdir=tmp_path)
+    reader = BPASSReader(rootdir=bpass_dir, convert=False)
     with pytest.raises(FileNotFoundError, match="convert_single_data"):
-        reader._load("singles")  # pylint: disable=protected-access
+        reader._load("singles")

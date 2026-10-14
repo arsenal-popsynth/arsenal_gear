@@ -72,12 +72,16 @@ class BinaryDataReader(ABC):
                 output_dir: directory for the converted tables
                             (default: <rootdir>/processed)
                 force_download: download the data if no local copy is found
-                overwrite: overwrite existing converted tables
+                convert: convert the data into tables if they don't exist yet
+                         (default: True); if False, stop once the raw data
+                         is available
+                overwrite: rebuild the converted tables even if they exist
                 verbose: decides on verbose output
         """
         self.met = kwargs.get("met", self.default_met)
         self.verbose = kwargs.get("verbose", False)
         self.force_download = kwargs.get("force_download", False)
+        self.convert = kwargs.get("convert", True)
         self.overwrite = kwargs.get("overwrite", False)
         # make data storage directories if they don't exist
         rootdir = kwargs.get("rootdir")
@@ -94,9 +98,37 @@ class BinaryDataReader(ABC):
 
         self.get_data()
 
-    @abstractmethod
     def get_data(self) -> None:
-        """Makes sure the source's data is available locally, downloading if allowed."""
+        """
+        Makes sure the converted tables exist: if any is missing (or overwrite
+        is True), makes sure the raw data is available, then converts it.
+        The raw model files are left in place.
+        """
+        kinds = [
+            kind
+            for kind in ("singles", "binaries")
+            if self.overwrite or not self._table_path(kind).exists()
+        ]
+        if not kinds:
+            print(f"{self.source} tables already available in {self.output_dir}.")
+            return
+        self._get_raw_data()
+        if not self.convert:
+            return
+        converters = {
+            "singles": self.convert_single_data,
+            "binaries": self.convert_binary_data,
+        }
+        # singles first: the BPASS binaries need them
+        for kind in kinds:
+            converters[kind]()
+
+    @abstractmethod
+    def _get_raw_data(self) -> None:
+        """
+        Makes sure the source's raw model files are available locally,
+        downloading them if allowed, or raises FileNotFoundError.
+        """
 
     @staticmethod
     @abstractmethod
@@ -121,31 +153,47 @@ class BinaryDataReader(ABC):
 
     def convert_single_data(self) -> None:
         """Converts the single-star models into a singles table on disk."""
-        data = self._extract_all(self._extract_single, self._single_files())
-        self._save(data, "singles")
+        self._convert("singles", "single-star", self._single_files(), self._extract_single)
 
     def convert_binary_data(self) -> None:
         """Converts the binary models into a binaries table on disk."""
-        data = self._extract_all(self._extract_binary, self._binary_files())
-        self._save(data, "binaries")
+        self._convert("binaries", "binary", self._binary_files(), self._extract_binary)
+
+    def _convert(self, kind: str, label: str, files: list[str], extract) -> None:
+        """Reads all model files with extract and saves them as the kind table."""
+        print(
+            f"Converting {len(files)} {self.source} {label} models "
+            f"(metallicity {self.metstr})..."
+        )
+        data = self._extract_all(extract, files, desc=f"{self.source} {kind}")
+        self._save(data, kind)
 
     @staticmethod
     def _scan(directory: Path, pattern: str) -> list[str]:
         """Sorted paths, relative to directory, of the files matching pattern."""
-        return sorted(
+        files = sorted(
             str(path.relative_to(directory))
             for path in directory.glob(pattern)
             if path.is_file()
         )
+        if not files:
+            raise FileNotFoundError(f"No files matching {pattern} in {directory}")
+        return files
 
     @staticmethod
-    def _extract_all(extract, files: list[str]) -> pd.DataFrame:
+    def _extract_all(extract, files: list[str], desc: str = "") -> pd.DataFrame:
         """
         Reads all files in parallel with extract, and combines the results
         into one table sorted by model (keeping the time order within each).
+        desc labels the progress bar.
         """
         with ThreadPool() as pool:
-            frames = list(tqdm.tqdm(pool.imap(extract, files), total=len(files)))
+            frames = list(
+                tqdm.tqdm(
+                    pool.imap(extract, files), total=len(files), desc=desc, unit="model"
+                )
+            )
+        print("Combining and sorting the models...")
         data = pd.concat(frames, ignore_index=True)
         return data.sort_values("model", kind="stable", ignore_index=True)
 
@@ -159,7 +207,10 @@ class BinaryDataReader(ABC):
         if path.exists() and not self.overwrite:
             print(f"{path} already exists. Set overwrite=True to replace it.")
             return
-        print("Saving processed data to", self.output_dir)
+        print(
+            f"Saving {kind} table ({data.model.nunique()} models, "
+            f"{len(data)} rows) to {path}"
+        )
         data.to_pickle(path, compression="gzip")
 
     def _load(self, kind: str) -> pd.DataFrame:
@@ -227,26 +278,25 @@ class BPASSReader(BinaryDataReader):
             return f"z{round(met * 1000):03d}"
         return f"zem{-round(np.log10(met)):01d}"
 
-    def get_data(self) -> None:
+    def _get_raw_data(self) -> None:
         """
         Looks for the BPASS models and downloads/unzips/untars them if they
-        are not available.
+        are not available. The zip and tar files are deleted once extracted
+        (unless delete_zip is False).
         """
         models_dir = self.rootdir / self.models_name
         tar_path = self.rootdir / self.tar_name
         zip_path = self.rootdir / self.zip_name
 
         if models_dir.is_dir():
-            print("BPASS data already available. Ready to start converting.")
             return
         if not tar_path.is_file():
             if not zip_path.is_file():
                 if not self.force_download:
-                    print(
-                        f"BPASS data not found in {self.rootdir}, "
-                        "set force_download = True to download"
+                    raise FileNotFoundError(
+                        f"BPASS data not found in {self.rootdir}; "
+                        "set force_download=True to download it"
                     )
-                    return
                 downloader(zip_path, self.url, "Downloading stellar models...")
             unzip(
                 zip_path,
@@ -260,7 +310,7 @@ class BPASSReader(BinaryDataReader):
                 f"Extracting {tar_path} did not produce {models_dir}. "
                 "The layout of the BPASS release may have changed."
             )
-        print("BPASS data now available. Ready to start converting.")
+        print(f"BPASS data now available in {self.rootdir}.")
 
     def _single_dir(self) -> Path:
         return self.rootdir / "NEWSINMODS" / self.metstr
@@ -291,6 +341,7 @@ class BPASSReader(BinaryDataReader):
         that outlive the binary model continue along single-star models, so the
         singles table (from convert_single_data) is loaded first.
         """
+        print("Loading the singles table, used to continue companions...")
         self._singles = self._load("singles")
         self._single_masses = (
             np.unique(np.round(self._singles.model.values.astype(float)).astype(int))
@@ -401,20 +452,21 @@ class MPAReader(BinaryDataReader):
             f"single_{self.met}/single_{self.met}",
         ]
 
-    def get_data(self) -> None:
+    def _have_raw_data(self) -> bool:
+        return self._single_dir().is_dir() and self._primary_dir().is_dir()
+
+    def _get_raw_data(self) -> None:
         """
         Looks for the MPA/Bonn models and downloads the tarballs if they are not
         available. Extracting them into place is still manual (see #46).
         """
-        if self._single_dir().is_dir() and self._primary_dir().is_dir():
-            print("MPA/Bonn data already available. Ready to start converting.")
+        if self._have_raw_data():
             return
         if not self.force_download:
-            print(
-                f"MPA/Bonn data not found in {self.rootdir}, "
-                "set force_download = True to download"
+            raise FileNotFoundError(
+                f"MPA/Bonn data not found in {self.rootdir}; "
+                "set force_download=True to download it"
             )
-            return
         if self.username is None:
             raise ValueError("Downloading MPA/Bonn data needs a username and password")
         for model_set in self._model_sets():
@@ -426,6 +478,12 @@ class MPAReader(BinaryDataReader):
                 "Downloading stellar models...",
                 self.username,
                 self.password,
+            )
+        if not self._have_raw_data():
+            raise FileNotFoundError(
+                f"MPA/Bonn tarballs downloaded to {self.rootdir}. Extract them into "
+                f"single_{self.met}/ and {self.met}/primary/, {self.met}/secondary/ "
+                "before converting (see #46)."
             )
 
     def _single_dir(self) -> Path:
