@@ -345,11 +345,9 @@ class MPAConverter(BinaryEvolutionConverter):
         def extract_data(model):
 
             df = pd.read_pickle(model_directory / model, compression="gzip")
-
+            model_name = str(int(round(10 ** float(model[:5]) * 100))).zfill(5)
             d = {
-                "model": str(int(round(10 ** float(model[:5]) * 100))).zfill(
-                    5
-                ),  # model name as 100*M
+                "model": model_name,  # model name as 100*M
                 "time": df.star_age.values.astype("float"),  # time in yr
                 "mass": df.star_mass.values.astype("float"),  # mass in MSun
                 "logL": df.log_L.values.astype("float"),  # log Lbol in Lsun
@@ -403,6 +401,14 @@ class MPAConverter(BinaryEvolutionConverter):
         # Function to extract the data
         def extract_data(model):
 
+            # model name as 100*M1 _ 100*q _ 100*logP (the file name stores log10(M1))
+            model_name = (
+                str(int(round(10 ** float(model[6:11]) * 100))).zfill(5)
+                + "_"
+                + str(int(float(model[12:17]) * 100)).zfill(3)
+                + "_"
+                + str(int(float(model[18:23]) * 100)).zfill(3)
+            )
             df_1 = pd.read_pickle(
                 primary_directory / model,
                 compression="gzip",
@@ -417,11 +423,7 @@ class MPAConverter(BinaryEvolutionConverter):
             if pad > 0:
 
                 d = {
-                    "model": str(int(round(10 ** float(model[6:11]) * 100))).zfill(5)
-                    + "_"
-                    + str(int(float(model[12:17]) * 100)).zfill(3)
-                    + "_"
-                    + str(int(float(model[18:23]) * 100)).zfill(3),
+                    "model": model_name,
                     "time": df_2.star_age.values.astype("float"),  # time in yr
                     "p_mass": np.concatenate(
                         (
@@ -451,11 +453,7 @@ class MPAConverter(BinaryEvolutionConverter):
             else:
 
                 d = {
-                    "model": str(int(round(10 ** float(model[6:11]) * 100))).zfill(5)
-                    + "_"
-                    + str(int(float(model[12:17]) * 100)).zfill(3)
-                    + "_"
-                    + str(int(float(model[18:23]) * 100)).zfill(3),
+                    "model": model_name,
                     "time": df_1.star_age.values.astype("float"),  # time in yr
                     "p_mass": df_1.star_mass.values.astype("float"),  # mass in MSun
                     "p_logL": df_1.log_L.values.astype("float"),  # log Lbol in Lsun
