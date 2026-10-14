@@ -18,10 +18,12 @@ from astropy.units import Quantity
 from scipy.interpolate import interp1d
 
 from ..formation import SinglePop
+from ..utils.citations import cite
 from .source import Source
 from .yieldtables import YieldTables
 
 
+@cite("10.3847/0004-637X/821/1/38")
 class Sukhbold2016(YieldTables):
     """
     Sukhbold et al. (2016) CCSN + wind yields for masses varying from 9 to 120 Msun.
