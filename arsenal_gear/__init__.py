@@ -14,7 +14,7 @@ import numpy as np
 from astropy.units import Quantity
 from scipy.integrate import trapezoid as trapz
 
-from . import element_yields, feedbacks, formation, stellar_evolution, binary_evolution
+from . import binary_evolution, element_yields, feedbacks, formation, stellar_evolution
 from .formation import BinaryPop, SinglePop
 from .stellar_evolution.isochrone import AbstractIsochrone
 from .stellar_evolution.se_data_structures import Isochrone

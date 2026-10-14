@@ -51,8 +51,8 @@ def _make_zip(directory):
     return archive
 
 
-@pytest.fixture(params=list(TAR_MODES) + ["zip"])
-def archive(tmp_path, request):
+@pytest.fixture(name="archive", params=list(TAR_MODES) + ["zip"])
+def fixture_archive(tmp_path, request):
     """(archive path, extraction function, delete kwarg) for each archive type."""
     if request.param == "zip":
         return _make_zip(tmp_path), unzip, "delete_zip"

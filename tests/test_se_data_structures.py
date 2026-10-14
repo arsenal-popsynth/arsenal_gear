@@ -139,14 +139,14 @@ def test_trackset_without_eeps():
 # --- structures built from MIST data (cached by the isochrone tests) ---
 
 
-@pytest.fixture(scope="module")
-def mist_isochrones():
+@pytest.fixture(name="mist_isochrones", scope="module")
+def fixture_mist_isochrones():
     """IsochroneSet for solar-metallicity, non-rotating MIST isochrones."""
     return MISTReader(met=0.0, interp_op="iso").read_iso_data()
 
 
-@pytest.fixture(scope="module")
-def mist_tracks():
+@pytest.fixture(name="mist_tracks", scope="module")
+def fixture_mist_tracks():
     """TrackSet for solar-metallicity, non-rotating MIST tracks."""
     return MISTReader(met=0.0, interp_op="track").read_track_data()
 
