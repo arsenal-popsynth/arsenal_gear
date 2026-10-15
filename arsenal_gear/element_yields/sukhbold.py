@@ -87,7 +87,7 @@ class Sukhbold2016(YieldTables):
             )
             self.interpolate = "nearest"
 
-        self.filedir = self.filedir / "data" / "NuGrid" / "Sukhbold2016"
+        self.filedir = self.filedir / "data" / "Sukhbold2016"
         self.name = "Sukhbold et al. (2016)"
         self.model = model
 
