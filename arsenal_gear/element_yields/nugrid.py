@@ -38,8 +38,10 @@ class NuGrid(YieldTables):
     # hard-coded parameters of the NuGrid tables
     ng_url = "https://nugrid.github.io/content/data/"
     models = ["delay", "rapid"]
-    lo_mass = np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
-    hi_mass = np.array([12.0, 15.0, 20.0, 25.0])
+    mass = [
+        np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]),
+        np.array([12.0, 15.0, 20.0, 25.0]),
+    ]
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
     def __init__(self, model: str = "delay") -> None:
@@ -66,8 +68,7 @@ class NuGrid(YieldTables):
         Attributes:
             ng_url           Yield source website
             models           Available models
-            lo_mass          Tabulated masses (low)
-            hi_mass          Tabulated masses (high)
+            mass             Tabulated masses (two ranges [low,high])
             metal            Tabulated metallicities
             filedir          Directory of yield tables
             name             Name of yields tables
@@ -102,7 +103,7 @@ class NuGrid(YieldTables):
         ri, rj = r18_replace.T
         bi, bj = bat_replace.T
         agb_yld[:, ri, rj] = agb_yld_bat[bat_idx[:, None], bi, bj]
-        self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
+        self.agb = Source(self.elements, [self.metal, self.mass[0]], agb_yld)
 
         # Stellar wind yields
         self.wind = r18.wind
@@ -232,8 +233,7 @@ class Pignatari2016(YieldTables):
         "element_table_set1.2_yields_exp.txt",
         "element_table_set1.2_yields_winds.txt",
     ]
-    lo_mass = np.array([1.65, 2.0, 3.0, 5.0])
-    hi_mass = np.array([15.0, 20.0, 25.0])
+    mass = [np.array([1.65, 2.0, 3.0, 5.0]), np.array([15.0, 20.0, 25.0])]
     metal = np.array([0.01, 0.02])
 
     def __init__(self) -> None:
@@ -257,8 +257,7 @@ class Pignatari2016(YieldTables):
         Attributes:
             p16_url          Yield source website
             files            Table filenames
-            lo_mass          Tabulated masses (low)
-            hi_mass          Tabulated masses (high)
+            mass             Tabulated masses (two ranges [low,high])
             metal            Tabulated metallicities
             filedir          Directory of yield tables
             name             Name of yields tables
@@ -283,15 +282,15 @@ class Pignatari2016(YieldTables):
 
         # Asymptotic giant branch
         agb_yld = self.load_agb_yields()
-        self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
+        self.agb = Source(self.elements, [self.metal, self.mass[0]], agb_yld)
 
         # Winds (massive stars)
         wind_yld = self.load_wind_yields()
-        self.wind = Source(self.elements, [self.metal, self.hi_mass], wind_yld)
+        self.wind = Source(self.elements, [self.metal, self.mass[1]], wind_yld)
 
         # Core-collapse SNe
         ccsn_yld = self.load_ccsn_yields()
-        self.ccsn = Source(self.elements, [self.metal, self.hi_mass], ccsn_yld)
+        self.ccsn = Source(self.elements, [self.metal, self.mass[1]], ccsn_yld)
 
     def ccsn_yields(
         self,
@@ -408,7 +407,7 @@ class Pignatari2016(YieldTables):
     def load_agb_yields(self) -> np.ndarray:
         """Load tables of yields ejected during agb."""
 
-        agb_yld = np.zeros([len(self.elements), self.metal.size, self.lo_mass.size])
+        agb_yld = np.zeros([len(self.elements), self.metal.size, self.mass[0].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -437,7 +436,7 @@ class Pignatari2016(YieldTables):
     def load_wind_yields(self) -> np.ndarray:
         """Load tables of yields ejected as winds from massive stars."""
 
-        wind_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        wind_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -466,7 +465,7 @@ class Pignatari2016(YieldTables):
     def load_ccsn_yields(self) -> np.ndarray:
         """Load tables of yields ejected by core-collapse supernovae."""
 
-        ccsn_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        ccsn_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "exp" in file:
@@ -528,8 +527,10 @@ class Ritter2018(YieldTables):
         "element_yield_table_MESAonly_fryer12_rapid_winds.txt",
     ]
     models = ["delay", "rapid"]
-    lo_mass = np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
-    hi_mass = np.array([12.0, 15.0, 20.0, 25.0])
+    mass = [
+        np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]),
+        np.array([12.0, 15.0, 20.0, 25.0]),
+    ]
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
     def __init__(self, model: str = "delay") -> None:
@@ -556,8 +557,7 @@ class Ritter2018(YieldTables):
         Attributes:
             r18_url          Yield source website
             files            Table filenames
-            lo_mass          Tabulated masses (low)
-            hi_mass          Tabulated masses (high)
+            mass             Tabulated masses (two ranges [low,high])
             metal            Tabulated metallicities
             filedir          Directory of yield tables
             name             Name of yields tables
@@ -587,15 +587,15 @@ class Ritter2018(YieldTables):
 
         # Asymptotic giant branch
         agb_yld = self.load_agb_yields()
-        self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
+        self.agb = Source(self.elements, [self.metal, self.mass[0]], agb_yld)
 
         # Winds (massive stars)
         wind_yld = self.load_wind_yields()
-        self.wind = Source(self.elements, [self.metal, self.hi_mass], wind_yld)
+        self.wind = Source(self.elements, [self.metal, self.mass[1]], wind_yld)
 
         # Core-collapse SNe
         ccsn_yld = self.load_ccsn_yields()
-        self.ccsn = Source(self.elements, [self.metal, self.hi_mass], ccsn_yld)
+        self.ccsn = Source(self.elements, [self.metal, self.mass[1]], ccsn_yld)
 
     def ccsn_yields(
         self,
@@ -713,7 +713,7 @@ class Ritter2018(YieldTables):
     def load_agb_yields(self) -> np.ndarray:
         """Load tables of yields ejected during agb."""
 
-        agb_yld = np.zeros([len(self.elements), self.metal.size, self.lo_mass.size])
+        agb_yld = np.zeros([len(self.elements), self.metal.size, self.mass[0].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -726,9 +726,9 @@ class Ritter2018(YieldTables):
                 if "H Table" in line:
                     m = float(line.split()[-1].split(",")[0].split("=")[-1])
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
-                    if m > max(self.lo_mass):
+                    if m > max(self.mass[0]):
                         continue
-                    ind_mass = np.argmin(np.abs(self.lo_mass - m))
+                    ind_mass = np.argmin(np.abs(self.mass[0] - m))
                     ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
@@ -745,7 +745,7 @@ class Ritter2018(YieldTables):
     def load_wind_yields(self) -> np.ndarray:
         """Load tables of yields ejected as winds from massive stars."""
 
-        wind_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        wind_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -758,9 +758,9 @@ class Ritter2018(YieldTables):
                 if "H Table" in line:
                     m = float(line.split()[-1].split(",")[0].split("=")[-1])
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
-                    if m < min(self.hi_mass):
+                    if m < min(self.mass[1]):
                         continue
-                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_mass = np.argmin(np.abs(self.mass[1] - m))
                     ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
@@ -777,7 +777,7 @@ class Ritter2018(YieldTables):
     def load_ccsn_yields(self) -> np.ndarray:
         """Load tables of yields ejected by core-collapse supernovae."""
 
-        total_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        total_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "total" in file:
@@ -790,9 +790,9 @@ class Ritter2018(YieldTables):
                 if "H Table" in line:
                     m = float(line.split()[-1].split(",")[0].split("=")[-1])
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
-                    if m < min(self.hi_mass):
+                    if m < min(self.mass[1]):
                         continue
-                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_mass = np.argmin(np.abs(self.mass[1] - m))
                     ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
