@@ -312,19 +312,33 @@ class TestReadSingles:
         np.testing.assert_allclose(track.grav.to(u.cm / u.s**2).value,
                                    g.to(u.cm / u.s**2).value)
 
-    def test_backward_time_steps_dropped(self, bpass_dir):
+    def test_time_made_increasing(self, bpass_dir):
         """
-        A row going back in time is dropped, while rows repeating a time are
-        kept, so ages never decrease.
+        Repeated and backward times, in the middle or at the end of a model,
+        are spread between their neighbours: every row is kept, time strictly
+        increases, and the final age is unchanged.
         """
         time = np.linspace(0, 3e7, 40)
         time[20] = time[19] * (1 - 1e-6)  # one tiny backward step
         time[30] = time[29]  # a repeated time
+        time[-3:] = time[-3]  # a model ending on repeated times
         _write_bpass(bpass_dir / "NEWSINMODS/z014/sneplot-z014-7", time, 7, 0)
         tset = BPASSReader(met=0.014, rootdir=bpass_dir).read_single_data()
-        track = tset.tracks[list(tset.masses.value).index(7.0)]
-        assert len(track.age) == 39
-        assert np.all(np.diff(track.age.value) >= 0)
+        age = tset.tracks[list(tset.masses.value).index(7.0)].age.to(u.yr).value
+        assert len(age) == 40
+        assert np.all(np.diff(age) > 0)
+        assert age[-1] == time[-1]
+        # no time moves by more than one of the model's timesteps
+        assert np.max(np.abs(age - time)) <= np.max(np.diff(time))
+
+    def test_old_table_rejected(self, bpass):
+        """A table whose time doesn't strictly increase asks to be rebuilt."""
+        path = bpass.output_dir / "singles_z014.pkl.gz"
+        table = pd.read_pickle(path, compression="gzip")
+        table.loc[1, "time"] = table.loc[0, "time"]
+        table.to_pickle(path, compression="gzip")
+        with pytest.raises(ValueError, match="overwrite=True"):
+            bpass.read_single_data()
 
 
 class TestReadBinaries:

@@ -34,9 +34,13 @@ def make_scalar_quantity(x: Quantity, unit: Unit = None) -> Quantity:
 
 def make_monotonic_increasing(x: np.float64, y: np.float64) -> np.float64:
     """
-    Make an array montonically increasing by replacing decreasing values with
-    interpolated values based on the nearest by points j and k such that
-    x[j] < x[k] and y[j] < y[k].
+    Make an array strictly montonically increasing by replacing repeated or
+    decreasing values with interpolated values based on the nearest by points
+    j and k such that x[j] < x[k] and y[j] < y[k]. A run of such values that
+    reaches the end of the array is instead spread between the value before
+    the run and the run's largest value, so the array never exceeds its
+    original maximum (unless the whole array is non-increasing).
+    Modifies y in place.
     Args:
         x (np.float64): indepednent variable, used for interpolation
         y (np.float64): dependent variable to be made monotonic
@@ -49,14 +53,12 @@ def make_monotonic_increasing(x: np.float64, y: np.float64) -> np.float64:
             while((k < n) and (y[j]>=y[k])):
                 k+=1
             if k == n:
-                k = n - 1
-                if y[j] > y[k]:
-                    last = y[j]*1.0001
+                if j > 0:
+                    y[j:] = np.interp(x[j:], [x[j - 1], x[-1]], [y[j - 1], y[j]])
                 else:
-                    last = y[k]
-                y[j + 1 :] = np.interp(x[j + 1 :], [x[j], x[k]], [y[j], last])
-            else:
-                y[j + 1 : k] = np.interp(x[j + 1 : k], [x[j], x[k]], [y[j], y[k]])
+                    y[1:] = np.interp(x[1:], [x[0], x[-1]], [y[0], y[0] * 1.0001])
+                break
+            y[j + 1 : k] = np.interp(x[j + 1 : k], [x[j], x[k]], [y[j], y[k]])
             j = k
         else:
             j += 1

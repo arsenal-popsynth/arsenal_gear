@@ -23,6 +23,7 @@ import tqdm
 
 from ..stellar_evolution.se_data_structures import StellarTrack, TrackSet
 from ..utils import downloader, untar, unzip
+from ..utils.array_utils import make_monotonic_increasing
 from ..utils.citations import cite
 from .be_data_structures import BinaryTrack, BinaryTrackSet
 
@@ -78,18 +79,6 @@ def _parse_model_name(name: str) -> tuple[float, float | None, float | None]:
     if len(values) == 1:
         return values[0], None, None
     return values[0], values[1], values[2]
-
-
-def _nondecreasing_rows(time: np.ndarray) -> np.ndarray:
-    """
-    Mask dropping rows whose time is earlier than an earlier row's, which
-    removes the occasional backward time step in the raw model files. Rows
-    with repeated times are kept: late-phase timesteps can be shorter than
-    the printed precision of the time column while the star still evolves.
-    """
-    keep = np.ones(len(time), dtype=bool)
-    keep[1:] = time[1:] >= np.maximum.accumulate(time)[:-1]
-    return keep
 
 
 def _logg(mass: np.ndarray, log_r: np.ndarray) -> np.ndarray:
@@ -237,7 +226,10 @@ class BinaryDataReader(ABC):
         """
         Reads all files in parallel with extract, and combines the results
         into one table sorted by model (keeping the time order within each).
-        desc labels the progress bar.
+        Each model's time is made strictly increasing: late-phase timesteps can
+        be shorter than the printed precision of the raw time column, giving
+        repeated (or slightly decreasing) times, which are spread between their
+        neighbours. desc labels the progress bar.
         """
         with ThreadPool() as pool:
             frames = list(
@@ -245,6 +237,10 @@ class BinaryDataReader(ABC):
                     pool.imap(extract, files), total=len(files), desc=desc, unit="model"
                 )
             )
+        for frame in frames:
+            time = frame["time"].to_numpy(float).copy()
+            rows = np.arange(len(time), dtype=float)
+            frame["time"] = make_monotonic_increasing(rows, time)
         print("Combining and sorting the models...")
         data = pd.concat(frames, ignore_index=True)
         return data.sort_values("model", kind="stable", ignore_index=True)
@@ -277,11 +273,16 @@ class BinaryDataReader(ABC):
     @staticmethod
     def _models(table: pd.DataFrame):
         """
-        Yields (model name, rows) for each model of a converted table, dropping
-        rows that go back in time.
+        Yields (model name, rows) for each model of a converted table, checking
+        that its time strictly increases (as conversion guarantees).
         """
         for name, rows in table.groupby("model", sort=False):
-            yield name, rows[_nondecreasing_rows(rows.time.to_numpy())]
+            if np.any(np.diff(rows.time.to_numpy()) <= 0):
+                raise ValueError(
+                    f"Time does not strictly increase in model {name}. The table "
+                    "may predate this check; rebuild it with overwrite=True."
+                )
+            yield name, rows
 
     @staticmethod
     def _track(rows: pd.DataFrame, prefix: str, m0: float) -> StellarTrack:
