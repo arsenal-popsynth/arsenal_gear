@@ -13,7 +13,6 @@ from typing import List
 
 import astropy.units as u
 import numpy as np
-from astropy.units import Quantity
 
 from ..formation import SinglePop
 from ..utils.citations import cite
@@ -110,72 +109,23 @@ class LimongiChieffi2018(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
-    ## Main interface functions
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> dict[str, Quantity["mass"]]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starSop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Limongi & Chieffi (2018) ccsn tables"""
         args = [
             starPop.rotation.value * starPop.ones_like,
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> dict[str, Quantity["mass"]]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Limongi & Chieffi (2018) wind tables"""
         args = [
             starPop.rotation.value * starPop.ones_like,
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
     ## Internal functions for loading data
     def get_element_list(self) -> None:

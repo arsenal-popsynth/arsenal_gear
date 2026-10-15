@@ -12,7 +12,6 @@ from typing import List
 
 import astropy.units as u
 import numpy as np
-from astropy.units import Quantity
 
 from ..formation import SinglePop
 from ..utils.citations import cite
@@ -111,101 +110,29 @@ class NuGrid(YieldTables):
         # Core-collapse SNe yields
         self.ccsn = r18.ccsn
 
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for NuGrid ccsn tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for NuGrid wind tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from AGB stars ejected as winds for specified elements
-        Stellar parameters can be provided as single value, array + single value, or arrays
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for NuGrid agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.agb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
 
 @cite("10.3847/0067-0049/225/2/24")
@@ -292,101 +219,29 @@ class Pignatari2016(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.metal, self.mass[1]], ccsn_yld)
 
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Pignatari (2016) ccsn tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Pignatari (2016) wind tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Pignatari (2016) agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.agb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
     def get_element_list(self) -> None:
         """Read element symbols from tables, atomic numbers not available."""
@@ -597,101 +452,29 @@ class Ritter2018(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.metal, self.mass[1]], ccsn_yld)
 
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Ritter (2018) ccsn tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Ritter (2018) wind tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
+        return args
 
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Ritter (2018) agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.agb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
@@ -891,37 +674,13 @@ class Battino20192021(YieldTables):
         agb_yld = self.load_agb_yields()
         self.agb = Source(self.elements, [self.metal, self.mass], agb_yld)
 
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Battino (2019,2021) agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.agb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
     def get_element_list(self) -> None:
         """Read element symbols from tables, atomic numbers not available."""

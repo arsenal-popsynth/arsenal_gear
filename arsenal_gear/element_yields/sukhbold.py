@@ -9,6 +9,7 @@ import os
 import re
 import tarfile
 import warnings
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -96,6 +97,20 @@ class Sukhbold2016(YieldTables):
         # Sets nucleosynthesis yields and explosion energies
         self.load_from_archives()
 
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Sukhbold (2016) ccsn tables"""
+        args = [
+            starPop.masses.to(u.Msun).value,
+        ]
+        return args
+
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Sukhbold (2016) wind tables"""
+        args = [
+            starPop.masses.to(u.Msun).value,
+        ]
+        return args
+
     def wind_yields(
         self,
         elements,
@@ -118,9 +133,7 @@ class Sukhbold2016(YieldTables):
             raise ValueError(f"{self.name} only include yields at Z = 0.02")
 
         elements = np.atleast_1d(elements)
-        args = [
-            starPop.masses.to(u.Msun).value,
-        ]
+        args = self.wind_args(starPop)
         yld_array = self.wind.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )
@@ -158,9 +171,7 @@ class Sukhbold2016(YieldTables):
             raise ValueError(f"{self.name} only include yields at Z = 0.02")
 
         elements = np.atleast_1d(elements)
-        args = [
-            starPop.masses.to(u.Msun).value,
-        ]
+        args = self.ccsn_args(starPop)
         yld_array = self.ccsn.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
         )

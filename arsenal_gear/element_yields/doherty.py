@@ -12,7 +12,6 @@ from typing import List
 
 import astropy.units as u
 import numpy as np
-from astropy.units import Quantity
 
 from ..formation import SinglePop
 from ..utils.citations import cite
@@ -83,37 +82,13 @@ class Doherty2014a(YieldTables):
         sagb_yld = self.load_sagb_yields()
         self.sagb = Source(self.elements, [self.metal, self.mass], sagb_yld)
 
-    def sagb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the super asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def sagb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Doherty (2014a) sagb tables"""
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value * starPop.ones_like,
+            starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.sagb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
     ## Internal functions for loading data
     def get_element_list(self) -> None:
@@ -252,37 +227,13 @@ class Doherty2014b(YieldTables):
         sagb_yld = self.load_sagb_yields()
         self.sagb = Source(self.elements, [self.metal, self.mass], sagb_yld)
 
-    def sagb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the super asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        elements = np.atleast_1d(elements)
+    def sagb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Doherty (2014b) sagb tables"""
         args = [
-            starPop["metals"].value,
-            starPop["mass"].to(u.M_sun).value,
+            starPop.metallicity.value * starPop.ones_like,
+            starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = self.sagb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
+        return args
 
     ## Internal functions for loading data
     def get_element_list(self) -> None:
