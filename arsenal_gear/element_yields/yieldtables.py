@@ -77,7 +77,7 @@ class YieldTables:
     def sagb_yields(
         self,
         elements: List[str],
-        starPop: StarPopulation,
+        starPop: SinglePop,
         interpolate: str = "nearest",
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
