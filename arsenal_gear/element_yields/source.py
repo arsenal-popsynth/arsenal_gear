@@ -94,7 +94,13 @@ class Source:
                     yld.append(np.ones(shape) * np.nan)
             return yld
 
-    def get_mloss(self, params, interpolate="nearest", extrapolate=False):
+    def get_mloss(
+        self,
+        params,
+        interpolate="nearest",
+        extrapolate=False,
+        accept_negative_remnant=False,
+    ):
         """Interpolate sum of all yields (total mass) from class.
 
         Args:
@@ -124,7 +130,18 @@ class Source:
                     self.params[ip]
                 )
 
-        return self.mloss(points, method=interpolate)
+        mloss = self.mloss(points, method=interpolate)
+
+        negative_remnant = (params[-1] - mloss) < 0.0
+        if np.any(negative_remnant):
+            if accept_negative_remnant:
+                print(
+                    "Warning!!! I understand that I'm working with negative mass remnants"
+                )
+            else:
+                mloss[negative_remnant] = params[-1][negative_remnant]
+
+        return mloss
 
     @staticmethod
     def _convert2array(params):
