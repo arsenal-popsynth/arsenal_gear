@@ -12,14 +12,14 @@ from .nugrid import Battino20192021, NuGrid, Pignatari2016, Ritter2018
 from .sukhbold import Sukhbold2016
 
 __all__ = [
-    "Ritter2018",
-    "Karakas2010",
-    "Karakas2016",
     "LimongiChieffi2018",
     "NuGrid",
-    "Doherty2014a",
-    "Doherty2014b",
+    "Ritter2018",
     "Battino20192021",
     "Pignatari2016",
+    "Karakas2010",
+    "Karakas2016",
+    "Doherty2014a",
+    "Doherty2014b",
     "Sukhbold2016",
 ]
