@@ -114,12 +114,12 @@ class Sukhbold2016(YieldTables):
         Returns:
             Dictionary of yields matching provided element list
         """
-        if any(starPop["metals"] != 0.02):
+        if any(starPop.metallicity.value != 0.02):
             raise ValueError(f"{self.name} only include yields at Z = 0.02")
 
         elements = np.atleast_1d(elements)
         args = [
-            starPop["mass"].to(u.Msun).value,
+            starPop.masses.to(u.Msun).value,
         ]
         yld_array = self.wind.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
@@ -154,12 +154,12 @@ class Sukhbold2016(YieldTables):
             )
             interpolate = "nearest"
 
-        if any(np.atleast_1d(starPop["metals"] != 0.02)):
+        if any(np.atleast_1d(starPop.metallicity.value != 0.02)):
             raise ValueError(f"{self.name} only include yields at Z = 0.02")
 
         elements = np.atleast_1d(elements)
         args = [
-            starPop["mass"].to(u.Msun).value,
+            starPop.masses.to(u.Msun).value,
         ]
         yld_array = self.ccsn.get_yld(
             elements, args, interpolate=interpolate, extrapolate=extrapolate
