@@ -14,7 +14,6 @@ from typing import List
 import numpy as np
 import pandas as pd
 from astropy import units as u
-from astropy.units import Quantity
 from scipy.interpolate import interp1d
 
 from ..formation import SinglePop
@@ -47,7 +46,7 @@ class Sukhbold2016(YieldTables):
     mass = None  # Loaded later
     metal = 0.02
 
-    def __init__(self, model="N20"):
+    def __init__(self, model="N20", **kwargs):
         """
         Args:
             model: choise of model to load, see Sukhbold et al. (2016) for details
@@ -80,7 +79,14 @@ class Sukhbold2016(YieldTables):
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
-        super().__init__()
+        super().__init__(**kwargs)
+
+        if self.interpolate != "nearest":
+            warnings.warn(
+                "Sukhbold2016: forcing nearest-neighbor due to explodability islands"
+            )
+            self.interpolate = "nearest"
+
         self.filedir = self.filedir / "data" / "NuGrid" / "Sukhbold2016"
         self.name = "Sukhbold et al. (2016)"
         self.model = model
@@ -99,6 +105,10 @@ class Sukhbold2016(YieldTables):
 
     def ccsn_args(self, starPop: SinglePop) -> List:
         """Argument structure for Sukhbold (2016) ccsn tables"""
+
+        if any(starPop.metallicity.value != 0.02):
+            raise ValueError(f"{self.name} only include yields at Z = 0.02")
+
         args = [
             starPop.masses.to(u.Msun).value,
         ]
@@ -106,79 +116,14 @@ class Sukhbold2016(YieldTables):
 
     def wind_args(self, starPop: SinglePop) -> List:
         """Argument structure for Sukhbold (2016) wind tables"""
+
+        if any(starPop.metallicity.value != 0.02):
+            raise ValueError(f"{self.name} only include yields at Z = 0.02")
+
         args = [
             starPop.masses.to(u.Msun).value,
         ]
         return args
-
-    def wind_yields(
-        self,
-        elements,
-        starPop: SinglePop,
-        interpolate="nearest",
-        extrapolate=False,
-    ) -> dict[str, Quantity["mass"]]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-        """
-        if any(starPop.metallicity.value != 0.02):
-            raise ValueError(f"{self.name} only include yields at Z = 0.02")
-
-        elements = np.atleast_1d(elements)
-        args = self.wind_args(starPop)
-        yld_array = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
-
-    def ccsn_yields(
-        self,
-        elements,
-        starPop: SinglePop,
-        interpolate="nearest",
-        extrapolate=False,
-    ) -> dict[str, Quantity["mass"]]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            Dictionary of yields matching provided element list
-
-        """
-        if interpolate != "nearest":
-            warnings.warn(
-                "Sukhbold2016: forcing nearest-neighbor due to explodability islands"
-            )
-            interpolate = "nearest"
-
-        if any(np.atleast_1d(starPop.metallicity.value != 0.02)):
-            raise ValueError(f"{self.name} only include yields at Z = 0.02")
-
-        elements = np.atleast_1d(elements)
-        args = self.ccsn_args(starPop)
-        yld_array = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-
-        if len(elements) == 1:
-            return {elements[0]: yld_array * u.M_sun}
-        return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def get_explosion_energy(self, mass):
         """Function that returns explosion energy interpolated from mass

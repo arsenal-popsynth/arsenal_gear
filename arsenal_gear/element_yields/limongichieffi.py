@@ -47,7 +47,7 @@ class LimongiChieffi2018(YieldTables):
     rot = np.array([0, 150, 300])
     ccsn_mmax = 25
 
-    def __init__(self, model: str = "R") -> None:
+    def __init__(self, model: str = "R", **kwargs) -> None:
         """
         Args:
             model: choice of model to load, see Limongi & Chieffi (2018) for details
@@ -88,7 +88,7 @@ class LimongiChieffi2018(YieldTables):
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data/LimongiChieffi2018"
         self.name = "Limongi & Chieffi (2018)"
 

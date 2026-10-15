@@ -35,7 +35,7 @@ class Doherty2014a(YieldTables):
     mass = np.array([6.5, 7.0, 7.5, 8.0, 8.5, 9.0])
     metal = np.array([0.004, 0.008, 0.02])
 
-    def __init__(self, model: str = "VW93"):
+    def __init__(self, model: str = "VW93", **kwargs):
         """
         Args:
             model: Model used for mass loss rates.
@@ -61,7 +61,7 @@ class Doherty2014a(YieldTables):
             raise ValueError(f"Model {model} does not exist.")
         self.model = model
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "Doherty"
         self.name = "Doherty et al. (2014a)"
         self.filename = "TABLE1-VW93ML.txt"
@@ -180,7 +180,7 @@ class Doherty2014b(YieldTables):
     mass = np.array([6.5, 7.0, 7.5])
     metal = np.array([0.0001, 0.001])
 
-    def __init__(self, model: str = "VW93"):
+    def __init__(self, model: str = "VW93", **kwargs):
         """
         Args:
             model: Model used for mass loss rates.
@@ -206,7 +206,7 @@ class Doherty2014b(YieldTables):
             raise ValueError(f"Model {model} does not exist.")
         self.model = model
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "Doherty"
         self.name = "Doherty et al. (2014b)"
         self.filename = "P3Doh14b-table1.txt"

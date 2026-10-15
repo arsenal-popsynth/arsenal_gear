@@ -24,7 +24,15 @@ def _not_implemented(channel: str, name: str):
 class YieldTables:
     """Class for defining base structure of yield tables."""
 
-    def __init__(self) -> None:
+    def __init__(self, interpolate: str = "nearest", extrapolate: bool = False) -> None:
+        """
+        Keyword Args:
+            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
+        """
+        self.interpolate = interpolate
+        self.extrapolate = extrapolate
+
         self.name = "None"
         self.filedir = Path(__file__).parent.absolute()
 
@@ -73,19 +81,13 @@ class YieldTables:
         return _not_implemented("SNIA", self.name)
 
     def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
+        self, elements: List[str], starPop: SinglePop
     ) -> u.Quantity["mass"]:
         """Interpolate yields from core-collapse supernovae for specified elements.
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
         Returns:
             Dictionary of yields matching provided element list
 
@@ -93,7 +95,7 @@ class YieldTables:
         elements = np.atleast_1d(elements)
         args = self.ccsn_args(starPop)
         yld_array = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
+            elements, args, interpolate=self.interpolate, extrapolate=self.extrapolate
         )
 
         if len(elements) == 1:
@@ -101,19 +103,13 @@ class YieldTables:
         return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
     def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
+        self, elements: List[str], starPop: SinglePop
     ) -> u.Quantity["mass"]:
         """Interpolate yields from massive stars ejected as winds for specified elements.
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             Dictionary of yields matching provided element list
 
@@ -121,7 +117,7 @@ class YieldTables:
         elements = np.atleast_1d(elements)
         args = self.wind_args(starPop)
         yld_array = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
+            elements, args, interpolate=self.interpolate, extrapolate=self.extrapolate
         )
 
         if len(elements) == 1:
@@ -132,16 +128,12 @@ class YieldTables:
         self,
         elements: List[str],
         starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
     ) -> u.Quantity["mass"]:
         """Interpolate yields from AGB stars ejected as winds for specified elements
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             Dictionary of yields matching provided element list
 
@@ -149,7 +141,7 @@ class YieldTables:
         elements = np.atleast_1d(elements)
         args = self.agb_args(starPop)
         yld_array = self.agb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
+            elements, args, interpolate=self.interpolate, extrapolate=self.extrapolate
         )
 
         if len(elements) == 1:
@@ -160,16 +152,12 @@ class YieldTables:
         self,
         elements: List[str],
         starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
     ) -> u.Quantity["mass"]:
         """Interpolate yields from stars on the super asymptotic giant branch for specified elements.
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             Dictionary of yields matching provided element list
 
@@ -177,7 +165,7 @@ class YieldTables:
         elements = np.atleast_1d(elements)
         args = self.sagb_args(starPop)
         yld_array = self.sagb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
+            elements, args, interpolate=self.interpolate, extrapolate=self.extrapolate
         )
 
         if len(elements) == 1:
@@ -188,16 +176,12 @@ class YieldTables:
         self,
         elements: List[str],
         starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
     ) -> u.Quantity["mass"]:
         """Interpolate yields supernovae type Ia for specified elements.
 
         Args:
             elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
             starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
         Returns:
             Dictionary of yields matching provided element list
 
@@ -205,7 +189,7 @@ class YieldTables:
         elements = np.atleast_1d(elements)
         args = self.snia_args(starPop)
         yld_array = self.snia.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
+            elements, args, interpolate=self.interpolate, extrapolate=self.extrapolate
         )
 
         if len(elements) == 1:

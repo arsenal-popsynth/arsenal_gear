@@ -44,14 +44,20 @@ class TestElementYieldModels:
         """
         model = Model()
 
-        if hasattr(model, "ccsn"):
+        if model.ccsn is not None:
             self._test_monotonically_increasing_params(model.ccsn)
 
-        if hasattr(model, "wind"):
+        if model.wind is not None:
             self._test_monotonically_increasing_params(model.wind)
 
-        if hasattr(model, "agb"):
+        if model.agb is not None:
             self._test_monotonically_increasing_params(model.agb)
+
+        if model.sagb is not None:
+            self._test_monotonically_increasing_params(model.sagb)
+
+        if model.snia is not None:
+            self._test_monotonically_increasing_params(model.snia)
 
     @pytest.mark.parametrize(
         "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
@@ -63,14 +69,20 @@ class TestElementYieldModels:
         """
         model = Model()
 
-        if hasattr(model, "ccsn"):
+        if model.ccsn is not None:
             self._test_check_positive_tables(model.ccsn)
 
-        if hasattr(model, "wind"):
+        if model.wind is not None:
             self._test_check_positive_tables(model.wind)
 
-        if hasattr(model, "agb"):
+        if model.agb is not None:
             self._test_check_positive_tables(model.agb)
+
+        if model.sagb is not None:
+            self._test_monotonically_increasing_params(model.sagb)
+
+        if model.snia is not None:
+            self._test_monotonically_increasing_params(model.snia)
 
     @pytest.mark.parametrize(
         "Model", MODEL_CLASSES, ids=[cls.__name__ for cls in MODEL_CLASSES]
@@ -82,14 +94,20 @@ class TestElementYieldModels:
         """
         model = Model()
 
-        if hasattr(model, "ccsn"):
+        if model.ccsn is not None:
             self._test_remnant_mass_from_interpolation(model.ccsn)
 
-        if hasattr(model, "wind"):
+        if model.wind is not None:
             self._test_remnant_mass_from_interpolation(model.wind)
 
-        if hasattr(model, "agb"):
+        if model.agb is not None:
             self._test_remnant_mass_from_interpolation(model.agb)
+
+        if model.sagb is not None:
+            self._test_monotonically_increasing_params(model.sagb)
+
+        if model.snia is not None:
+            self._test_monotonically_increasing_params(model.snia)
 
     def _test_monotonically_increasing_params(self, source):
         """Ensure monotonically increasing parameter grid"""

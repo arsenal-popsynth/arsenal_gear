@@ -35,7 +35,7 @@ class Karakas2010(YieldTables):
     )
     metal = np.array([0.0001, 0.004, 0.008, 0.02])
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Usage:
             >> k10 = arsenal_gear.element_yields.Karakas2010()
@@ -56,7 +56,7 @@ class Karakas2010(YieldTables):
             agb              Source object for stellar winds (asymptotic giant branch)
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "Karakas"
         self.name = "Karakas (2010)"
 
@@ -213,7 +213,7 @@ class Karakas2016(YieldTables):
     )
     metal = np.array([0.007, 0.014, 0.03])
 
-    def __init__(self, include_overshoot: bool = False):
+    def __init__(self, include_overshoot: bool = False, **kwargs):
         """
         Args:
             include_overshoot: set True if using models that mixing layer overshoot
@@ -237,7 +237,7 @@ class Karakas2016(YieldTables):
             agb              Source object for stellar winds (asymptotic giant branch)
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "Karakas"
         self.name = "Karakas (2016)"
         self.include_overshoot = include_overshoot

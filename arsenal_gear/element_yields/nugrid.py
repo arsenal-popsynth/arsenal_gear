@@ -43,7 +43,7 @@ class NuGrid(YieldTables):
     ]
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
-    def __init__(self, model: str = "delay") -> None:
+    def __init__(self, model: str = "delay", **kwargs) -> None:
         """
         Args:
             model: choise of model to load, see Fryer et al. (2012) for details
@@ -80,7 +80,7 @@ class NuGrid(YieldTables):
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "NuGrid"
 
@@ -163,7 +163,7 @@ class Pignatari2016(YieldTables):
     mass = [np.array([1.65, 2.0, 3.0, 5.0]), np.array([15.0, 20.0, 25.0])]
     metal = np.array([0.01, 0.02])
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         Usage:
             >> p16 = arsenal_gear.element_yields.Pignatari2016()
@@ -195,7 +195,7 @@ class Pignatari2016(YieldTables):
             ccsn             Source object for core-collapse SNe
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Pignatari et al. (2016)"
         if not self.filedir.is_dir():
@@ -388,7 +388,7 @@ class Ritter2018(YieldTables):
     ]
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
-    def __init__(self, model: str = "delay") -> None:
+    def __init__(self, model: str = "delay", **kwargs) -> None:
         """
         Args:
             model: choise of model to load, see Fryer et al. (2012) for details
@@ -427,7 +427,7 @@ class Ritter2018(YieldTables):
 
         self.files = [file for file in self.files if model in file]
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Ritter et al. (2018)"
 
@@ -626,7 +626,7 @@ class Battino20192021(YieldTables):
     mass = np.array([2.0, 3.0])
     metal = np.array([0.001, 0.01, 0.02, 0.03])
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         Usage:
             >> bat = arsenal_gear.element_yields.Battino20192021()
@@ -657,7 +657,7 @@ class Battino20192021(YieldTables):
             agb              Source object for stellar winds (asymptotic giant branch)
         """
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Battino et al. (2019, 2021)"
 
