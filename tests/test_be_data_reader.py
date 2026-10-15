@@ -13,12 +13,21 @@ import io
 import tarfile
 import zipfile
 
+import astropy.constants as const
+import astropy.units as u
 import numpy as np
 import pandas as pd
 import pytest
 
 from arsenal_gear.binary_evolution import data_reader
-from arsenal_gear.binary_evolution.data_reader import BPASSReader, MPAReader
+from arsenal_gear.binary_evolution.be_data_structures import BinaryTrackSet
+from arsenal_gear.binary_evolution.data_reader import (
+    BPASSReader,
+    MPAReader,
+    _model_name,
+    _parse_model_name,
+)
+from arsenal_gear.stellar_evolution.se_data_structures import TrackSet
 
 N_BIN = 25  # points in each fake binary model
 T_BIN = np.linspace(0, 1e7, N_BIN)  # binary models end at 10 Myr
@@ -269,3 +278,81 @@ def test_load_before_convert(bpass_dir):
     reader = BPASSReader(rootdir=bpass_dir, convert=False)
     with pytest.raises(FileNotFoundError, match="convert_single_data"):
         reader._load("singles")
+
+
+@pytest.mark.parametrize(
+    "params", [(20.0, None, None), (2.3, 0.4, 1.2), (100.0, 0.9, 3.8)]
+)
+def test_model_name_round_trip(params):
+    """Model names decode back to the parameters they were built from."""
+    assert _parse_model_name(_model_name(*params)) == params
+
+
+class TestReadSingles:
+    """Reading the singles table into a TrackSet."""
+
+    def test_trackset(self, bpass):
+        """One track per model, initial masses from the names, no EEPs."""
+        tset = bpass.read_single_data()
+        assert isinstance(tset, TrackSet)
+        assert tset.max_eep is None and tset.eep_name is None
+        np.testing.assert_allclose(
+            tset.masses.to(u.Msun).value, [2.3, 3, 3.5, 5, 10, 20]
+        )
+        assert all(track.eeps is None for track in tset.tracks)
+
+    def test_track_values(self, bpass):
+        """Track properties match the table, and gravity follows from M and R."""
+        track = bpass.read_single_data().tracks[-1]
+        rows = _model(bpass, "singles", "02000")
+        np.testing.assert_allclose(track.age.to(u.yr).value, rows.time)
+        np.testing.assert_allclose(track.mass.to(u.Msun).value, rows.mass)
+        np.testing.assert_allclose(track.lbol.to(u.Lsun).value, 10**rows.logL)
+        g = const.G * track.mass / track.rad**2
+        np.testing.assert_allclose(track.grav.to(u.cm / u.s**2).value,
+                                   g.to(u.cm / u.s**2).value)
+
+    def test_backward_time_steps_dropped(self, bpass_dir):
+        """
+        A row going back in time is dropped, while rows repeating a time are
+        kept, so ages never decrease.
+        """
+        time = np.linspace(0, 3e7, 40)
+        time[20] = time[19] * (1 - 1e-6)  # one tiny backward step
+        time[30] = time[29]  # a repeated time
+        _write_bpass(bpass_dir / "NEWSINMODS/z014/sneplot-z014-7", time, 7, 0)
+        tset = BPASSReader(met=0.014, rootdir=bpass_dir).read_single_data()
+        track = tset.tracks[list(tset.masses.value).index(7.0)]
+        assert len(track.age) == 39
+        assert np.all(np.diff(track.age.value) >= 0)
+
+
+class TestReadBinaries:
+    """Reading the binaries table into a BinaryTrackSet."""
+
+    def test_initial_parameters(self, bpass):
+        """Initial parameters are decoded from the model names."""
+        bset = bpass.read_binary_data()
+        assert isinstance(bset, BinaryTrackSet)
+        binary = bset.tracks[list(bset.q0).index(0.5)]  # "02000_050_200"
+        assert binary.primary.m0 == 20 * u.Msun
+        assert binary.secondary.m0 == 10 * u.Msun
+        assert binary.P0 == 100 * u.d
+        assert binary.e0 == 0.0
+        assert binary.a0.unit == u.au
+        assert len(binary.primary.age) == len(binary.secondary.age)
+
+    def test_merger(self, bpass):
+        """After the merger, the secondary has no mass and no luminosity."""
+        bset = bpass.read_binary_data()
+        binary = bset.tracks[list(bset.q0).index(0.5)]
+        assert binary.mass2[-1] == 0 * u.Msun
+        assert np.isnan(binary.lbol2[10:].value).all()
+        assert np.isnan(binary.grav2[-1].value)
+
+    def test_mpa(self, mpa):
+        """MPA/Bonn systems decode in the same way."""
+        bset = mpa.read_binary_data()
+        binary = bset.tracks[list(bset.q0).index(0.9)]  # "01000_090_230"
+        assert binary.primary.m0 == 10 * u.Msun
+        np.testing.assert_allclose(binary.P0.to(u.d).value, 10**2.3)

@@ -7,19 +7,38 @@ binary evolution codes and converting it into tables in a uniform format:
 one row per track point, with a "model" column naming the track.
 Singles tables have columns model, time, mass, logL, logT, logR; binaries
 tables have the same quantities for the primary and secondary, prefixed by
-"p_" and "s_".
+"p_" and "s_". The read_* methods turn these tables into TrackSet and
+BinaryTrackSet data structures.
 """
 
 from abc import ABC, abstractmethod
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
+import astropy.constants as const
+import astropy.units as u
 import numpy as np
 import pandas as pd
 import tqdm
 
+from ..stellar_evolution.se_data_structures import StellarTrack, TrackSet
 from ..utils import downloader, untar, unzip
 from ..utils.citations import cite
+from .be_data_structures import BinaryTrack, BinaryTrackSet
+
+# variable names of the track quantities in StellarTrack.qs, shared by all tracks
+_TRACK_NAMES = {
+    "age_name": "time",
+    "mass_name": "mass",
+    "lteff_name": "logT",
+    "llbol_name": "logL",
+    "lrad_name": "logR",
+    "lgrav_name": "logg",
+}
+# the same names for TrackSet, which has no current-mass column name
+_SET_NAMES = {k: v for k, v in _TRACK_NAMES.items() if k != "mass_name"}
+# log10(G Msun / Rsun^2 / (cm/s^2)), the solar surface gravity
+_LOGG_SUN = np.log10((const.G * u.Msun / u.Rsun**2).to(u.cm / u.s**2).value)
 
 
 def _model_name(m1: float, q: float | None = None, logp: float | None = None) -> str:
@@ -48,6 +67,39 @@ def _star_columns(prefix: str, mass, logL, logT, logR) -> dict:
 def _pad(x: np.ndarray, n: int, fill: float = np.nan) -> np.ndarray:
     """Pad x to length n with the value fill."""
     return np.concatenate((x, np.full(n - len(x), fill)))
+
+
+def _parse_model_name(name: str) -> tuple[float, float | None, float | None]:
+    """
+    Inverse of _model_name: the initial (primary) mass, and for binaries the
+    initial mass ratio and log10(period/days); None for single stars.
+    """
+    values = [int(part) / 100 for part in name.split("_")]
+    if len(values) == 1:
+        return values[0], None, None
+    return values[0], values[1], values[2]
+
+
+def _nondecreasing_rows(time: np.ndarray) -> np.ndarray:
+    """
+    Mask dropping rows whose time is earlier than an earlier row's, which
+    removes the occasional backward time step in the raw model files. Rows
+    with repeated times are kept: late-phase timesteps can be shorter than
+    the printed precision of the time column while the star still evolves.
+    """
+    keep = np.ones(len(time), dtype=bool)
+    keep[1:] = time[1:] >= np.maximum.accumulate(time)[:-1]
+    return keep
+
+
+def _logg(mass: np.ndarray, log_r: np.ndarray) -> np.ndarray:
+    """
+    log10(surface gravity / (cm/s^2)) from mass/Msun and log10(R/Rsun);
+    NaN where the star has no (positive) mass or radius.
+    """
+    with np.errstate(divide="ignore", invalid="ignore"):
+        logg = _LOGG_SUN + np.log10(mass) - 2 * log_r
+    return np.where(mass > 0, logg, np.nan)
 
 
 class BinaryDataReader(ABC):
@@ -221,6 +273,87 @@ class BinaryDataReader(ABC):
                 f"'{path}' not found. Run convert_{kind[:-1]}_data() first."
             )
         return pd.read_pickle(path, compression="gzip")
+
+    @staticmethod
+    def _models(table: pd.DataFrame):
+        """
+        Yields (model name, rows) for each model of a converted table, dropping
+        rows that go back in time.
+        """
+        for name, rows in table.groupby("model", sort=False):
+            yield name, rows[_nondecreasing_rows(rows.time.to_numpy())]
+
+    @staticmethod
+    def _track(rows: pd.DataFrame, prefix: str, m0: float) -> StellarTrack:
+        """
+        StellarTrack of one star from its rows in a converted table, where its
+        columns start with prefix ("" for single stars, "p_" or "s_" in binaries).
+        """
+        qs = {"time": rows.time.to_numpy(float)}
+        for col in ("mass", "logL", "logT", "logR"):
+            qs[col] = rows[prefix + col].to_numpy(float)
+        qs["logg"] = _logg(qs["mass"], qs["logR"])
+        return StellarTrack(m0=m0 * u.Msun, eeps=None, elems=[], qs=qs, **_TRACK_NAMES)
+
+    @staticmethod
+    def _set_fields(tracks: list) -> dict:
+        """TrackSet fields shared by single-star and binary track sets."""
+        ages = [track.age.to(u.yr).value for track in tracks]
+        return {
+            "min_ages": np.array([age.min() for age in ages]) * u.yr,
+            "max_ages": np.array([age.max() for age in ages]) * u.yr,
+            "max_eep": None,
+            "eep_name": None,
+            "elems": [],
+            **_SET_NAMES,
+        }
+
+    def read_single_data(self) -> TrackSet:
+        """
+        Reads the converted single-star table into a TrackSet, with one
+        StellarTrack per model and no EEPs.
+        """
+        tracks = [
+            self._track(rows, "", _parse_model_name(name)[0])
+            for name, rows in self._models(self._load("singles"))
+        ]
+        return TrackSet(
+            masses=u.Quantity([track.m0 for track in tracks]),
+            hdr_list=list(tracks[0].qs),
+            tracks=tracks,
+            **self._set_fields(tracks),
+        )
+
+    def read_binary_data(self) -> BinaryTrackSet:
+        """
+        Reads the converted binaries table into a BinaryTrackSet, with one
+        BinaryTrack per system. Initial parameters come from the model names;
+        the initial eccentricity e0 is 0, i.e. orbits are assumed circular,
+        since neither source provides it. No orbital evolution is stored yet.
+        """
+        binaries = []
+        for name, rows in self._models(self._load("binaries")):
+            m1, q, logp = _parse_model_name(name)
+            binaries.append(
+                BinaryTrack(
+                    primary=self._track(rows, "p_", m1),
+                    secondary=self._track(rows, "s_", q * m1),
+                    q0=q,
+                    P0=10**logp * u.d,
+                    e0=0.0,
+                    period_name=None,
+                    eccentricity_name=None,
+                )
+            )
+        return BinaryTrackSet(
+            masses=u.Quantity([b.primary.m0 for b in binaries]),
+            hdr_list=list(binaries[0].primary.qs),
+            tracks=binaries,
+            q0=np.array([b.q0 for b in binaries]),
+            P0=u.Quantity([b.P0 for b in binaries]),
+            e0=np.array([b.e0 for b in binaries]),
+            **self._set_fields(binaries),
+        )
 
 
 @cite("10.1017/pasa.2017.51", "10.1093/mnras/sty1353")
