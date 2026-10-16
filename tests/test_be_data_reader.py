@@ -18,6 +18,7 @@ import astropy.units as u
 import numpy as np
 import pandas as pd
 import pytest
+import requests
 
 from arsenal_gear.binary_evolution import data_reader
 from arsenal_gear.binary_evolution.be_data_structures import BinaryTrackSet
@@ -28,6 +29,16 @@ from arsenal_gear.binary_evolution.data_reader import (
     _parse_model_name,
 )
 from arsenal_gear.stellar_evolution.se_data_structures import TrackSet
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    """Fail any real HTTP request, so no test can download data by mistake."""
+
+    def fail(*args, **kwargs):
+        raise AssertionError("tests must not make real HTTP requests")
+
+    monkeypatch.setattr(requests, "get", fail)
 
 N_BIN = 25  # points in each fake binary model
 T_BIN = np.linspace(0, 1e7, N_BIN)  # binary models end at 10 Myr
@@ -195,9 +206,9 @@ class TestBPASSGetData:
         pd.testing.assert_frame_equal(reader._load("binaries"), expected)
 
     def test_keep_archives(self, tmp_path):
-        """delete_zip=False keeps the zip."""
+        """delete_archives=False keeps the zip."""
         self._release(tmp_path)
-        BPASSReader(rootdir=tmp_path, delete_zip=False, convert=False)
+        BPASSReader(rootdir=tmp_path, delete_archives=False, convert=False)
         assert (tmp_path / BPASSReader.zip_name).exists()
         assert (tmp_path / "NEWBINMODS").is_dir()
 
@@ -216,6 +227,27 @@ class TestBPASSGetData:
         monkeypatch.setattr(data_reader, "downloader", fail)
         with pytest.raises(FileNotFoundError, match="force_download"):
             BPASSReader(rootdir=tmp_path)
+
+    def test_force_download(self, tmp_path, bpass_dir, monkeypatch):
+        """
+        force_download=True downloads the release again even when the models
+        and tables exist, then rebuilds the tables (no real download).
+        """
+        root = tmp_path / "release"
+        self._release(root, tree=bpass_dir)
+        reader = BPASSReader(met=0.014, rootdir=root)
+        path = reader.output_dir / "binaries_z014.pkl.gz"
+        mtime = path.stat().st_mtime_ns
+        calls = []
+
+        def fake_download(fname, url, *_):
+            calls.append((fname, url))
+            self._release(fname.parent, tree=bpass_dir)
+
+        monkeypatch.setattr(data_reader, "downloader", fake_download)
+        BPASSReader(met=0.014, rootdir=root, force_download=True)
+        assert [fname.name for fname, _ in calls] == [BPASSReader.zip_name]
+        assert path.stat().st_mtime_ns != mtime
 
 
 def _write_mpa(path, n, m0):
@@ -263,6 +295,155 @@ class TestMPAConversion:
         assert len(system) == 12
         assert system.loc[8:, system.columns.str.startswith("s_")].isna().all().all()
         assert not system.filter(like="p_").isna().any().any()
+
+
+MPA_BINARIES = [
+    # (file name, primary points, secondary points)
+    ("1.300_0.500_1.000_compressed.pkl.gz", 10, 15),  # secondary outlives
+    ("1.000_0.900_-0.500_compressed.pkl.gz", 12, 8),  # merger; negative logP
+]
+
+
+def _mpa_tarballs(root, prefix=MPAReader.server_prefix):
+    """
+    Fake MPA/Bonn tarballs with the server's layout: bare files in the singles
+    tarball, and the server's full path in each binary tarball.
+    """
+    src = root.parent / "mpa_src"
+    _write_mpa(src / "single/1.000_0_compressed.pkl.gz", 30, 10.0)
+    _write_mpa(src / "single/1.000_100_compressed.pkl.gz", 30, 10.0)  # rotating
+    for name, n1, n2 in MPA_BINARIES:
+        logm = name.split("_")[0]
+        _write_mpa(src / "primary" / prefix / "MW/primary" / logm / name, n1, 20.0)
+        _write_mpa(src / "secondary" / prefix / "MW/secondary" / logm / name, n2, 10.0)
+    root.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(root / "single_MW.tar", "w") as tar:
+        for path in sorted((src / "single").iterdir()):
+            tar.add(path, arcname=path.name)
+    top = prefix.split("/")[0]
+    for kind in ("primary", "secondary"):
+        with tarfile.open(root / f"MW_{kind}.tar", "w") as tar:
+            tar.add(src / kind / top, arcname=top)
+
+
+class TestMPAGetData:
+    """Getting the MPA/Bonn raw data in place, with fake tarballs."""
+
+    @pytest.fixture(name="no_download")
+    def fixture_no_download(self, monkeypatch):
+        """Make any call to the downloader fail."""
+
+        def fail(*args, **kwargs):
+            raise AssertionError("downloader should not be called")
+
+        monkeypatch.setattr(data_reader, "downloader", fail)
+
+    @pytest.mark.usefixtures("no_download")
+    def test_tarballs_extracted(self, tmp_path):
+        """
+        Local tarballs are extracted into the expected layout, the tables are
+        built, and the tarballs are deleted.
+        """
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root)
+        reader = MPAReader(met="MW", rootdir=root)
+        assert (root / "single_MW/1.000_0_compressed.pkl.gz").is_file()
+        for name, _, _ in MPA_BINARIES:
+            logm = name.split("_")[0]
+            for kind in ("primary", "secondary"):
+                assert (root / "MW" / kind / logm / name).is_file()
+        assert not (root / "afs").exists()
+        assert not list(root.glob("*.tar"))
+        assert set(reader._load("singles").model) == {"01000"}  # rotating left out
+        assert set(reader._load("binaries").model) == {"01995_050_100", "01000_090_-50"}
+
+    @pytest.mark.usefixtures("no_download")
+    def test_empty_folders_not_data(self, tmp_path):
+        """
+        Folders without model files (e.g. from an interrupted extraction)
+        don't count as data, so the tarball is still extracted.
+        """
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root)
+        (root / "MW/secondary/1.000").mkdir(parents=True)
+        MPAReader(met="MW", rootdir=root, convert=False)
+        assert (root / "MW/secondary/1.000" / MPA_BINARIES[1][0]).is_file()
+
+    @pytest.mark.usefixtures("no_download")
+    def test_keep_archives(self, tmp_path):
+        """delete_archives=False keeps the tarballs."""
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root)
+        MPAReader(met="MW", rootdir=root, delete_archives=False, convert=False)
+        assert len(list(root.glob("*.tar"))) == 3
+
+    @pytest.mark.usefixtures("no_download")
+    def test_extracted_data_used(self, tmp_path, monkeypatch):
+        """With the model directories in place, nothing is extracted again."""
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root)
+        MPAReader(met="MW", rootdir=root, delete_archives=False, convert=False)
+
+        def fail(*args, **kwargs):
+            raise AssertionError("untar should not be called")
+
+        monkeypatch.setattr(data_reader, "untar", fail)
+        MPAReader(met="MW", rootdir=root)
+
+    @pytest.mark.usefixtures("no_download")
+    def test_negative_logp(self, tmp_path):
+        """A name with a negative log10(P/days) is decoded correctly."""
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root)
+        bset = MPAReader(met="MW", rootdir=root).read_binary_data()
+        binary = bset.tracks[list(bset.q0).index(0.9)]
+        assert binary.primary.m0 == 10 * u.Msun
+        np.testing.assert_allclose(binary.P0.to(u.d).value, 10**-0.5)
+
+    def test_force_download(self, tmp_path, monkeypatch):
+        """
+        force_download=True downloads every tarball again, to top-level file
+        names, even when the data and tables exist, then rebuilds the tables
+        (no real download).
+        """
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root)
+        reader = MPAReader(met="MW", rootdir=root, delete_archives=False)
+        archives = {p.name: p.read_bytes() for p in root.glob("*.tar")}
+        path = reader.output_dir / "binaries_MW.pkl.gz"
+        mtime = path.stat().st_mtime_ns
+        calls = []
+
+        def fake_download(fname, url, _message, username, password):
+            calls.append((fname, url, username, password))
+            fname.write_bytes(archives[fname.name])
+
+        monkeypatch.setattr(data_reader, "downloader", fake_download)
+        MPAReader(met="MW", rootdir=root, force_download=True, username="u", password="p")
+        assert sorted(fname.name for fname, *_ in calls) == sorted(archives)
+        assert all(fname.parent == root for fname, *_ in calls)
+        assert all(url.startswith(MPAReader.url) for _, url, *_ in calls)
+        assert all(call[2:] == ("u", "p") for call in calls)
+        assert path.stat().st_mtime_ns != mtime
+
+    def test_force_download_needs_credentials(self, tmp_path):
+        """Downloading without a username is refused before any request."""
+        with pytest.raises(ValueError, match="username"):
+            MPAReader(met="MW", rootdir=tmp_path, force_download=True)
+
+    @pytest.mark.usefixtures("no_download")
+    def test_no_data(self, tmp_path):
+        """Without data, tarballs or force_download, the error says what to do."""
+        with pytest.raises(FileNotFoundError, match="force_download"):
+            MPAReader(met="MW", rootdir=tmp_path)
+
+    @pytest.mark.usefixtures("no_download")
+    def test_bad_layout(self, tmp_path):
+        """Tarballs with an unexpected layout are reported clearly."""
+        root = tmp_path / "MPA"
+        _mpa_tarballs(root, prefix="some/other/path/")
+        with pytest.raises(FileNotFoundError, match="layout"):
+            MPAReader(met="MW", rootdir=root)
 
 
 def test_invalid_metallicity(tmp_path):

@@ -17,7 +17,7 @@ Functions:
 import glob
 import os.path as osp
 import tarfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
 import requests
@@ -84,7 +84,12 @@ def downloader(fname, url, message=None, username=None, password=None):
 
 
 def untar(
-    tar_file, target_dir=None, target_file=None, delete_tar=False, inspect=False
+    tar_file,
+    target_dir=None,
+    target_file=None,
+    delete_tar=False,
+    inspect=False,
+    strip_components=0,
 ) -> Path:
     """
     Un-compress a tar file. Compression (none, gz, xz, bz2) is detected automatically.
@@ -98,6 +103,9 @@ def untar(
         delete_tar (bool): Delete the tar file after extracting
         inspect    (bool): Print the names of the members in the tar file
                            without extracting anything
+        strip_components (int): Remove this many leading directories from each
+                                member's path (like tar --strip-components);
+                                members with nothing left are skipped
     Returns:
         target_dir (Path): Directory into which the tar file was extracted
     """
@@ -116,17 +124,34 @@ def untar(
         target_dir.mkdir(parents=True, exist_ok=True)
         print(f"Extracting {fname}...")
         if target_file is None:
-            tar.extractall(path=target_dir)
+            members = tar.getmembers()
         elif target_file in tar.getnames():
-            tar.extract(target_file, path=target_dir)
+            members = [tar.getmember(target_file)]
         else:
             raise FileNotFoundError(f"{target_file} not found in {fname}")
+        if strip_components:
+            members = _strip_components(members, strip_components)
+        tar.extractall(path=target_dir, members=members)
 
     if delete_tar and fname.exists():
         print("Deleting", fname)
         fname.unlink()
 
     return target_dir
+
+
+def _strip_components(members: list, n: int) -> list:
+    """
+    Tar members with the first n directories removed from their paths,
+    leaving out those with nothing left.
+    """
+    stripped = []
+    for member in members:
+        parts = PurePosixPath(member.name).parts[n:]
+        if parts:
+            member.name = str(PurePosixPath(*parts))
+            stripped.append(member)
+    return stripped
 
 
 def unzip(

@@ -112,7 +112,10 @@ class BinaryDataReader(ABC):
                          (default: binary_evolution/data/<source>)
                 output_dir: directory for the converted tables
                             (default: <rootdir>/processed)
-                force_download: download the data if no local copy is found
+                force_download: always download the raw data (and rebuild the
+                                tables), even if it is already present
+                delete_archives: delete downloaded archives once their
+                                 contents have been extracted (default: True)
                 convert: convert the data into tables if they don't exist yet
                          (default: True); if False, stop once the raw data
                          is available
@@ -122,8 +125,10 @@ class BinaryDataReader(ABC):
         self.met = kwargs.get("met", self.default_met)
         self.verbose = kwargs.get("verbose", False)
         self.force_download = kwargs.get("force_download", False)
+        self.delete_archives = kwargs.get("delete_archives", True)
         self.convert = kwargs.get("convert", True)
-        self.overwrite = kwargs.get("overwrite", False)
+        # freshly downloaded raw data always replaces the converted tables
+        self.overwrite = kwargs.get("overwrite", False) or self.force_download
         # make data storage directories if they don't exist
         rootdir = kwargs.get("rootdir")
         if rootdir is None:
@@ -142,7 +147,8 @@ class BinaryDataReader(ABC):
     def get_data(self) -> None:
         """
         Makes sure the converted tables exist: if any is missing (or overwrite
-        is True), makes sure the raw data is available, then converts it.
+        or force_download is True), makes sure the raw data is available
+        (downloading it if force_download is True), then converts it.
         The raw model files are left in place.
         """
         kinds = [
@@ -167,8 +173,9 @@ class BinaryDataReader(ABC):
     @abstractmethod
     def _get_raw_data(self) -> None:
         """
-        Makes sure the source's raw model files are available locally,
-        downloading them if allowed, or raises FileNotFoundError.
+        Makes sure the source's raw model files are available locally: always
+        downloads them if force_download is True, otherwise uses the extracted
+        files or extracts local archives, or raises FileNotFoundError.
         """
 
     @staticmethod
@@ -395,11 +402,10 @@ class BPASSReader(BinaryDataReader):
     def __init__(self, **kwargs) -> None:
         """
         Args:
-            kwargs: Keyword arguments for BinaryDataReader, plus
-                delete_zip: delete the (~13 GB) release zip, and the models tar
-                            file, once the models have been extracted from them
+            kwargs: Keyword arguments for BinaryDataReader. With
+                delete_archives (default), the (~13 GB) release zip and the
+                models tar file are deleted once the models are extracted.
         """
-        self.delete_zip = kwargs.get("delete_zip", True)
         # singles table and its masses, loaded by convert_binary_data
         self._singles = None
         self._single_masses = None
@@ -414,31 +420,32 @@ class BPASSReader(BinaryDataReader):
 
     def _get_raw_data(self) -> None:
         """
-        Looks for the BPASS models and downloads/unzips/untars them if they
-        are not available. The zip and tar files are deleted once extracted
-        (unless delete_zip is False).
+        Downloads the BPASS release if force_download is True; otherwise looks
+        for the extracted models, then the models tar file, then the release
+        zip, and unzips/untars what is needed. The zip and tar files are
+        deleted once extracted (unless delete_archives is False).
         """
         models_dir = self.rootdir / self.models_name
         tar_path = self.rootdir / self.tar_name
         zip_path = self.rootdir / self.zip_name
 
-        if models_dir.is_dir():
+        if self.force_download:
+            downloader(zip_path, self.url, "Downloading stellar models...")
+        elif models_dir.is_dir():
             return
-        if not tar_path.is_file():
+        if self.force_download or not tar_path.is_file():
             if not zip_path.is_file():
-                if not self.force_download:
-                    raise FileNotFoundError(
-                        f"BPASS data not found in {self.rootdir}; "
-                        "set force_download=True to download it"
-                    )
-                downloader(zip_path, self.url, "Downloading stellar models...")
+                raise FileNotFoundError(
+                    f"BPASS data not found in {self.rootdir}; "
+                    "set force_download=True to download it"
+                )
             unzip(
                 zip_path,
                 self.rootdir,
                 target_file=self.tar_name,
-                delete_zip=self.delete_zip,
+                delete_zip=self.delete_archives,
             )
-        untar(tar_path, self.rootdir, delete_tar=self.delete_zip)
+        untar(tar_path, self.rootdir, delete_tar=self.delete_archives)
         if not models_dir.is_dir():
             raise FileNotFoundError(
                 f"Extracting {tar_path} did not produce {models_dir}. "
@@ -559,6 +566,8 @@ class MPAReader(BinaryDataReader):
     default_met = "MW"
     mets = ["MW", "LMC", "SMC"]
     url = "https://wwwmpa.mpa-garching.mpg.de/stellgrid/data/BonnGrids/"
+    # leading path of the members of the binary tarballs (the server's layout)
+    server_prefix = "afs/mpa/project/stellgrid2/web/data/BonnGrids/"
     # model columns of mass, logL, logT and logR
     star_cols = ["star_mass", "log_L", "log_Teff", "log_R"]
 
@@ -578,47 +587,70 @@ class MPAReader(BinaryDataReader):
         """MPA/Bonn metallicities are already strings: MW, LMC or SMC."""
         return met
 
-    def _model_sets(self) -> list[str]:
-        """Model sets on the server for this metallicity."""
+    def _archives(self) -> list[tuple]:
+        """
+        For each model set of this metallicity: its name on the server, the
+        local tarball, where to extract it, how many leading directories to
+        strip from its members, and the directory its model files end up in.
+        The binary tarballs store the server's full path, the singles none.
+        """
+        strip = self.server_prefix.count("/")
+        met = self.met
         return [
-            f"{self.met}/primary",
-            f"{self.met}/secondary",
-            f"single_{self.met}/single_{self.met}",
+            (f"{met}/primary", f"{met}_primary.tar", self.rootdir, strip,
+             self._primary_dir()),
+            (f"{met}/secondary", f"{met}_secondary.tar", self.rootdir, strip,
+             self._secondary_dir()),
+            (f"single_{met}/single_{met}", f"single_{met}.tar", self._single_dir(),
+             0, self._single_dir()),
         ]
 
-    def _have_raw_data(self) -> bool:
-        return self._single_dir().is_dir() and self._primary_dir().is_dir()
+    @staticmethod
+    def _has_files(directory: Path) -> bool:
+        """Whether directory holds any model file (empty subdirectories don't count)."""
+        return any(directory.rglob("*_compressed.pkl.gz"))
 
     def _get_raw_data(self) -> None:
         """
-        Looks for the MPA/Bonn models and downloads the tarballs if they are not
-        available. Extracting them into place is still manual (see #46).
+        Downloads the MPA/Bonn tarballs if force_download is True; otherwise
+        uses the extracted model directories, extracting any local tarballs
+        whose directory is missing. Tarballs are deleted once extracted
+        (unless delete_archives is False).
         """
-        if self._have_raw_data():
-            return
-        if not self.force_download:
-            raise FileNotFoundError(
-                f"MPA/Bonn data not found in {self.rootdir}; "
-                "set force_download=True to download it"
+        archives = self._archives()
+        if self.force_download:
+            if self.username is None:
+                raise ValueError(
+                    "Downloading MPA/Bonn data needs a username and password"
+                )
+            for model_set, tarball, *_ in archives:
+                downloader(
+                    self.rootdir / tarball,
+                    self.url + model_set + ".tar",
+                    "Downloading stellar models...",
+                    self.username,
+                    self.password,
+                )
+        for _, tarball, target, strip, data_dir in archives:
+            if self._has_files(data_dir) and not self.force_download:
+                continue
+            tar_path = self.rootdir / tarball
+            if not tar_path.is_file():
+                raise FileNotFoundError(
+                    f"MPA/Bonn data not found: neither {data_dir} nor {tar_path} "
+                    "exists; set force_download=True to download it"
+                )
+            untar(
+                tar_path,
+                target,
+                delete_tar=self.delete_archives,
+                strip_components=strip,
             )
-        if self.username is None:
-            raise ValueError("Downloading MPA/Bonn data needs a username and password")
-        for model_set in self._model_sets():
-            fname = self.rootdir / f"{model_set}.tar"
-            fname.parent.mkdir(parents=True, exist_ok=True)
-            downloader(
-                fname,
-                self.url + model_set + ".tar",
-                "Downloading stellar models...",
-                self.username,
-                self.password,
-            )
-        if not self._have_raw_data():
-            raise FileNotFoundError(
-                f"MPA/Bonn tarballs downloaded to {self.rootdir}. Extract them into "
-                f"single_{self.met}/ and {self.met}/primary/, {self.met}/secondary/ "
-                "before converting (see #46)."
-            )
+            if not self._has_files(data_dir):
+                raise FileNotFoundError(
+                    f"Extracting {tar_path} did not produce {data_dir}. "
+                    "The layout of the MPA/Bonn data may have changed."
+                )
 
     def _single_dir(self) -> Path:
         return self.rootdir / f"single_{self.met}"
@@ -637,20 +669,20 @@ class MPAReader(BinaryDataReader):
 
     def _extract_single(self, model: str) -> pd.DataFrame:
         df = pd.read_pickle(self._single_dir() / model, compression="gzip")
-        # the file name starts with log10(M)
+        # the file name starts with log10(M), then the rotation rate
+        log_m = float(model.split("_")[0])
         return pd.DataFrame(
             {
-                "model": _model_name(10 ** float(model[:5])),
+                "model": _model_name(10**log_m),
                 "time": df.star_age.to_numpy(float),  # time in yr
                 **_star_columns("", *(df[col] for col in self.star_cols)),
             }
         )
 
     def _extract_binary(self, model: str) -> pd.DataFrame:
-        # the file name stores log10(M1), q and logP
-        model_name = _model_name(
-            10 ** float(model[6:11]), float(model[12:17]), float(model[18:23])
-        )
+        # the file name stores log10(M1), q and log10(P/days), e.g. 1.300_0.500_-0.050
+        log_m1, q, logp = (float(x) for x in Path(model).name.split("_")[:3])
+        model_name = _model_name(10**log_m1, q, logp)
         df_1 = pd.read_pickle(self._primary_dir() / model, compression="gzip")
         df_2 = pd.read_pickle(self._secondary_dir() / model, compression="gzip")
 

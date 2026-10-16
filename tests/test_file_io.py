@@ -113,6 +113,18 @@ class TestExtract:
         assert not path.exists()
 
 
+def test_untar_strip_components(tmp_path):
+    """Leading directories are removed from member paths, as tar --strip-components."""
+    paths = _write_members(tmp_path / "src" / "a" / "b" / "c")
+    archive = tmp_path / "deep.tar"
+    with tarfile.open(archive, "w") as tar:
+        tar.add(tmp_path / "src" / "a", arcname="a")
+    out = untar(archive, tmp_path / "out", strip_components=2)
+    for path in paths:
+        assert (out / "c" / path.name).read_text() == path.read_text()
+    assert not (out / "a").exists()
+
+
 class TestTarValidity:
     """Tests for is_valid_tar and untar's handling of invalid archives."""
 
