@@ -30,7 +30,8 @@ def _kepler_semimajor_axis(
 class BinaryTrack:
     """
     Data class for storing one binary system: two StellarTracks sharing an age
-    grid, plus the system's initial orbital parameters.
+    grid, plus the system's initial orbital parameters. The evolution of the
+    orbit (period and eccentricity over time) is not stored yet, see #45.
 
     Attributes:
         primary: track of the initially more massive star (primary.m0 = M1)
@@ -38,10 +39,6 @@ class BinaryTrack:
         q0: initial mass ratio q = M2 / M1
         P0: initial orbital period
         e0: initial orbital eccentricity
-        period_name: variable name for the orbital period/days in primary.qs,
-                     None if not available
-        eccentricity_name: variable name for the orbital eccentricity in
-                           primary.qs, None if not available
     """
 
     primary: StellarTrack
@@ -49,8 +46,6 @@ class BinaryTrack:
     q0: float
     P0: Quantity["time"]
     e0: float
-    period_name: str | None
-    eccentricity_name: str | None
 
     def __post_init__(self):
         if len(self.primary.age) != len(self.secondary.age):
@@ -115,29 +110,6 @@ class BinaryTrack:
     def mass_ratio(self) -> np.ndarray[np.float64]:
         """Current mass ratios M2 / M1 of the binary track points."""
         return (self.mass2 / self.mass1).decompose().value
-
-    @property
-    def period(self) -> Quantity["time"]:
-        """Current orbital periods of the binary track points."""
-        if self.period_name is None:
-            raise ValueError("binary track has no orbital-period column")
-        return self.primary.qs[self.period_name] * u.d
-
-    @property
-    def eccentricity(self) -> np.ndarray[np.float64]:
-        """Current orbital eccentricities of the binary track points."""
-        if self.eccentricity_name is None:
-            raise ValueError("binary track has no orbital-eccentricity column")
-        return self.primary.qs[self.eccentricity_name]
-
-    @property
-    def semimajor_axis(self) -> Quantity["length"]:
-        """
-        Current orbital semi-major axes of the binary track points, from
-        Kepler's third law with the current period and total mass. Only
-        meaningful while the binary is bound.
-        """
-        return _kepler_semimajor_axis(self.mass1 + self.mass2, self.period)
 
     @property
     def a0(self) -> Quantity["length"]:

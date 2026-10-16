@@ -396,6 +396,7 @@ class TestMPAGetData:
         root = tmp_path / "MPA"
         _mpa_tarballs(root)
         bset = MPAReader(met="MW", rootdir=root).read_binary_data()
+        _assert_initial_parameters(bset, [(10**1.3, 0.5, 1.0), (10.0, 0.9, -0.5)])
         binary = bset.tracks[list(bset.q0).index(0.9)]
         assert binary.primary.m0 == 10 * u.Msun
         np.testing.assert_allclose(binary.P0.to(u.d).value, 10**-0.5)
@@ -522,6 +523,28 @@ class TestReadSingles:
             bpass.read_single_data()
 
 
+def _assert_initial_parameters(bset, expected):
+    """
+    The systems' initial parameters match expected, a list of
+    (M1/Msun, q0, log10(P0/days)) taken from the file names, with e0 = 0
+    (circular), M2 = q0 M1, and the set's arrays lining up with its tracks.
+    """
+    got = sorted(
+        (b.primary.m0.to_value(u.Msun), b.q0, np.log10(b.P0.to_value(u.d)))
+        for b in bset.tracks
+    )
+    # model names keep M1 to 0.01 Msun (MPA file names store log10(M1))
+    np.testing.assert_allclose(got, sorted(expected), rtol=1e-3, atol=1e-12)
+    for i, binary in enumerate(bset.tracks):
+        assert binary.e0 == 0.0 and bset.e0[i] == 0.0
+        assert binary.q0 == bset.q0[i] and binary.P0 == bset.P0[i]
+        assert binary.primary.m0 == bset.masses[i]
+        np.testing.assert_allclose(
+            binary.secondary.m0.to_value(u.Msun),
+            binary.q0 * binary.primary.m0.to_value(u.Msun),
+        )
+
+
 class TestReadBinaries:
     """Reading the binaries table into a BinaryTrackSet."""
 
@@ -529,6 +552,9 @@ class TestReadBinaries:
         """Initial parameters are decoded from the model names."""
         bset = bpass.read_binary_data()
         assert isinstance(bset, BinaryTrackSet)
+        _assert_initial_parameters(
+            bset, [(20, 0.5, 2), (20, 0.15, 1), (20, 0.25, 1), (2.3, 0.4, 1.2)]
+        )
         binary = bset.tracks[list(bset.q0).index(0.5)]  # "02000_050_200"
         assert binary.primary.m0 == 20 * u.Msun
         assert binary.secondary.m0 == 10 * u.Msun
@@ -548,6 +574,7 @@ class TestReadBinaries:
     def test_mpa(self, mpa):
         """MPA/Bonn systems decode in the same way."""
         bset = mpa.read_binary_data()
+        _assert_initial_parameters(bset, [(10**1.3, 0.5, 1.0), (10.0, 0.9, 2.3)])
         binary = bset.tracks[list(bset.q0).index(0.9)]  # "01000_090_230"
         assert binary.primary.m0 == 10 * u.Msun
         np.testing.assert_allclose(binary.P0.to(u.d).value, 10**2.3)

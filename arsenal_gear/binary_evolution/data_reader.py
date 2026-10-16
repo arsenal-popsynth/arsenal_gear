@@ -335,9 +335,10 @@ class BinaryDataReader(ABC):
     def read_binary_data(self) -> BinaryTrackSet:
         """
         Reads the converted binaries table into a BinaryTrackSet, with one
-        BinaryTrack per system. Initial parameters come from the model names;
-        the initial eccentricity e0 is 0, i.e. orbits are assumed circular,
-        since neither source provides it. No orbital evolution is stored yet.
+        BinaryTrack per system. For both BPASS and MPA/Bonn, the initial mass
+        ratio and period come from the model names; the initial eccentricity e0
+        is 0, i.e. orbits are assumed circular, since neither source provides
+        it. The orbit's evolution is not stored yet (see #45).
         """
         binaries = []
         for name, rows in self._models(self._load("binaries")):
@@ -349,8 +350,6 @@ class BinaryDataReader(ABC):
                     q0=q,
                     P0=10**logp * u.d,
                     e0=0.0,
-                    period_name=None,
-                    eccentricity_name=None,
                 )
             )
         return BinaryTrackSet(

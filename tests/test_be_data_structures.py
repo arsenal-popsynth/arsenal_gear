@@ -25,18 +25,16 @@ NAMES = {
 
 
 def _track(n, m0, mass=None, log_value=1.0):
-    """A StellarTrack without EEPs, with n points and an optional orbit."""
+    """A StellarTrack without EEPs, with n points."""
     qs = {key: np.full(n, log_value) for key in ("logT", "logL", "logR", "logg")}
     qs["time"] = np.linspace(0, 1e7, n)
     qs["mass"] = np.full(n, m0) if mass is None else mass
-    qs["period"] = np.linspace(10, 20, n)
-    qs["ecc"] = np.linspace(0.1, 0.0, n)
     return StellarTrack(
         m0=m0 * u.Msun, eeps=None, mass_name="mass", elems=[], qs=qs, **NAMES
     )
 
 
-def _binary(m1=20.0, q=0.5, period=10 * u.d, ecc=0.1, n=5, orbit_names=(None, None)):
+def _binary(m1=20.0, q=0.5, period=10 * u.d, ecc=0.1, n=5):
     """A BinaryTrack whose stars share an n-point age grid."""
     return BinaryTrack(
         primary=_track(n, m1),
@@ -44,8 +42,6 @@ def _binary(m1=20.0, q=0.5, period=10 * u.d, ecc=0.1, n=5, orbit_names=(None, No
         q0=q,
         P0=period,
         e0=ecc,
-        period_name=orbit_names[0],
-        eccentricity_name=orbit_names[1],
     )
 
 
@@ -85,21 +81,8 @@ class TestBinaryTrack:
         assert_allclose(binary.mass_ratio, np.linspace(10.0, 15.0, 5) / 20.0)
         assert binary.q0 == 0.5
 
-    def test_orbit_without_columns(self):
-        """Current period, eccentricity and separation need their columns."""
-        binary = _binary()
-        for prop in ("period", "eccentricity", "semimajor_axis"):
-            with pytest.raises(ValueError):
-                getattr(binary, prop)
-
-    def test_orbit_with_columns(self):
-        """Current period (in days) and eccentricity are read from primary.qs."""
-        binary = _binary(orbit_names=("period", "ecc"))
-        assert_allclose(binary.period.to(u.d).value, np.linspace(10, 20, 5))
-        assert_allclose(binary.eccentricity, np.linspace(0.1, 0.0, 5))
-
-    def test_semimajor_axis_kepler(self):
-        """The Sun and Earth on a one-year orbit are 1 AU apart."""
+    def test_a0_kepler(self):
+        """The Sun and Earth on a one-year orbit start 1 AU apart."""
         n = 3
         earth = 3.003e-6
         binary = BinaryTrack(
@@ -108,13 +91,9 @@ class TestBinaryTrack:
             q0=earth,
             P0=1 * u.yr,
             e0=0.0,
-            period_name="period",
-            eccentricity_name=None,
         )
-        binary.primary.qs["period"] = np.full(n, (1 * u.yr).to(u.d).value)
-        for a in (binary.semimajor_axis, binary.a0):
-            assert a.unit == u.au
-            assert_allclose(a.value, 1.0, rtol=1e-4)
+        assert binary.a0.unit == u.au
+        assert_allclose(binary.a0.value, 1.0, rtol=1e-4)
 
 
 def test_binary_trackset():
