@@ -1,0 +1,21 @@
+BPASS test subset
+=================
+
+A small subset of the BPASS v2.2.1 stellar models at Z = 0.014 (z014), used by
+tests/test_be_physics.py so that physics tests on real BPASS tracks can run
+without the full (~13 GB) release.
+
+Contents (in the release's own folder layout):
+  NEWSINMODS/z014/            single stars of 1, 5, 20 and 60 Msun (compared with
+                              MIST), plus the single stars that the binaries'
+                              companions continue onto
+  NEWBINMODS/NEWBINMODS/z014/ three binaries with M1 = 10 Msun: one merger, one
+                              rejuvenated companion and one plain (disrupted) system
+
+Each file keeps only the leading columns that arsenal_gear reads (6 for single
+stars, 49 for binaries), copied as text so the values are unchanged.
+Regenerate with: python tests/data/make_bpass_fixture.py [BPASS_ROOTDIR]
+
+These files are for testing only. When using BPASS, cite:
+  Eldridge, Stanway et al. 2017, PASA, 34, e058 (doi:10.1017/pasa.2017.51)
+  Stanway & Eldridge 2018, MNRAS, 479, 75 (doi:10.1093/mnras/sty1353)
