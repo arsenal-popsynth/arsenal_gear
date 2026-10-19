@@ -44,10 +44,11 @@ N_BIN = 25  # points in each fake binary model
 T_BIN = np.linspace(0, 1e7, N_BIN)  # binary models end at 10 Myr
 
 
-def _write_bpass(path, time, p_mass, s_mass):
+def _write_bpass(path, time, p_mass, s_mass, p_log_r=1.5, p_log_l=1.5):
     """Write a fake BPASS model file (50 columns, see the BPASS manual)."""
     data = np.zeros((len(time), 50))
     data[:, 1], data[:, 2:5] = time, 1.5
+    data[:, 2], data[:, 4] = p_log_r, p_log_l
     data[:, 5], data[:, 37] = p_mass, s_mass
     data[:, 46:49] = 0.7
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -181,6 +182,41 @@ class TestBPASSConversion:
         assert len(system) > N_BIN
         assert np.all(np.diff(system.time) > 0)
         assert system.p_logL[N_BIN:].isna().all()
+
+    def test_white_dwarf_join(self, bpass_dir):
+        """
+        When the primary becomes a white dwarf (its final drop below log R =
+        -1, at row 6, after a brief dip at rows 2-3), the companion continues
+        along its single star from then on, while the primary keeps its
+        cooling sequence: every raw row is kept, with the primary's values.
+        """
+        bdir = bpass_dir / "NEWBINMODS/NEWBINMODS/z014"
+        time = np.linspace(0, 1e8, N_BIN)  # outlasts the 3e7 yr single stars
+        log_r = np.where(np.arange(N_BIN) >= 6, -2.0, 1.5)
+        log_r[2:4] = -1.5
+        log_l = np.linspace(2.0, -3.0, N_BIN)  # the white dwarf cools
+        _write_bpass(bdir / "sneplot-z014-20-0.25-2", time, 3.0, 5.0, log_r, log_l)
+        reader = BPASSReader(met=0.014, rootdir=bpass_dir)
+        system = _model(reader, "binaries", "02000_025_200")
+        assert np.all(np.diff(system.time) > 0)
+
+        # the binary phase, up to the white dwarf's formation, is unchanged
+        np.testing.assert_allclose(system.time[:7], time[:7])
+        np.testing.assert_allclose(system.s_logL[:7], 0.7)
+        # the primary's raw rows are all kept, cooling sequence included
+        raw = system[np.isin(system.time, time)]
+        assert len(raw) == N_BIN
+        np.testing.assert_allclose(raw.p_logR, log_r)
+        np.testing.assert_allclose(raw.p_logL, log_l)
+        # after the join the companion is the 5 Msun single star (log L = 1.5)
+        # until that star's model ends; then its mass is held and it is dark
+        after = system[system.time > time[6]]
+        alive = after.time <= 3e7 + 1.3e5
+        assert alive.sum() > 1 and (~alive).sum() > 1
+        np.testing.assert_allclose(after.s_logL[alive], 1.5)
+        assert after.s_logL[~alive].isna().all()
+        np.testing.assert_allclose(after.s_mass, 5.0)
+        np.testing.assert_allclose(after.p_mass, 3.0)
 
 
 

@@ -65,6 +65,22 @@ def _star_columns(prefix: str, mass, logL, logT, logR) -> dict:
     }
 
 
+def _interp_star(prefix: str, time, src_time, src) -> dict:
+    """
+    Columns for one star at the given times, linearly interpolated from a
+    source track (with mass, logL, logT and logR). Beyond the source's last
+    time the star's mass is held and its logL, logT and logR are NaN.
+    """
+    beyond = np.asarray(time) > src_time[-1]
+    columns = {}
+    for key in ("mass", "logL", "logT", "logR"):
+        value = np.interp(time, src_time, np.asarray(src[key], dtype=float))
+        if key != "mass":
+            value[beyond] = np.nan
+        columns[prefix + key] = value
+    return columns
+
+
 def _pad(x: np.ndarray, n: int, fill: float = np.nan) -> np.ndarray:
     """Pad x to length n with the value fill."""
     return np.concatenate((x, np.full(n - len(x), fill)))
@@ -392,6 +408,12 @@ class BPASSReader(BinaryDataReader):
     BinaryTrackSet.mass_excess). Some low-mass models are already merged at
     t = 0: they start with the combined mass and a placeholder companion, and
     are treated as merged throughout.
+
+    Otherwise, once the binary model ends the companion continues along the
+    single-star model of its (effective) mass. When the primary becomes a
+    white dwarf, BPASS follows its cooling for much longer but no longer
+    evolves the companion, so the companion continues from the white dwarf's
+    formation, while the primary keeps its cooling sequence.
     """
 
     source = "BPASS"
@@ -428,6 +450,11 @@ class BPASSReader(BinaryDataReader):
     # companion mass below which a model is already merged at t = 0: BPASS's
     # placeholder companion has 1e-5 Msun, real companions at least 0.01 Msun
     placeholder_mass = 1e-3
+    # log10(R/Rsun) below which the primary is a white dwarf. It forms at the
+    # start of the primary's final run below this value: in some z014 models
+    # (M1 ~ 2 Msun) the stripped primary dips below it briefly, then expands
+    # again before becoming a white dwarf
+    wd_log_radius = -1.0
 
     def __init__(self, **kwargs) -> None:
         """
@@ -556,36 +583,60 @@ class BPASSReader(BinaryDataReader):
             combined_df.loc[start:, ["s_logL", "s_logT", "s_logR"]] = np.nan
             return combined_df
 
+        # The binary phase ends with the model (e.g. at the primary's supernova),
+        # or when the primary becomes a white dwarf: at the start of its final
+        # run of rows below wd_log_radius. BPASS then follows its cooling, but
+        # no longer evolves the companion
+        log_r = combined_df.p_logR.to_numpy()
+        i_end = len(log_r) - 1
+        if log_r[-1] < self.wd_log_radius:
+            i_end = np.flatnonzero(log_r >= self.wd_log_radius)[-1] + 1
+        binary_df = combined_df.iloc[: i_end + 1]
+        # the primary from the end of the binary phase on, no longer coupled to
+        # the companion: its white-dwarf cooling rows, or only its last row
+        uncoupled_df = combined_df.iloc[i_end:].copy()
+        # strictly increasing times (see _extract_all) to interpolate the primary
+        uncoupled_time = uncoupled_df.time.to_numpy(float).copy()
+        uncoupled_df["time"] = make_monotonic_increasing(
+            np.arange(len(uncoupled_time), dtype=float), uncoupled_time
+        )
+
         # Companion's effective mass: rejuvenated if it accreted > 5% and is >= 2 Msun
-        m2_init = combined_df.s_mass.values[0]
-        m2_max = np.max(combined_df.s_mass.values)
+        m2_init = binary_df.s_mass.values[0]
+        m2_max = np.max(binary_df.s_mass.values)
         rejuvenated = (m2_max > 1.05 * m2_init) and (m2_max >= 2)
         m2_eff = m2_max if rejuvenated else m2_init
         # the companion is treated as born when it first reaches m2_eff
-        i_birth = np.flatnonzero(combined_df.s_mass.values == m2_eff)[0]
-        t_birth = combined_df.time.values[i_birth]
-        # companion's age at the end of the binary model
-        age_end = combined_df.time.values[-1] - t_birth
+        i_birth = np.flatnonzero(binary_df.s_mass.values == m2_eff)[0]
+        t_birth = binary_df.time.values[i_birth]
+        # companion's age at the end of the binary phase
+        age_end = binary_df.time.values[-1] - t_birth
         # continue with the nearest-mass single-star model, strictly after that age
         masses = self._single_masses
         m_single = masses[np.argmin(np.abs(masses - m2_eff))]
         track = self._singles[self._singles.model == _model_name(m_single)]
-        track = track[track.time.values > age_end]
+        # companion age -> system time, so the join moves forward in time
+        track_time = t_birth + track.time.values
+        # after the join: the primary's uncoupled rows (if any beyond the last
+        # binary row) and the companion's single-star rows, each star
+        # interpolated onto both
+        time = np.union1d(
+            uncoupled_df.time.values[1:], track_time[track.time.values > age_end]
+        )
         evolved_df = pd.DataFrame(
             {
                 "model": model_name,
-                # companion age -> system time, so the join moves forward in time
-                "time": t_birth + track.time.values,
-                "p_mass": combined_df.p_mass.values[-1],
-                "p_logL": np.nan,
-                "p_logT": np.nan,
-                "p_logR": np.nan,
-                **_star_columns(
-                    "s_", track.mass, track.logL, track.logT, track.logR
+                "time": time,
+                **_interp_star(
+                    "p_",
+                    time,
+                    uncoupled_df.time.values,
+                    uncoupled_df.rename(columns=lambda c: c.removeprefix("p_")),
                 ),
+                **_interp_star("s_", time, track_time, track),
             }
         )
-        return pd.concat([combined_df, evolved_df], ignore_index=True)
+        return pd.concat([binary_df, evolved_df], ignore_index=True)
 
 
 class MPAReader(BinaryDataReader):
