@@ -124,6 +124,35 @@ class TestBPASSConversion:
         assert merger.loc[:10, star].notna().all().all()
         assert len(merger) == N_BIN  # no single-star continuation after a merger
 
+    def test_already_merged(self, bpass_dir):
+        """
+        A model starting with BPASS's placeholder companion (1e-5 Msun) is
+        merged throughout: no companion, and no single-star continuation (which
+        would otherwise be a 0.1 Msun star).
+        """
+        bdir = bpass_dir / "NEWBINMODS/NEWBINMODS/z014"
+        _write_bpass(bdir / "sneplot-z014-2.3-0.5-0", T_BIN, 3.4, 1e-5)
+        reader = BPASSReader(met=0.014, rootdir=bpass_dir)
+        system = _model(reader, "binaries", "00230_050_000")
+        assert len(system) == N_BIN
+        np.testing.assert_allclose(system.s_mass, 0.0)
+        assert system.filter(regex="^s_log").isna().all().all()
+
+    def test_mass_excess_flag(self, bpass_dir):
+        """
+        A merger whose primary ends 20% above the initial M1 + M2 is flagged;
+        the other systems aren't.
+        """
+        bdir = bpass_dir / "NEWBINMODS/NEWBINMODS/z014"
+        gain = np.where(np.arange(N_BIN) > 10, 5.0 + 0.2 * 25, 0.0)  # +20% of 25
+        _write_bpass(bdir / "sneplot-z014-20-0.25-3", T_BIN, 20 + gain, 5.0)
+        bset = BPASSReader(met=0.014, rootdir=bpass_dir).read_binary_data()
+        flagged = {
+            _model_name(b.primary.m0.to_value(u.Msun), b.q0, np.log10(b.P0.to_value(u.d)))
+            for b, f in zip(bset.tracks, bset.mass_excess) if f
+        }
+        assert flagged == {"02000_025_300"}
+
     def test_merger_detection(self, bpass_dir):
         """
         A merger is found from the rise in total mass, even when the secondary's
@@ -289,6 +318,12 @@ def _write_mpa(path, n, m0):
     ).to_pickle(path, compression="gzip")
 
 
+def _mpa_masses(name):
+    """Initial primary and secondary masses given by an MPA/Bonn binary file name."""
+    log_m1, q = (float(x) for x in name.split("_")[:2])
+    return 10**log_m1, q * 10**log_m1
+
+
 @pytest.fixture(name="mpa")
 def fixture_mpa(tmp_path):
     """MPA/Bonn reader for a fake MW tree, with the binaries converted."""
@@ -298,8 +333,9 @@ def fixture_mpa(tmp_path):
         ("1.300_0.500_1.000_compressed.pkl.gz", 10, 15),  # secondary outlives
         ("1.000_0.900_2.300_compressed.pkl.gz", 12, 8),  # merger
     ]:
-        _write_mpa(root / "MW/primary/grid1" / name, n1, 20.0)
-        _write_mpa(root / "MW/secondary/grid1" / name, n2, 10.0)
+        m1, m2 = _mpa_masses(name)
+        _write_mpa(root / "MW/primary/grid1" / name, n1, m1)
+        _write_mpa(root / "MW/secondary/grid1" / name, n2, m2)
     return MPAReader(met="MW", rootdir=root)
 
 
@@ -310,7 +346,7 @@ class TestMPAConversion:
         """The primary keeps its final mass, and its other columns become NaN."""
         system = _model(mpa, "binaries", "01995_050_100")
         assert len(system) == 15
-        np.testing.assert_allclose(system.p_mass[10:], 18.0)
+        np.testing.assert_allclose(system.p_mass[10:], 0.9 * 10**1.3)  # final mass
         assert system.loc[10:, ["p_logL", "p_logT", "p_logR"]].isna().all().all()
         assert not system.filter(like="s_").isna().any().any()
 
@@ -339,8 +375,9 @@ def _mpa_tarballs(root, prefix=MPAReader.server_prefix):
     _write_mpa(src / "single/1.000_100_compressed.pkl.gz", 30, 10.0)  # rotating
     for name, n1, n2 in MPA_BINARIES:
         logm = name.split("_")[0]
-        _write_mpa(src / "primary" / prefix / "MW/primary" / logm / name, n1, 20.0)
-        _write_mpa(src / "secondary" / prefix / "MW/secondary" / logm / name, n2, 10.0)
+        m1, m2 = _mpa_masses(name)
+        _write_mpa(src / "primary" / prefix / "MW/primary" / logm / name, n1, m1)
+        _write_mpa(src / "secondary" / prefix / "MW/secondary" / logm / name, n2, m2)
     root.mkdir(parents=True, exist_ok=True)
     with tarfile.open(root / "single_MW.tar", "w") as tar:
         for path in sorted((src / "single").iterdir()):
@@ -597,8 +634,9 @@ class TestReadBinaries:
         assert np.isnan(binary.grav2[-1].value)
 
     def test_mpa(self, mpa):
-        """MPA/Bonn systems decode in the same way."""
+        """MPA/Bonn systems decode in the same way, and none is flagged."""
         bset = mpa.read_binary_data()
+        assert not bset.mass_excess.any()
         _assert_initial_parameters(bset, [(10**1.3, 0.5, 1.0), (10.0, 0.9, 2.3)])
         binary = bset.tracks[list(bset.q0).index(0.9)]  # "01000_090_230"
         assert binary.primary.m0 == 10 * u.Msun

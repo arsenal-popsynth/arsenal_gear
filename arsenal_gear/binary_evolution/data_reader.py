@@ -102,6 +102,11 @@ class BinaryDataReader(ABC):
     mets: list[str] = []
     default_met = None
     source: str = ""
+    # a primary more massive than the initial M1 + M2 by more than this fraction
+    # is flagged in BinaryTrackSet.mass_excess. In the z014 BPASS mergers the
+    # excess is either <= 0 or >= 6.6%, and BPASS's models merged at t = 0 start
+    # up to 3% above it (masses rounded to 0.1 Msun)
+    mass_excess_tol = 0.05
 
     def __init__(self, **kwargs) -> None:
         """
@@ -339,6 +344,9 @@ class BinaryDataReader(ABC):
         ratio and period come from the model names; the initial eccentricity e0
         is 0, i.e. orbits are assumed circular, since neither source provides
         it. The orbit's evolution is not stored yet (see #45).
+        Systems whose primary becomes more massive than the initial M1 + M2
+        (beyond mass_excess_tol), which is unphysical, are kept but flagged in
+        the set's mass_excess array.
         """
         binaries = []
         for name, rows in self._models(self._load("binaries")):
@@ -359,6 +367,12 @@ class BinaryDataReader(ABC):
             q0=np.array([b.q0 for b in binaries]),
             P0=u.Quantity([b.P0 for b in binaries]),
             e0=np.array([b.e0 for b in binaries]),
+            mass_excess=np.array(
+                [
+                    b.mass1.max() > b.primary.m0 * (1 + b.q0) * (1 + self.mass_excess_tol)
+                    for b in binaries
+                ]
+            ),
             **self._set_fields(binaries),
         )
 
@@ -374,7 +388,10 @@ class BPASSReader(BinaryDataReader):
     rise in the total mass M1 + M2. The converter detects mergers that way and
     removes the secondary from the start of the merger on. It never adds mass;
     note however that in some low-mass mergers (M1 ~ 2-4 Msun) BPASS's primary
-    alone ends up more massive than the initial M1 + M2.
+    alone ends up more massive than the initial M1 + M2 (see
+    BinaryTrackSet.mass_excess). Some low-mass models are already merged at
+    t = 0: they start with the combined mass and a placeholder companion, and
+    are treated as merged throughout.
     """
 
     source = "BPASS"
@@ -408,6 +425,9 @@ class BPASSReader(BinaryDataReader):
     # models, systems without a merger rise by at most 0.16% in a step and
     # mergers by at least 2.9% (99% of them), so any value in between works
     merger_rise = 0.01
+    # companion mass below which a model is already merged at t = 0: BPASS's
+    # placeholder companion has 1e-5 Msun, real companions at least 0.01 Msun
+    placeholder_mass = 1e-3
 
     def __init__(self, **kwargs) -> None:
         """
@@ -519,14 +539,21 @@ class BPASSReader(BinaryDataReader):
         total = combined_df.p_mass.to_numpy() + combined_df.s_mass.to_numpy()
         rise = np.diff(total) / total[:-1]
         jumps = np.flatnonzero(rise > self.merger_rise)
-        if jumps.size:
+        if combined_df.s_mass.iloc[0] < self.placeholder_mass:
+            # already merged at t = 0: the companion is only a placeholder
+            start = 0
+        elif jumps.size:
             # the merger starts with the unbroken rise that contains the first jump
             step = jumps[0]
             while step > 0 and rise[step - 1] > 0:
                 step -= 1
+            start = step + 1
+        else:
+            start = None
+        if start is not None:
             # from then on the secondary no longer exists as a separate star
-            combined_df.loc[step + 1 :, "s_mass"] = 0.0
-            combined_df.loc[step + 1 :, ["s_logL", "s_logT", "s_logR"]] = np.nan
+            combined_df.loc[start:, "s_mass"] = 0.0
+            combined_df.loc[start:, ["s_logL", "s_logT", "s_logR"]] = np.nan
             return combined_df
 
         # Companion's effective mass: rejuvenated if it accreted > 5% and is >= 2 Msun

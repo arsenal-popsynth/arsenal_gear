@@ -109,37 +109,47 @@ def test_total_lifetime(mass, bpass_singles, mist_tracks):
 # Checked on the full z014 grid (12,663 systems): time strictly increases, the
 # first-row total mass is within 3% of M1 (1 + q0), after the primary's death its
 # mass is held and the companion's properties stay defined, and the converter
-# never adds mass: mergers stay within 0.04% of the initial M1 + M2, except where
-# BPASS's own primary column already exceeds it (402 low-mass mergers with
-# M1 ~ 2-4 Msun, none in the subset). The size of the companion's mass jump at
-# the join isn't tested yet: companions join their single-star track late when
-# the primary becomes a white dwarf, which is to be fixed first.
+# never adds mass: mergers stay within 0.04% of the initial M1 + M2. In 402
+# low-mass mergers (M1 ~ 2-4 Msun) BPASS's own primary ends up more massive than
+# the initial M1 + M2; those are flagged in BinaryTrackSet.mass_excess. Models
+# already merged at t = 0 have a placeholder companion and no continuation.
+# The size of the companion's mass jump at the join isn't tested yet: companions
+# join their single-star track late when the primary becomes a white dwarf,
+# which is to be fixed first.
 
 BINARY_FILES = {
     "merger": "sneplot-z014-10-0.1-0",
     "rising_merger": "sneplot-z014-5-0.9-0.2",  # secondary ticks up while absorbed
+    "excess_merger": "sneplot-z014-1.9-0.3-0",  # BPASS's primary exceeds M1 + M2
+    "premerged": "sneplot-z014-1.1-0.5-0",  # merged at t = 0
     "plain": "sneplot-z014-10-0.1-0.8",
     "rejuvenated": "sneplot-z014-10-0.2-0.2",
 }
 
 
+@pytest.fixture(name="bpass_binary_set", scope="module")
+def fixture_bpass_binary_set(bpass):
+    """BinaryTrackSet of the subset's binaries."""
+    return bpass.read_binary_data()
+
+
+def _index(bset, kind):
+    """Position in the set of the system read from BINARY_FILES[kind]."""
+    m1, q0, log_p = (float(x) for x in BINARY_FILES[kind].split("-")[-3:])
+    return next(
+        i
+        for i, b in enumerate(bset.tracks)
+        if np.isclose(b.primary.m0.to_value(u.Msun), m1)
+        and np.isclose(b.q0, q0)
+        and np.isclose(b.P0.to_value(u.d), 10**log_p)
+    )
+
+
 @pytest.fixture(name="bpass_binaries", scope="module")
-def fixture_bpass_binaries(bpass):
-    """BinaryTrackSet of the subset's binaries, keyed by their kind."""
-    bset = bpass.read_binary_data()
-
-    def find(q0, log_p):
-        return next(
-            b for b in bset.tracks
-            if np.isclose(b.q0, q0) and np.isclose(b.P0.to_value(u.d), 10**log_p)
-        )
-
-    return {
-        "merger": find(0.1, 0.0),
-        "rising_merger": find(0.9, 0.2),
-        "plain": find(0.1, 0.8),
-        "rejuvenated": find(0.2, 0.2),
-    }
+def fixture_bpass_binaries(bpass_binary_set):
+    """The subset's binaries, keyed by their kind."""
+    return {kind: bpass_binary_set.tracks[_index(bpass_binary_set, kind)]
+            for kind in BINARY_FILES}
 
 
 def _bpass_total(kind):
@@ -229,3 +239,28 @@ def test_rejuvenated_companion(bpass_binaries, bpass_singles):
     after = s_time > time[join - 1] - t_birth
     np.testing.assert_allclose(time[join:], t_birth + s_time[after])
     np.testing.assert_allclose(mass2[join:], single.mass.to_value(u.Msun)[after])
+
+
+def test_mass_excess_flag(bpass_binary_set):
+    """Only the merger whose BPASS primary outgrows the initial M1 + M2 is flagged."""
+    flagged = {
+        kind for kind in BINARY_FILES
+        if bpass_binary_set.mass_excess[_index(bpass_binary_set, kind)]
+    }
+    assert flagged == {"excess_merger"}
+    assert len(bpass_binary_set.mass_excess) == len(bpass_binary_set.tracks)
+
+
+def test_already_merged(bpass_binaries):
+    """
+    A model merged at t = 0 has no companion at any time (BPASS's placeholder
+    isn't treated as a star) and no single-star continuation.
+    """
+    binary = bpass_binaries["premerged"]
+    assert np.all(binary.mass2 == 0 * u.Msun)
+    assert np.all(np.isnan(binary.lbol2.value))
+    raw_rows = len(np.genfromtxt(
+        BPASS_SUBSET / "NEWBINMODS/NEWBINMODS/z014" / BINARY_FILES["premerged"], usecols=1
+    ))
+    assert len(binary.age) == raw_rows
+    assert np.all(np.isfinite(binary.lbol1.value))

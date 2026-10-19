@@ -25,8 +25,14 @@ MET = "z014"
 SINGLE_MASSES = ["1", "5", "20", "60"]
 # range of primary masses the example binaries are drawn from
 M1_RANGE = (10, 30)
-# also included: a merger whose secondary column ticks up while it is absorbed
-EXTRA_BINARIES = ["sneplot-z014-5-0.9-0.2"]
+# also included: a merger whose secondary column ticks up while it is absorbed,
+# a merger whose primary ends up more massive than the initial M1 + M2, and a
+# model already merged at t = 0 (placeholder companion)
+EXTRA_BINARIES = [
+    "sneplot-z014-5-0.9-0.2",
+    "sneplot-z014-1.9-0.3-0",
+    "sneplot-z014-1.1-0.5-0",
+]
 # columns kept: the reader uses columns 1-5 of single stars and 1-48 of binaries
 SINGLE_COLS, BINARY_COLS = 6, 49
 

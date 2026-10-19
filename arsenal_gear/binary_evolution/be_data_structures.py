@@ -130,12 +130,16 @@ class BinaryTrackSet(TrackSet):
         q0: initial mass ratio of each system
         P0: initial orbital period of each system
         e0: initial orbital eccentricity of each system
+        mass_excess: True for each system whose primary becomes more massive
+                     than its initial M1 + M2 (beyond the reader's tolerance),
+                     i.e. an unphysical track in the source data
     """
 
     tracks: list[BinaryTrack]
     q0: np.ndarray[np.float64]
     P0: Quantity["time"]
     e0: np.ndarray[np.float64]
+    mass_excess: np.ndarray[np.bool_]
 
     @property
     def a0(self) -> Quantity["length"]:

@@ -110,10 +110,12 @@ def test_binary_trackset():
         q0=np.array([b.q0 for b in systems]),
         P0=u.Quantity([b.P0 for b in systems]),
         e0=np.array([b.e0 for b in systems]),
+        mass_excess=np.array([False, True]),
         elems=[],
         **NAMES,
     )
     assert isinstance(bset, TrackSet)
+    assert len(bset.mass_excess) == len(bset.tracks) and bset.mass_excess[1]
     assert bset.max_eep is None and bset.eep_name is None
     for i, binary in enumerate(bset.tracks):
         assert binary.primary.m0 == bset.masses[i]
