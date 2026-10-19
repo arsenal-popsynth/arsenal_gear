@@ -16,6 +16,7 @@ import pytest
 
 from arsenal_gear.binary_evolution import BPASSReader
 from arsenal_gear.stellar_evolution.data_reader import MISTReader
+from arsenal_gear.utils.array_utils import make_monotonic_increasing
 
 BPASS_SUBSET = Path(__file__).parent / "data" / "bpass"
 
@@ -113,9 +114,11 @@ def test_total_lifetime(mass, bpass_singles, mist_tracks):
 # low-mass mergers (M1 ~ 2-4 Msun) BPASS's own primary ends up more massive than
 # the initial M1 + M2; those are flagged in BinaryTrackSet.mass_excess. Models
 # already merged at t = 0 have a placeholder companion and no continuation.
-# The size of the companion's mass jump at the join isn't tested yet: companions
-# join their single-star track late when the primary becomes a white dwarf,
-# which is to be fixed first.
+# When the primary becomes a white dwarf (its final drop below log R = -1),
+# BPASS no longer evolves the companion, which continues along its single star
+# from then on: in the 1,775 such systems the companion's mass jumps by a median
+# 1.6% at the join (> 10% in 347, from the single-star mass grid and mass
+# transfer, > 50% in 7), and only 3 companions have already ended there.
 
 BINARY_FILES = {
     "merger": "sneplot-z014-10-0.1-0",
@@ -124,6 +127,8 @@ BINARY_FILES = {
     "premerged": "sneplot-z014-1.1-0.5-0",  # merged at t = 0
     "plain": "sneplot-z014-10-0.1-0.8",
     "rejuvenated": "sneplot-z014-10-0.2-0.2",
+    "white_dwarf": "sneplot-z014-3-0.7-3",  # the primary becomes a white dwarf
+    "wd_dip": "sneplot-z014-2-0.3-0.8",  # ... after dipping below log R = -1
 }
 
 
@@ -152,11 +157,22 @@ def fixture_bpass_binaries(bpass_binary_set):
             for kind in BINARY_FILES}
 
 
+def _raw(kind, cols):
+    """Columns of the subset's raw BPASS file, by 0-indexed column number."""
+    raw = BPASS_SUBSET / "NEWBINMODS/NEWBINMODS/z014" / BINARY_FILES[kind]
+    return np.genfromtxt(raw, usecols=cols).T
+
+
 def _bpass_total(kind):
     """M1 + M2 as written in the subset's raw BPASS file."""
-    raw = BPASS_SUBSET / "NEWBINMODS/NEWBINMODS/z014" / BINARY_FILES[kind]
-    p_mass, s_mass = np.genfromtxt(raw, usecols=(5, 37)).T
+    p_mass, s_mass = _raw(kind, (5, 37))
     return p_mass + s_mass
+
+
+def _wd_row(kind):
+    """Raw row at which the primary becomes a white dwarf (final log R < -1)."""
+    log_r = _raw(kind, 2)
+    return np.flatnonzero(log_r >= BPASSReader.wd_log_radius)[-1] + 1
 
 
 @pytest.mark.parametrize("kind", list(BINARY_FILES))
@@ -200,8 +216,13 @@ def test_merger_mass_conservation(kind, bpass_binaries):
 
 @pytest.mark.parametrize("kind", list(BINARY_FILES))
 def test_no_mass_added(kind, bpass_binaries):
-    """The converted M1 + M2 never exceeds BPASS's own, row by row."""
+    """
+    The converted M1 + M2 never exceeds BPASS's own, row by row, during the
+    binary phase (up to a white dwarf primary's formation).
+    """
     raw = _bpass_total(kind)
+    if kind in ("white_dwarf", "wd_dip"):
+        raw = raw[: _wd_row(kind) + 1]
     binary = bpass_binaries[kind]
     converted = (binary.mass1 + binary.mass2).to_value(u.Msun)[: len(raw)]
     assert np.all(converted <= raw * (1 + 1e-9))
@@ -239,6 +260,62 @@ def test_rejuvenated_companion(bpass_binaries, bpass_singles):
     after = s_time > time[join - 1] - t_birth
     np.testing.assert_allclose(time[join:], t_birth + s_time[after])
     np.testing.assert_allclose(mass2[join:], single.mass.to_value(u.Msun)[after])
+
+
+@pytest.mark.parametrize("kind", ["white_dwarf", "wd_dip"])
+def test_white_dwarf_join(kind, bpass_binaries, bpass_singles):
+    """
+    When the primary becomes a white dwarf, the binary phase ends: the
+    companion continues along its single star (as if born at t = 0, without
+    rejuvenation) from the white dwarf's formation, with little jump in mass,
+    and the primary keeps its whole raw track, cooling sequence included.
+    """
+    binary = bpass_binaries[kind]
+    time, log_r1, log_l1, p_mass, m2_raw = _raw(kind, (1, 2, 4, 5, 37))
+    i_wd = _wd_row(kind)
+    age = binary.age.to_value(u.yr)
+    mass2 = binary.mass2.to_value(u.Msun)
+    # the binary phase is the raw rows up to the white dwarf's formation (with
+    # tied times spread, by less than the raw times' 7 significant digits)
+    np.testing.assert_allclose(age[: i_wd + 1], time[: i_wd + 1], rtol=1e-6)
+    np.testing.assert_allclose(mass2[: i_wd + 1], m2_raw[: i_wd + 1])
+    # every raw row of the primary is kept: the binary phase, then the cooling
+    # rows at their (strictly increasing) times
+    cooling = make_monotonic_increasing(
+        np.arange(len(time) - i_wd, dtype=float), time[i_wd:].copy()
+    )
+    rows = np.isin(age, cooling[1:]) & (age > age[i_wd])
+    rows[: i_wd + 1] = True
+    assert rows.sum() == len(time)
+    np.testing.assert_allclose(binary.mass1[rows].to_value(u.Msun), p_mass)
+    np.testing.assert_allclose(np.log10(binary.lbol1[rows].to_value(u.Lsun)), log_l1)
+    np.testing.assert_allclose(np.log10(binary.rad1[rows].to_value(u.Rsun)), log_r1)
+    # then the companion follows its single star, shifted by nothing
+    single = min(bpass_singles.tracks, key=lambda t: abs(t.m0.to_value(u.Msun) - m2_raw[0]))
+    s_time = single.age.to_value(u.yr)
+    after = age > time[i_wd]
+    on_track = np.isin(age[after], s_time)
+    assert on_track.sum() == np.sum(s_time > time[i_wd])
+    np.testing.assert_allclose(mass2[after][on_track], single.mass.to_value(u.Msun)[s_time > time[i_wd]])
+    # with a small jump in mass at the join (measured: 0% and 3.5%)
+    assert abs(mass2[i_wd + 1] / mass2[i_wd] - 1) < 0.07
+
+
+def test_white_dwarf_companion_evolves(bpass_binaries):
+    """
+    The companion of 3-0.7-3 now goes through its own giant phase and
+    becomes a white dwarf (at ~1.3e9 yr), long before the binary model ends
+    (~1e11 yr), while the first white dwarf is still cooling.
+    """
+    binary = bpass_binaries["white_dwarf"]
+    age = binary.age.to_value(u.yr)
+    log_r2 = np.log10(binary.rad2.to_value(u.Rsun))
+    end = _raw("white_dwarf", 1)[-1]
+    giant = age[log_r2 > 1]
+    assert giant.size and giant[0] < end
+    second_wd = age[(age > giant[0]) & (log_r2 < BPASSReader.wd_log_radius)][0]
+    assert second_wd < 0.1 * end
+    assert np.isfinite(binary.lbol1[age < end].value).all()
 
 
 def test_mass_excess_flag(bpass_binary_set):
