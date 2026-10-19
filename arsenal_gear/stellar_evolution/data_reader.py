@@ -14,7 +14,7 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 
-from ..utils import downloader, extract_one, find_match, get_metstr, is_valid_txz
+from ..utils import downloader, find_match, get_metstr, is_valid_tar, untar
 from ..utils.citations import cite
 from .se_data_structures import Isochrone, IsochroneSet, StellarTrack, TrackSet
 
@@ -103,7 +103,14 @@ class MISTReader(IsochroneDataReader):
         # set input parameters
         super().__init__(**kwargs)
         self.vvcrit = kwargs.get("vvcrit", "0.0")
+        # make data storage directory if it doesn't exist
         self.rootdir = kwargs.get("rootdir", None)
+        rootdir = self.rootdir
+        if rootdir is None:
+            rootdir = Path(__file__).parent.absolute() / "data/mist"
+            if not rootdir.is_dir():
+                rootdir.mkdir(parents=True, exist_ok=True)
+        self.rootdir = Path(rootdir)
         # Fill out dummy attributes
         self.hdr_list = None
         self.num_ages = None
@@ -147,13 +154,6 @@ class MISTReader(IsochroneDataReader):
             self.modeldir = mod_temp.format(self.metstr, self.vvcrit)
             tar_temp = "MIST_v1.2_feh_{}_afe_p0.0_vvcrit{}_EEPS.txz"
             self.tarfile = tar_temp.format(self.metstr, self.vvcrit)
-        # make data storage directory if it doesn't exist
-        rootdir = self.rootdir
-        if rootdir is None:
-            rootdir = Path(__file__).parent.absolute() / "data/mist"
-            if not rootdir.is_dir():
-                rootdir.mkdir(parents=True, exist_ok=True)
-        self.rootdir = Path(rootdir)
 
         # check if the file exists and download otherwise
         force_download = self.force_download
@@ -165,12 +165,12 @@ class MISTReader(IsochroneDataReader):
                 if not tarfile_path.is_file():
                     # if it doesn't exist, download it
                     force_download = True
-                elif not is_valid_txz(tarfile_path):
+                elif not is_valid_tar(tarfile_path):
                     # if it's not a valid tar file, download it again
                     force_download = True
                 else:
                     # tarfile exists and is valid -> extract it
-                    extract_one(tarfile_path, self.rootdir, delete_txz=True)
+                    untar(tarfile_path, self.rootdir, delete_tar=True)
             elif (self.interp_op == "iso") and (
                 not (modeldir_path / self.isofile).is_file()
             ):
@@ -185,7 +185,7 @@ class MISTReader(IsochroneDataReader):
             message = "Downloading MIST data"
             # download the tarfile
             downloader(self.rootdir / self.tarfile, url, message)
-            extract_one(self.rootdir / self.tarfile, self.rootdir, delete_txz=True)
+            untar(self.rootdir / self.tarfile, self.rootdir, delete_tar=True)
 
     @staticmethod
     def _process_elem_label(label):
@@ -300,19 +300,20 @@ class MISTReader(IsochroneDataReader):
         max_eep = 0
         for f in mass_file_list:
             # read in the EEP file
-            m0_t, eeps, min_age, max_age, data = self.read_eep_file(f)
+            track_m0, eeps, min_age, max_age, data = self.read_eep_file(f)
             # store the mass and EEP data
             max_eep = max(max_eep, np.max(eeps))
-            masses.append(m0_t)
+            masses.append(track_m0)
             min_ages.append(min_age)
             max_ages.append(max_age)
             (qs, elems) = self._dictionary_to_qs_elems(data, data.keys())
 
             tracks.append(
                 StellarTrack(
-                    mass=m0_t * u.Msun,
+                    m0=track_m0 * u.Msun,
                     eeps=eeps,
                     age_name="star_age",
+                    mass_name="star_mass",
                     lteff_name="log_Teff",
                     llbol_name="log_L",
                     lrad_name="log_R",
@@ -402,7 +403,7 @@ class MISTReader(IsochroneDataReader):
             self.abun = {content[3][i]: float(content[4][i]) for i in range(1, 5)}
             self.rot = float(content[4][-1])
             self.hdr_list = content[11][1:]
-        m0_t = float(content[7][1])
+        track_m0 = float(content[7][1])
         hdr_list = content[11][1:]
         eeps = [int(j) for j in content[8][2:]]
 
@@ -410,4 +411,4 @@ class MISTReader(IsochroneDataReader):
         min_age = min(data["star_age"])
         max_age = max(data["star_age"])
 
-        return m0_t, eeps, min_age, max_age, data
+        return track_m0, eeps, min_age, max_age, data

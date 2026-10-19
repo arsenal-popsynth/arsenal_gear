@@ -9,7 +9,7 @@ import astropy.units as u
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from arsenal_gear.formation.form_data_structures import SinglePop, BinaryPop
+from arsenal_gear.formation.form_data_structures import BinaryPop, SinglePop
 
 
 def test_single_pop():

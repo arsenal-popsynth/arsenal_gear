@@ -40,7 +40,8 @@ packages = ["arsenal_gear",
     "arsenal_gear.element_yields",
     "arsenal_gear.utils",
     "arsenal_gear.scripts",
-    "arsenal_gear.stellar_evolution",]
+    "arsenal_gear.stellar_evolution",
+    "arsenal_gear.binary_evolution",]
 
 [tool.setuptools.package-data]
 "arsenal_gear.utils" = ["citations.bib"]
