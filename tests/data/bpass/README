@@ -10,7 +10,9 @@ Contents (in the release's own folder layout):
                               MIST), plus the single stars that the binaries'
                               companions continue onto
   NEWBINMODS/NEWBINMODS/z014/ three binaries with M1 = 10 Msun: one merger, one
-                              rejuvenated companion and one plain (disrupted) system
+                              rejuvenated companion and one plain (disrupted) system;
+                              plus a 5 Msun merger whose secondary column ticks up
+                              while it is absorbed (5-0.9-0.2)
 
 Each file keeps only the leading columns that arsenal_gear reads (6 for single
 stars, 49 for binaries), copied as text so the values are unchanged.

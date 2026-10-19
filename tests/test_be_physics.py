@@ -107,11 +107,20 @@ def test_total_lifetime(mass, bpass_singles, mist_tracks):
 
 # --- binaries (#44) ---
 # Checked on the full z014 grid (12,663 systems): time strictly increases, the
-# first-row total mass is within 3% of M1 (1 + q0), and after the primary's death
-# its mass is held and the companion's properties stay defined. Mass conservation
-# and the size of the companion's mass jump at the join are not tested yet: the
-# full grid shows mergers the converter misses and companions that join their
-# single-star track late, which are to be fixed first.
+# first-row total mass is within 3% of M1 (1 + q0), after the primary's death its
+# mass is held and the companion's properties stay defined, and the converter
+# never adds mass: mergers stay within 0.04% of the initial M1 + M2, except where
+# BPASS's own primary column already exceeds it (402 low-mass mergers with
+# M1 ~ 2-4 Msun, none in the subset). The size of the companion's mass jump at
+# the join isn't tested yet: companions join their single-star track late when
+# the primary becomes a white dwarf, which is to be fixed first.
+
+BINARY_FILES = {
+    "merger": "sneplot-z014-10-0.1-0",
+    "rising_merger": "sneplot-z014-5-0.9-0.2",  # secondary ticks up while absorbed
+    "plain": "sneplot-z014-10-0.1-0.8",
+    "rejuvenated": "sneplot-z014-10-0.2-0.2",
+}
 
 
 @pytest.fixture(name="bpass_binaries", scope="module")
@@ -126,13 +135,21 @@ def fixture_bpass_binaries(bpass):
         )
 
     return {
-        "merger": find(0.1, 0.0),  # sneplot-z014-10-0.1-0
-        "plain": find(0.1, 0.8),  # sneplot-z014-10-0.1-0.8
-        "rejuvenated": find(0.2, 0.2),  # sneplot-z014-10-0.2-0.2
+        "merger": find(0.1, 0.0),
+        "rising_merger": find(0.9, 0.2),
+        "plain": find(0.1, 0.8),
+        "rejuvenated": find(0.2, 0.2),
     }
 
 
-@pytest.mark.parametrize("kind", ["merger", "plain", "rejuvenated"])
+def _bpass_total(kind):
+    """M1 + M2 as written in the subset's raw BPASS file."""
+    raw = BPASS_SUBSET / "NEWBINMODS/NEWBINMODS/z014" / BINARY_FILES[kind]
+    p_mass, s_mass = np.genfromtxt(raw, usecols=(5, 37)).T
+    return p_mass + s_mass
+
+
+@pytest.mark.parametrize("kind", list(BINARY_FILES))
 def test_binary_basics(kind, bpass_binaries):
     """Time strictly increases, and the initial total mass is M1 (1 + q0)."""
     binary = bpass_binaries[kind]
@@ -152,7 +169,32 @@ def test_merger(bpass_binaries):
     assert first > 0 and np.all(gone[first:])
     assert binary.mass2[-1] == 0 * u.Msun
     before = binary.mass1[first - 1] + binary.mass2[first - 1]
-    assert np.all(binary.mass1[first:] <= before)
+    assert np.all(binary.mass1[first:] <= before * 1.001)  # rounding
+
+
+@pytest.mark.parametrize("kind", ["merger", "rising_merger"])
+def test_merger_mass_conservation(kind, bpass_binaries):
+    """
+    Mergers conserve mass: the total never exceeds the initial M1 + M2 by more
+    than rounding (0.04% at most on the full grid), and the secondary keeps its
+    BPASS mass until the merger starts, then has none and no longer shines.
+    """
+    binary = bpass_binaries[kind]
+    m_init = binary.primary.m0 * (1 + binary.q0)
+    total = (binary.mass1 + binary.mass2) / m_init
+    assert np.all(total.decompose().value <= 1.001)
+    gone = np.isnan(binary.lbol2.value)
+    assert gone.any() and np.all(binary.mass2[gone] == 0)
+    assert np.all(binary.mass2[~gone] > 0)
+
+
+@pytest.mark.parametrize("kind", list(BINARY_FILES))
+def test_no_mass_added(kind, bpass_binaries):
+    """The converted M1 + M2 never exceeds BPASS's own, row by row."""
+    raw = _bpass_total(kind)
+    binary = bpass_binaries[kind]
+    converted = (binary.mass1 + binary.mass2).to_value(u.Msun)[: len(raw)]
+    assert np.all(converted <= raw * (1 + 1e-9))
 
 
 @pytest.mark.parametrize("kind", ["plain", "rejuvenated"])

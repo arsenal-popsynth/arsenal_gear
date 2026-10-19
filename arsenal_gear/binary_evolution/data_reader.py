@@ -368,6 +368,13 @@ class BPASSReader(BinaryDataReader):
     """
     Class for acquiring BPASS stellar models and converting them into tables.
     This is an instantiation of the BinaryDataReader abstract base class.
+
+    In a BPASS binary model, the primary absorbs the secondary in a merger, but
+    the secondary's own columns are left unchanged, so a merger shows up as a
+    rise in the total mass M1 + M2. The converter detects mergers that way and
+    removes the secondary from the start of the merger on. It never adds mass;
+    note however that in some low-mass mergers (M1 ~ 2-4 Msun) BPASS's primary
+    alone ends up more massive than the initial M1 + M2.
     """
 
     source = "BPASS"
@@ -397,6 +404,10 @@ class BPASSReader(BinaryDataReader):
     # 0-indexed data columns of mass, logL, logT and logR for each star
     primary_cols = [5, 4, 3, 2]
     secondary_cols = [37, 48, 47, 46]
+    # single-step relative rise of M1 + M2 that marks a merger. In the z014
+    # models, systems without a merger rise by at most 0.16% in a step and
+    # mergers by at least 2.9% (99% of them), so any value in between works
+    merger_rise = 0.01
 
     def __init__(self, **kwargs) -> None:
         """
@@ -503,24 +514,19 @@ class BPASSReader(BinaryDataReader):
             }
         )
 
-        p_dm = combined_df.p_mass.values[1:] - combined_df.p_mass.values[:-1]
-        s_dm = combined_df.s_mass.values[1:] - combined_df.s_mass.values[:-1]
-        # Check for mergers: the primary grows while the secondary's mass column is frozen
-        merging = (p_dm > 0) & (s_dm == 0)
-        if merging.any():
-            first, last = np.flatnonzero(merging)[[0, -1]]
-            # mass gained by the primary during merger steps, up to each row
-            # (row i + 1 follows step i, hence the leading zero)
-            gain = np.concatenate(([0.0], np.cumsum(p_dm * merging)))
-            s_mass = combined_df.s_mass.to_numpy().copy()
-            # the secondary loses what the primary gains, until it is fully absorbed
-            s_mass[first : last + 1] = np.clip(
-                s_mass[first : last + 1] - gain[first : last + 1], 0.0, None
-            )
-            s_mass[last + 1 :] = 0.0
-            combined_df["s_mass"] = s_mass
-            # the secondary no longer exists as a separate star
-            combined_df.loc[first:, ["s_logL", "s_logT", "s_logR"]] = np.nan
+        # Check for mergers: the total mass rises as the primary absorbs the
+        # secondary, whose own columns BPASS leaves unchanged
+        total = combined_df.p_mass.to_numpy() + combined_df.s_mass.to_numpy()
+        rise = np.diff(total) / total[:-1]
+        jumps = np.flatnonzero(rise > self.merger_rise)
+        if jumps.size:
+            # the merger starts with the unbroken rise that contains the first jump
+            step = jumps[0]
+            while step > 0 and rise[step - 1] > 0:
+                step -= 1
+            # from then on the secondary no longer exists as a separate star
+            combined_df.loc[step + 1 :, "s_mass"] = 0.0
+            combined_df.loc[step + 1 :, ["s_logL", "s_logT", "s_logR"]] = np.nan
             return combined_df
 
         # Companion's effective mass: rejuvenated if it accreted > 5% and is >= 2 Msun

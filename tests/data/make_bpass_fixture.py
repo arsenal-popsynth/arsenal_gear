@@ -18,11 +18,15 @@ from pathlib import Path
 
 import numpy as np
 
+from arsenal_gear.binary_evolution import BPASSReader
+
 MET = "z014"
 # single stars compared with MIST
 SINGLE_MASSES = ["1", "5", "20", "60"]
 # range of primary masses the example binaries are drawn from
 M1_RANGE = (10, 30)
+# also included: a merger whose secondary column ticks up while it is absorbed
+EXTRA_BINARIES = ["sneplot-z014-5-0.9-0.2"]
 # columns kept: the reader uses columns 1-5 of single stars and 1-48 of binaries
 SINGLE_COLS, BINARY_COLS = 6, 49
 
@@ -49,8 +53,8 @@ def classify(path: Path) -> tuple[str, float]:
     criteria, and the companion's effective mass (for its continuation).
     """
     p_mass, s_mass = np.genfromtxt(path, usecols=(5, 37)).T
-    p_dm, s_dm = np.diff(p_mass), np.diff(s_mass)
-    if np.any((p_dm > 0) & (s_dm == 0)):
+    total = p_mass + s_mass
+    if np.any(np.diff(total) / total[:-1] > BPASSReader.merger_rise):
         return "merger", np.nan
     m2_init, m2_max = s_mass[0], s_mass.max()
     if (m2_max > 1.05 * m2_init) and (m2_max >= 2):
@@ -88,7 +92,9 @@ def main(rootdir: Path) -> None:
     for name in sorted(singles, key=float):
         trim(single_files[name], OUT / "NEWSINMODS" / MET / single_files[name].name,
              SINGLE_COLS)
-    for path, _ in chosen.values():
+    binaries = [path for path, _ in chosen.values()]
+    binaries += [binary_dir / name for name in EXTRA_BINARIES]
+    for path in binaries:
         trim(path, OUT / "NEWBINMODS" / "NEWBINMODS" / MET / path.name, BINARY_COLS)
     size = sum(f.stat().st_size for f in OUT.rglob("*") if f.is_file())
     print(f"single stars: {sorted(singles, key=float)}; total size {size / 1e6:.2f} MB")

@@ -112,13 +112,38 @@ class TestBPASSConversion:
         }
 
     def test_merger(self, bpass):
-        """The secondary is absorbed step by step, then no longer exists."""
+        """
+        The merger starts at the first row whose total mass has risen (row 11,
+        after the primary's gain in step 10); from then on the secondary has no
+        mass and no longer shines.
+        """
         merger = _model(bpass, "binaries", "02000_050_200")
-        net_gain = 1 - 0.01  # each merger step is net of the primary's wind loss
-        expected = [5.0] * 11 + [5 - net_gain] + [5 - 2 * net_gain] * 4 + [0.0] * 9
-        np.testing.assert_allclose(merger.s_mass[:N_BIN], expected)
-        assert merger.loc[10:, ["s_logL", "s_logT", "s_logR"]].isna().all().all()
+        np.testing.assert_allclose(merger.s_mass[:N_BIN], [5.0] * 11 + [0.0] * 14)
+        star = ["s_logL", "s_logT", "s_logR"]
+        assert merger.loc[11:, star].isna().all().all()
+        assert merger.loc[:10, star].notna().all().all()
         assert len(merger) == N_BIN  # no single-star continuation after a merger
+
+    def test_merger_detection(self, bpass_dir):
+        """
+        A merger is found from the rise in total mass, even when the secondary's
+        column ticks up in the same step; a rounding-level rise isn't a merger.
+        """
+        bdir = bpass_dir / "NEWBINMODS/NEWBINMODS/z014"
+        winds = 20 - 0.01 * np.arange(N_BIN)
+        absorbed = np.where(np.arange(N_BIN) > 10, 4.0, 0.0)
+        # primary +4 Msun in step 10 while the secondary's column ticks up
+        _write_bpass(bdir / "sneplot-z014-20-0.5-3", T_BIN, winds + absorbed,
+                     5.0 + absorbed / 80)
+        # the total rises by 0.04% in step 12: rounding, not a merger
+        _write_bpass(bdir / "sneplot-z014-20-0.5-4", T_BIN, winds,
+                     np.where(np.arange(N_BIN) > 12, 5.02, 5.0))
+        reader = BPASSReader(met=0.014, rootdir=bpass_dir)
+        merger = _model(reader, "binaries", "02000_050_300")
+        np.testing.assert_allclose(merger.s_mass[11:N_BIN], 0.0)
+        assert merger.s_logL[11:].isna().all() and len(merger) == N_BIN
+        plain = _model(reader, "binaries", "02000_050_400")
+        assert plain.s_logL[:N_BIN].notna().all() and len(plain) > N_BIN
 
     @pytest.mark.parametrize("name", ["02000_015_100", "02000_025_100"])
     def test_continuation_moves_forward(self, bpass, name):
@@ -568,7 +593,7 @@ class TestReadBinaries:
         bset = bpass.read_binary_data()
         binary = bset.tracks[list(bset.q0).index(0.5)]
         assert binary.mass2[-1] == 0 * u.Msun
-        assert np.isnan(binary.lbol2[10:].value).all()
+        assert np.isnan(binary.lbol2[11:].value).all()
         assert np.isnan(binary.grav2[-1].value)
 
     def test_mpa(self, mpa):
