@@ -27,6 +27,7 @@ dependencies = [
     "pyerf",
     "matplotlib",
     "marimo>=0.23.13",
+    "requests",
 ]
 dynamic = ["version"]
 
@@ -42,3 +43,6 @@ packages = ["arsenal_gear",
     "arsenal_gear.utils",
     "arsenal_gear.scripts",
     "arsenal_gear.stellar_evolution",]
+
+[tool.setuptools.package-data]
+"arsenal_gear.utils" = ["citations.bib"]

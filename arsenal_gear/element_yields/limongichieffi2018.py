@@ -16,10 +16,12 @@ import numpy as np
 from astropy.units import Quantity
 
 from ..formation import SinglePop
+from ..utils.citations import cite
 from .source import Source
 from .yieldtables import YieldTables
 
 
+@cite("10.3847/1538-4365/aacb24")
 class LimongiChieffi2018(YieldTables):
     """
     Include yields majority of elements (and isotopes) for massive stars
