@@ -34,13 +34,21 @@ class Source:
             )
             for i, element in enumerate(elements)
         }
+
+        _mloss = np.sum(yields, axis=0)
         self.mloss = RegularGridInterpolator(
-            self.params, np.sum(yields, axis=0), fill_value=None, bounds_error=False
+            self.params, _mloss, fill_value=None, bounds_error=False
         )
+
         self.relative = {
             element: RegularGridInterpolator(
                 self.params,
-                yields[i] / np.sum(yields, axis=0),
+                np.divide(
+                    yields[i],
+                    _mloss,
+                    out=np.full_like(_mloss, np.nan, dtype=float),
+                    where=_mloss != 0,
+                ),
                 fill_value=None,
                 bounds_error=False,
             )

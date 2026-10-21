@@ -97,6 +97,8 @@ class Sukhbold2016(YieldTables):
         for table in self.files:
             if not (self.filedir / table).exists():
                 self.download_sukhbold_table(table)
+        if not self.available:
+            return
 
         self.ccsn = None
         self.wind = None
@@ -139,13 +141,21 @@ class Sukhbold2016(YieldTables):
 
     def download_sukhbold_table(self, filename):
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        from ..utils.scraper import DownloadError, downloader
 
-        downloader(
-            str(self.filedir / filename),
-            f"{self.s16_url}/{filename}",
-            message=f"Downloading Sukhbold 2016 table: {filename}...",
-        )
+        print("Sukhbold (2016) tables not found, starting download.")
+        try:
+            downloader(
+                str(self.filedir / filename),
+                f"{self.s16_url}/{filename}",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
 
     def load_from_archives(self):
         """

@@ -8,6 +8,7 @@ NuGrid.
 
 import os
 import re
+import warnings
 from typing import List
 
 import astropy.units as u
@@ -86,6 +87,9 @@ class NuGrid(YieldTables):
 
         r18 = Ritter2018(model=model)
         bat = Battino20192021()
+        self.available = all(m.available for m in (r18, bat))
+        if not self.available:
+            return
 
         self.elements = r18.elements
         self.atomic_num = r18.atomic_num
@@ -204,6 +208,8 @@ class Pignatari2016(YieldTables):
         else:
             if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -348,11 +354,20 @@ class Pignatari2016(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        from ..utils.scraper import DownloadError, downloader
 
         print("NuGrid (Pignatari et al., 2016) tables not found, starting download.")
         for file in self.files:
-            downloader(self.filedir / file, self.p16_url + os.sep + file, message=None)
+            try:
+                downloader(
+                    self.filedir / file, self.p16_url + os.sep + file, message=None
+                )
+            except DownloadError as e:
+                self.available = False
+                warnings.warn(
+                    f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                    RuntimeWarning,
+                )
 
 
 @cite("10.1093/mnras/sty1729")
@@ -437,6 +452,8 @@ class Ritter2018(YieldTables):
         else:
             if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -592,11 +609,20 @@ class Ritter2018(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        from ..utils.scraper import DownloadError, downloader
 
         print("NuGrid (Ritter et al., 2018) tables not found, starting download.")
         for file in self.files:
-            downloader(self.filedir / file, self.r18_url + os.sep + file, message=None)
+            try:
+                downloader(
+                    self.filedir / file, self.r18_url + os.sep + file, message=None
+                )
+            except DownloadError as e:
+                self.available = False
+                warnings.warn(
+                    f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                    RuntimeWarning,
+                )
 
 
 @cite("10.1093/mnras/stz2158", "10.3390/universe7020025")
@@ -667,6 +693,8 @@ class Battino20192021(YieldTables):
         else:
             if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -763,21 +791,37 @@ class Battino20192021(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        from ..utils.scraper import DownloadError, downloader
 
         print(
             "NuGrid (Battinoi et al., 2019, 2021) tables not found, starting download."
         )
-        downloader(
-            self.filedir / self.files[0],
-            self.b19_url + os.sep + "Yields_table.txt",
-            message=None,
-        )
-        downloader(
-            self.filedir / self.files[1],
-            self.b21_url + os.sep + "Yields_Table.txt",
-            message=None,
-        )
+
+        try:
+            downloader(
+                self.filedir / self.files[0],
+                self.b19_url + os.sep + "Yields_table.txt",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
+
+        try:
+            downloader(
+                self.filedir / self.files[1],
+                self.b21_url + os.sep + "Yields_Table.txt",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
 
     @staticmethod
     def _get_index_from_model(model: str) -> int:

@@ -75,6 +75,8 @@ class Doherty2014a(YieldTables):
             if not (self.filedir / self.file).is_file():
                 self.download_yields()
         self.filedir = self.filedir / self.file
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -154,13 +156,15 @@ class Doherty2014a(YieldTables):
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
         # from ..utils.scraper import downloader
+        import warnings
 
         print("Doherty (2014a) tables not found, starting download.")
-        raise RuntimeError(
+        warnings.warn(
             f"Automatic download for these yields is not available. "
             f"Please download yields from suplementary material in {self.name} and place"
             f"in {self.filedir} (follow link {self.d14_url} for download)"
         )
+        self.available = False
         # downloader(self.filedir / self.file, self.d14_url, message=None)
 
 
@@ -220,6 +224,8 @@ class Doherty2014b(YieldTables):
             if not (self.filedir / self.file).is_file():
                 self.download_yields()
         self.filedir = self.filedir / self.file
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -247,11 +253,13 @@ class Doherty2014b(YieldTables):
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
         # from ..utils.scraper import downloader
+        import warnings
 
         print("Doherty (2014b) tables not found, starting download.")
-        raise RuntimeError(
+        warnings.warn(
             f"Automatic download for these yields is not available. "
             f"Please download yields from suplementary material in {self.name} and place"
             f"in {self.filedir} (follow link {self.d14_url} for download)"
         )
+        self.available = False
         # downloader(self.filedir / self.file, self.d14_url, message=None)

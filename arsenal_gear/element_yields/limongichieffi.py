@@ -97,8 +97,10 @@ class LimongiChieffi2018(YieldTables):
             self.download_yields(table=f"tab_{model}")
         elif not (self.filedir / f"tab_{model}.tgz").is_file():
             self.download_yields(table=f"tab_{model}")
-
         self.filedir = self.filedir / f"tab_{model}.tgz"
+        if not self.available:
+            return
+
         self.elements, self.atomic_num = self.get_element_list()
 
         # Stellar wind yields
@@ -216,19 +218,34 @@ class LimongiChieffi2018(YieldTables):
     ## Function for downloading data from the web
     def download_yields(self, table: str) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        import warnings
 
-        downloader(
-            self.filedir / f"{table}.tgz",
-            f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
-            message=f"Yield file {table}.tgz not found.",
-        )
+        from ..utils.scraper import DownloadError, downloader
 
-        if not (self.filedir / "readme.txt").is_file():
+        try:
             downloader(
-                self.filedir / "readme.txt",
-                f"{self.lc_url}/2018-modelli/yields/legenda",
-                message="See downloaded readme.txt for info about yields.",
+                self.filedir / f"{table}.tgz",
+                f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
+
+        try:
+            if not (self.filedir / "readme.txt").is_file():
+                downloader(
+                    self.filedir / "readme.txt",
+                    f"{self.lc_url}/2018-modelli/yields/legenda",
+                    message=None,
+                )
+        except DownloadError:
+            warnings.warn(
+                f"{self.__class__.__name__}: Could not found readme.",
+                RuntimeWarning,
             )
 
     # helper functions for reading tables

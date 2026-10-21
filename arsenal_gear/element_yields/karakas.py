@@ -67,6 +67,8 @@ class Karakas2010(YieldTables):
             if not (self.filedir / self.file).is_file():
                 self.download_yields()
         self.filedir = self.filedir / self.file
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -155,10 +157,20 @@ class Karakas2010(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        import warnings
+
+        from ..utils.scraper import DownloadError, downloader
 
         print("Karakas (2010) tables not found, starting download.")
-        downloader(self.filedir / self.file, self.k10_url, message=None)
+
+        try:
+            downloader(self.filedir / self.file, self.k10_url, message=None)
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
 
     # helper functions for reading tables
     @staticmethod
@@ -249,6 +261,8 @@ class Karakas2016(YieldTables):
             if not (self.filedir / self.file).is_file():
                 self.download_yields()
         self.filedir = self.filedir / self.file
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -356,10 +370,19 @@ class Karakas2016(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        import warnings
+
+        from ..utils.scraper import DownloadError, downloader
 
         print("Karakas (2016) tables not found, starting download.")
-        downloader(self.filedir / self.file, self.k16_url + self.file, message=None)
+        try:
+            downloader(self.filedir / self.file, self.k16_url + self.file, message=None)
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
 
     # helper functions for reading tables
     @staticmethod

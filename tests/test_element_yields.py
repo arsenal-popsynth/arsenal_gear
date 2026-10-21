@@ -43,6 +43,8 @@ class TestElementYieldModels:
         This applies to ccsn, wind, and agb source objects when present.
         """
         model = Model()
+        if not model.available:
+            pytest.skip("Yield tables unavailable")
 
         if model.ccsn is not None:
             self._test_monotonically_increasing_params(model.ccsn)
@@ -68,6 +70,8 @@ class TestElementYieldModels:
         This applies to ccsn, wind, and agb source objects when present.
         """
         model = Model()
+        if not model.available:
+            pytest.skip("Yield tables unavailable")
 
         if model.ccsn is not None:
             self._test_check_positive_tables(model.ccsn)
@@ -93,6 +97,8 @@ class TestElementYieldModels:
         This applies to ccsn, wind, and agb source objects when present.
         """
         model = Model()
+        if not model.available:
+            pytest.skip("Yield tables unavailable")
 
         if model.ccsn is not None:
             self._test_remnant_mass_from_interpolation(model.ccsn)
@@ -143,6 +149,10 @@ class TestLimongiChieffi2018:
     """Tests for yields from Limongi & Chieffi (2018)"""
 
     lc18 = arsenal_gear.element_yields.LimongiChieffi2018()
+    pytestmark = pytest.mark.skipif(
+        not lc18.available,
+        reason="LimongiChieffi2018 yield tables unavailable",
+    )
 
     def test_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -180,58 +190,41 @@ class TestLimongiChieffi2018:
             _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
 
 
-class TestNuGrid:
+class TestBattino20192021:
 
-    nugrid = arsenal_gear.element_yields.NuGrid()
-    p16 = arsenal_gear.element_yields.Pignatari2016()
-    r18 = arsenal_gear.element_yields.Ritter2018()
     bat = arsenal_gear.element_yields.Battino20192021()
+    pytestmark = pytest.mark.skipif(
+        not bat.available,
+        reason="Battino (2019,2020) yield tables unavailable",
+    )
 
-    def test_p16_tables(self):
+    def test_bat_tables(self):
         """Make sure that online tables did not change by checking random yields."""
-        elements = ["H", "C", "O", "Fe"]
-        models_lo = [(0.01, 2.0), (0.02, 3.0)]
-        models_hi = [(0.01, 15.0), (0.02, 25.0)]
+        elements = ["H", "C", "O"]
+        models = [(0.01, 2.0), (0.001, 3.0)]
 
         ylds_lo = [
-            [9.551e-1, 1.853e-2, 1.389e-2, 9.961e-4],
-            [1.542e0, 3.955e-2, 3.603e-2, 3.377e-3],
-        ]
-        ylds_hi = [
-            [1.920e0, 3.995e-3, 1.256e-2, 1.906e-3],
-            [7.194e0, 2.787e-2, 8.769e-2, 1.619e-2],
-        ]
-        ylds_sn = [
-            [4.569e0, 1.546e-1, 2.069e-1, 1.980e-1],
-            [1.963e0, 4.365e-1, 7.289e-1, 9.694e-3],
+            [7.334349323233e-1, 9.950594153e-3, 8.95887761e-3],
+            [1.2695745259991285, 3.9231768329611e-3, 1.630396175869021e-3],
         ]
 
-        for model, yld in zip(models_lo, ylds_lo):
-            agb_yld = self.p16.agb.get_yld(
+        for model, yld in zip(models, ylds_lo):
+            agb_yld = self.bat.agb.get_yld(
                 elements=elements,
                 params=model,
                 interpolate="nearest",
                 extrapolate=False,
             )
-            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=4)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=5)
 
-        for model, yld in zip(models_hi, ylds_hi):
-            wind_yld = self.p16.wind.get_yld(
-                elements=elements,
-                params=model,
-                interpolate="nearest",
-                extrapolate=False,
-            )
-            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
 
-        for model, yld in zip(models_hi, ylds_sn):
-            wind_yld = self.p16.ccsn.get_yld(
-                elements=elements,
-                params=model,
-                interpolate="nearest",
-                extrapolate=False,
-            )
-            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
+class TestRitter2018:
+
+    r18 = arsenal_gear.element_yields.Ritter2018()
+    pytestmark = pytest.mark.skipif(
+        not r18.available,
+        reason="Ritter (2018) yield tables unavailable",
+    )
 
     def test_r18_tables(self):
         """Make sure that online tables did not change by checking random yields."""
@@ -288,21 +281,57 @@ class TestNuGrid:
             )
             _assert_array_approx_equal(loaded_yld, yld_tot, significant=3)
 
-    def test_bat_tables(self):
+
+class TestPignatari2016:
+
+    p16 = arsenal_gear.element_yields.Pignatari2016()
+    pytestmark = pytest.mark.skipif(
+        not p16.available,
+        reason="Pignatari (2016) yield tables unavailable",
+    )
+
+    def test_p16_tables(self):
         """Make sure that online tables did not change by checking random yields."""
-        elements = ["H", "C", "O"]
-        models = [(0.01, 2.0), (0.001, 3.0)]
+        elements = ["H", "C", "O", "Fe"]
+        models_lo = [(0.01, 2.0), (0.02, 3.0)]
+        models_hi = [(0.01, 15.0), (0.02, 25.0)]
 
         ylds_lo = [
-            [7.334349323233e-1, 9.950594153e-3, 8.95887761e-3],
-            [1.2695745259991285, 3.9231768329611e-3, 1.630396175869021e-3],
+            [9.551e-1, 1.853e-2, 1.389e-2, 9.961e-4],
+            [1.542e0, 3.955e-2, 3.603e-2, 3.377e-3],
+        ]
+        ylds_hi = [
+            [1.920e0, 3.995e-3, 1.256e-2, 1.906e-3],
+            [7.194e0, 2.787e-2, 8.769e-2, 1.619e-2],
+        ]
+        ylds_sn = [
+            [4.569e0, 1.546e-1, 2.069e-1, 1.980e-1],
+            [1.963e0, 4.365e-1, 7.289e-1, 9.694e-3],
         ]
 
-        for model, yld in zip(models, ylds_lo):
-            agb_yld = self.bat.agb.get_yld(
+        for model, yld in zip(models_lo, ylds_lo):
+            agb_yld = self.p16.agb.get_yld(
                 elements=elements,
                 params=model,
                 interpolate="nearest",
                 extrapolate=False,
             )
-            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=5)
+            _assert_array_approx_equal(agb_yld.flatten(), yld, significant=4)
+
+        for model, yld in zip(models_hi, ylds_hi):
+            wind_yld = self.p16.wind.get_yld(
+                elements=elements,
+                params=model,
+                interpolate="nearest",
+                extrapolate=False,
+            )
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)
+
+        for model, yld in zip(models_hi, ylds_sn):
+            wind_yld = self.p16.ccsn.get_yld(
+                elements=elements,
+                params=model,
+                interpolate="nearest",
+                extrapolate=False,
+            )
+            _assert_array_approx_equal(wind_yld.flatten(), yld, significant=4)

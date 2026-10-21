@@ -8,6 +8,7 @@ derived class, which will typically only implement a subset
 of the available yield channels.
 """
 
+from functools import wraps
 from pathlib import Path
 from typing import List
 
@@ -19,6 +20,21 @@ from ..formation import SinglePop
 
 def _not_implemented(channel: str, name: str):
     raise NotImplementedError(f"{channel} yields not implemented for {name}.")
+
+
+def requires_available(func):
+    """Require the yield model to be available before executing a method."""
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if not self.available:
+            raise RuntimeError(
+                f"{self.__class__.__name__}: Yield model is unavailable."
+            )
+
+        return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 class YieldTables:
@@ -35,6 +51,7 @@ class YieldTables:
 
         self.name = "None"
         self.filedir = Path(__file__).parent.absolute()
+        self.available = True
 
         self.elements = None
         self.atomic_num = None
@@ -80,6 +97,7 @@ class YieldTables:
         _ = starPop
         return _not_implemented("SNIA", self.name)
 
+    @requires_available
     def ccsn_yields(
         self, elements: List[str], starPop: SinglePop
     ) -> u.Quantity["mass"]:
@@ -102,6 +120,7 @@ class YieldTables:
             return {elements[0]: yld_array * u.M_sun}
         return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
+    @requires_available
     def wind_yields(
         self, elements: List[str], starPop: SinglePop
     ) -> u.Quantity["mass"]:
@@ -124,6 +143,7 @@ class YieldTables:
             return {elements[0]: yld_array * u.M_sun}
         return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
+    @requires_available
     def agb_yields(
         self,
         elements: List[str],
@@ -148,6 +168,7 @@ class YieldTables:
             return {elements[0]: yld_array * u.M_sun}
         return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
+    @requires_available
     def sagb_yields(
         self,
         elements: List[str],
@@ -172,6 +193,7 @@ class YieldTables:
             return {elements[0]: yld_array * u.M_sun}
         return {element: yld_array[i] * u.M_sun for i, element in enumerate(elements)}
 
+    @requires_available
     def snia_yields(
         self,
         elements: List[str],
