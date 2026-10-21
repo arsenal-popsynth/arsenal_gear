@@ -105,6 +105,26 @@ class Yields(ABC):
         """
 
     @abstractmethod
+    def sagb_yields(
+        self,
+        elements: List[str],
+        starPop: SinglePop,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for super-AGB mass loss yields.
+
+        Args:
+            elements: list of elements to get yields for
+            starPop: SinglePop object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Yields for the specified elements
+        """
+
+    @abstractmethod
     def ccsn_mloss(
         self,
         starPop: SinglePop,
@@ -166,6 +186,24 @@ class Yields(ABC):
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
         """Abstract method for AGB mass loss mloss.
+
+        Args:
+            starPop: SinglePop object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Total mass loss from AGB
+        """
+
+    @abstractmethod
+    def sagb_mloss(
+        self,
+        starPop: SinglePop,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for super-AGB mass loss mloss.
 
         Args:
             starPop: SinglePop object
@@ -250,6 +288,28 @@ class Yields(ABC):
         extrapolate: bool = False,
     ) -> Quantity["mass"]:
         """Abstract method for AGB mass loss yields relative to
+           total mass loss.
+
+
+        Args:
+            elements: list of elements to get yields for
+            starPop: SinglePop object
+            interpolate: interpolation method
+            extrapolate: whether to extrapolate beyond bounds
+
+        Returns:
+            Fractional yields for the specified elements
+        """
+
+    @abstractmethod
+    def sagb_relative(
+        self,
+        elements: List[str],
+        starPop: SinglePop,
+        interpolate: str = "nearest",
+        extrapolate: bool = False,
+    ) -> Quantity["mass"]:
+        """Abstract method for super-AGB mass loss yields relative to
            total mass loss.
 
 
