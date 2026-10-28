@@ -433,7 +433,7 @@ class BPASSReader(BinaryDataReader):
         "z030",
         "z040",
     ]
-    # Change dl=0 to dl=1 in the Dropbox link to force download
+    # dl=0 changed to dl=1 in the Dropbox link to force download
     url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
     # name of the release on the server, and the only member of it that we need
     zip_name = "BPASSv2.2.1_release-07-18-Tuatara.zip"
@@ -494,7 +494,8 @@ class BPASSReader(BinaryDataReader):
             if not zip_path.is_file():
                 raise FileNotFoundError(
                     f"BPASS data not found in {self.rootdir}; "
-                    "set force_download=True to download it"
+                    "set force_download=True to download it. "
+                    "This will download ~13 GB of data."
                 )
             unzip(
                 zip_path,
@@ -721,7 +722,8 @@ class MPAReader(BinaryDataReader):
             if not tar_path.is_file():
                 raise FileNotFoundError(
                     f"MPA/Bonn data not found: neither {data_dir} nor {tar_path} "
-                    "exists; set force_download=True to download it"
+                    "exists; set force_download=True to download it."
+                    "This will download ~30 GB of data."
                 )
             untar(
                 tar_path,
