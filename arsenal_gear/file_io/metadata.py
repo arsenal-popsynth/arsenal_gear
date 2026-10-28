@@ -8,34 +8,37 @@ binary outputs.
 
 from __future__ import annotations
 
-import importlib
-import importlib.util
-import pkgutil
+import os
 import tarfile
 from io import BytesIO
 
 import arsenal_gear
 
+IGNORED_DIRS = ("data", "__pycache__")
 
-def subpackage_paths(pkg_name):
-    """Map each package under pkg_name (including itself) to its __path__ entries."""
-    pkg = importlib.import_module(pkg_name)
-    result = {pkg_name: list(pkg.__path__)}
 
-    for info in pkgutil.walk_packages(pkg.__path__, prefix=pkg_name + "."):
-        if info.ispkg:
-            spec = importlib.util.find_spec(info.name)
-            result[info.name] = list(spec.submodule_search_locations)
-    return result
+def _exclude_ignored_dirs(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
+    """
+    Filter for tarfile.add that drops any subdirectory named in IGNORED_DIRS
+    (along with everything beneath it).
+    """
+    if tarinfo.isdir() and os.path.basename(tarinfo.name) in IGNORED_DIRS:
+        return None
+    return tarinfo
 
 
 def get_full_src_tree() -> bytes:
     """
     This function generates a tarball of the entire source tree returned by
-    arsenal_gear.__path__ and returns it as a bytes object.
+    arsenal_gear.__path__ and returns it as a bytes object.  Subdirectories
+    named 'data' or '__pycache__' are excluded.
     """
     buf = BytesIO()
     # we are writing the tarfile to memory in buf
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        tar.add(arsenal_gear.__path__, arcname="dir")
+        tar.add(
+            arsenal_gear.__path__[0],
+            arcname="arsenal_gear",
+            filter=_exclude_ignored_dirs,
+        )
     return buf.getvalue()
