@@ -26,6 +26,7 @@ dependencies = [
     "pandas",
     "pyerf",
     "requests",
+    "h5py",
     ]
 dynamic = ["version"]
 
