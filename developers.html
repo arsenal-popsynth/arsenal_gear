@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Developers Guide &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Arsenal Sphinx Documentation" href="docs.html" />
+    <link rel="prev" title="Troubleshooting and Known Issues" href="troubleshooting.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="docs.html" title="Arsenal Sphinx Documentation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="troubleshooting.html" title="Troubleshooting and Known Issues"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Developers Guide</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section class="tex2jax_ignore mathjax_ignore" id="developers-guide">
+<h1>Developers Guide<a class="headerlink" href="#developers-guide" title="Link to this heading">¶</a></h1>
+<p>While it should work out-of-the box without modification, Arsenal Gear is an
+open-source project, and we welcome contributions from the community. This guide
+provides information for developers who want to contribute to the project.</p>
+<section id="recommended-development-environment">
+<h2>Recommended Development Environment<a class="headerlink" href="#recommended-development-environment" title="Link to this heading">¶</a></h2>
+<p>You are of course free to use whatever set of tools you prefer, but we have
+found that the following tools make a fairly low-friction development
+environment.  The tools in this section are not completely essential for
+developing <code class="docutils literal notranslate"><span class="pre">arsenal_gear</span></code>, but are <em>strongly</em> recommended, and will make your
+life and ours easier.  These tools can all be easily installed and set up
+automatically on your local machine by running:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="n">setup_dev</span>
+</pre></div>
+</div>
+<p>from the project root directory, and then using the virtual environment that
+is built in the project root’s <code class="docutils literal notranslate"><span class="pre">.venv</span></code> directory for testing, linting, etc.</p>
+<section id="virtual-environment">
+<h3>Virtual Environment<a class="headerlink" href="#virtual-environment" title="Link to this heading">¶</a></h3>
+<p>I typically just use the standard python <code class="docutils literal notranslate"><span class="pre">venv</span></code> module to manage my virtual
+environments.  I usually store this in <code class="docutils literal notranslate"><span class="pre">.venv</span></code>, as it keeps things out of the
+way and tied to the project.  To set it up, you can run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">venv</span> <span class="o">.</span><span class="n">venv</span>
+</pre></div>
+</div>
+<p>And then activate it with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="o">.</span><span class="n">venv</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">activate</span>
+</pre></div>
+</div>
+<p>To install Arsenal Gear and its dependencies, you can then run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span><span class="p">[</span><span class="nb">all</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">-e</span></code> flag tells pip to install the package in “editable” mode, which just
+symlinks the source to the installed package so you don’t need to re-run <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span></code> every time you change the source code.</p>
+</section>
+</section>
+<section id="linting-and-code-style">
+<h2>Linting and Code Style<a class="headerlink" href="#linting-and-code-style" title="Link to this heading">¶</a></h2>
+<p>We use <a class="reference external" href="https://pylint.pycqa.org/en/stable/index.html">pylint</a> as our linter.
+You can manually run it with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pylint</span> <span class="n">arsenal_gear</span><span class="o">/</span>
+</pre></div>
+</div>
+<p>By default, we have it configured to only show <code class="docutils literal notranslate"><span class="pre">FATAL</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, and <code class="docutils literal notranslate"><span class="pre">WARNING</span></code>
+messages (with <code class="docutils literal notranslate"><span class="pre">exec-used</span></code> excluded).  We allow the use of <code class="docutils literal notranslate"><span class="pre">exec()</span></code> because
+Arsenal Gear’s parameter file is itself a python script.  The security concern
+with <code class="docutils literal notranslate"><span class="pre">exec()</span></code> isn’t a concern for us because Arsenal Gear is scientific software
+that isn’t going to be exposed to untrusted input.  If you want to run <code class="docutils literal notranslate"><span class="pre">pylint</span></code>
+with all messages enabled (including some of the more annoying convention
+messages), you can use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pylint</span> <span class="o">--</span><span class="n">enable</span><span class="o">=</span><span class="nb">all</span> <span class="n">arsenal_gear</span><span class="o">/</span>
+</pre></div>
+</div>
+<p>We also use the <a class="reference external" href="https://black.readthedocs.io/en/stable/">black</a> code formatter
+which will make the linter happy at all times provided you run it prior to
+running the linter.  You can run black manually with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">black</span> <span class="n">arsenal_gear</span>
+</pre></div>
+</div>
+</section>
+<section id="automated-tests">
+<h2>Automated Tests<a class="headerlink" href="#automated-tests" title="Link to this heading">¶</a></h2>
+<p>We use <a class="reference external" href="https://pytest.org/">pytest</a> as our testing framework. The testing suite
+is located in <code class="docutils literal notranslate"><span class="pre">tests/</span></code>.  You can run them with <code class="docutils literal notranslate"><span class="pre">pytest</span></code> from the project root
+directory.</p>
+<p>It is good practice to try and get tests that cover as large a fraction of your
+code as possible.  One easy way to check your test coverage is with the
+<code class="docutils literal notranslate"><span class="pre">pytest-cov</span></code> plugin.  You can install it with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pytest-cov</span></code>, and then
+run your tests with coverage reporting with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pytest</span> <span class="o">--</span><span class="n">cov</span><span class="o">=</span><span class="n">arsenal_gear</span> <span class="n">tests</span><span class="o">/</span>
+</pre></div>
+</div>
+<p>This will generate a report showing you the test coverage of each file in the
+<code class="docutils literal notranslate"><span class="pre">arsenal_gear</span></code> package using the tests in the <code class="docutils literal notranslate"><span class="pre">tests/</span></code> directory.</p>
+<section id="pre-commit-hooks">
+<h3>Pre-Commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Link to this heading">¶</a></h3>
+<p>It’s nice to have some tests and linting done automatically before you commit
+your changes (this avoids some of the “million little commits to fix a typo”
+problem).  We use git’s pre-commit hooks to do this.  To set them up, you can run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">pre</span><span class="o">-</span><span class="n">commit</span> <span class="o">&amp;&amp;</span> <span class="n">pre</span><span class="o">-</span><span class="n">commit</span> <span class="n">install</span>
+</pre></div>
+</div>
+<p>from within the project directory.  The pre-commit hooks are defined in the
+<code class="docutils literal notranslate"><span class="pre">.pre-commit-config.yaml</span></code> file, and will then run every time you run <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">commit</span></code>.  Most of the hooks will automatically apply themselves, so if your
+commit appears to fail, you can just re-run <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">commit</span></code> and it will usually
+just work.</p>
+<p>Two of them can’t fix themselves, and want a word from you instead:</p>
+<ul class="simple">
+<li><p><strong>pylint</strong> reports what static analysis can catch, which you have to go and
+fix.</p></li>
+<li><p><strong>citations</strong> checks that <code class="docutils literal notranslate"><span class="pre">arsenal_gear/utils/citations.bib</span></code> still matches the
+<code class="docutils literal notranslate"><span class="pre">&#64;cite</span></code> decorators in the source, and tells you to regenerate it if not — see
+<em>Citations</em> below.  The check itself is offline and needs no credentials, so
+it runs for everyone.</p></li>
+</ul>
+</section>
+</section>
+<section id="citations">
+<h2>Citations<a class="headerlink" href="#citations" title="Link to this heading">¶</a></h2>
+<p>Arsenal Gear wraps up a lot of other people’s work: IMFs, yield tables,
+isochrones, and stellar evolution models all come from published papers whose
+authors deserve to be cited.  Rather than leaving users to work out which
+papers a given calculation actually depended on, the code carries that
+information itself, and can emit a bibtex bibliography for any entry point.</p>
+<section id="citing-a-paper-in-your-code">
+<h3>Citing a paper in your code<a class="headerlink" href="#citing-a-paper-in-your-code" title="Link to this heading">¶</a></h3>
+<p>Attach citations with the <code class="docutils literal notranslate"><span class="pre">cite</span></code> decorator, giving it one or more identifiers.
+It works on classes and on individual functions or methods:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">arsenal_gear.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
+
+<span class="nd">@cite</span><span class="p">(</span><span class="s2">&quot;10.1086/145971&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Salpeter</span><span class="p">(</span><span class="n">IMF</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>Two kinds of identifier are accepted, and the code works out which is which
+from the shape of the string, so you never have to say:</p>
+<ul class="simple">
+<li><p>a <strong>DOI</strong>, e.g. <code class="docutils literal notranslate"><span class="pre">&quot;10.1086/145971&quot;</span></code>;</p></li>
+<li><p>a <strong>NASA ADS bibcode</strong>, e.g. <code class="docutils literal notranslate"><span class="pre">&quot;1996A&amp;A...315..105R&quot;</span></code>, for papers old enough
+to predate DOIs.  Write the bibcode literally, with a plain <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> and no URL
+escaping.</p></li>
+</ul>
+<p>Pass several identifiers if a class rests on more than one paper, e.g.
+<code class="docutils literal notranslate"><span class="pre">&#64;cite(&quot;10.1093/mnras/stz2158&quot;,</span> <span class="pre">&quot;10.3390/universe7020025&quot;)</span></code>.  Stacking the
+decorator works too, and accumulates rather than replaces.</p>
+<p>If a paper is in neither form, it can’t be cited here.  Anything NASA ADS
+doesn’t index isn’t really part of the published literature, so there is
+deliberately no way to paste in bibtex by hand.</p>
+</section>
+<section id="regenerating-the-bibliography">
+<h3>Regenerating the bibliography<a class="headerlink" href="#regenerating-the-bibliography" title="Link to this heading">¶</a></h3>
+<p>The bibtex itself lives in <code class="docutils literal notranslate"><span class="pre">arsenal_gear/utils/citations.bib</span></code>, which is
+generated, not hand-written.  <strong>After adding or changing a <code class="docutils literal notranslate"><span class="pre">&#64;cite</span></code>, regenerate
+it and commit the result alongside your code:</strong></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">arsenal_gear</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">refresh_citations</span>
+</pre></div>
+</div>
+<p>This imports every <code class="docutils literal notranslate"><span class="pre">arsenal_gear</span></code> module (which is what registers the
+citations), looks up whatever the bibliography is missing, drops entries for
+citations that no longer exist, and rewrites the file.  Pass <code class="docutils literal notranslate"><span class="pre">--force</span></code> to
+re-fetch everything rather than only the missing entries.</p>
+<p>You shouldn’t have to remember this.  The <code class="docutils literal notranslate"><span class="pre">citations</span></code> pre-commit hook runs</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">arsenal_gear</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">refresh_citations</span> <span class="o">--</span><span class="n">check</span>
+</pre></div>
+</div>
+<p>on every commit that touches a <code class="docutils literal notranslate"><span class="pre">.py</span></code> or <code class="docutils literal notranslate"><span class="pre">.bib</span></code> file, and fails it if the
+bibliography has fallen behind, naming what’s wrong:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">arsenal_gear</span><span class="o">/</span><span class="n">utils</span><span class="o">/</span><span class="n">citations</span><span class="o">.</span><span class="n">bib</span> <span class="ow">is</span> <span class="n">out</span> <span class="n">of</span> <span class="n">date</span><span class="o">.</span>
+
+  <span class="n">missing</span><span class="p">:</span> <span class="mf">10.1093</span><span class="o">/</span><span class="n">mnras</span><span class="o">/</span><span class="n">stab1234</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">--check</span></code> only compares the registered citations against the bibliography.  It
+fetches nothing and writes nothing, so it needs no token and no network — every
+contributor gets the warning, whether or not they can act on it themselves.
+Three things will trip it:</p>
+<ul class="simple">
+<li><p><strong>missing</strong> — something is cited that the bibliography has no entry for.  This
+is the one that needs a token to fix, since the entry has to be fetched.</p></li>
+<li><p><strong>stale</strong> — the bibliography has an entry nothing cites any more, because a
+<code class="docutils literal notranslate"><span class="pre">&#64;cite</span></code> was deleted.  A plain refresh drops it, no network required.</p></li>
+<li><p><strong>typo</strong> — an identifier that is neither a DOI nor a bibcode.  Fix it at the
+<code class="docutils literal notranslate"><span class="pre">&#64;cite</span></code> that spells it; no refresh will ever resolve it.</p></li>
+</ul>
+<p>Nothing validates identifiers at import time, so without this a typo’d DOI would
+sit quietly in the source until someone refreshed.  It still can’t reach a user
+— a citation can’t resolve until it’s in the bibliography — but it’s much less
+annoying to find at the commit that caused it.</p>
+<section id="setting-up-your-ads-token">
+<h4>Setting up your ADS token<a class="headerlink" href="#setting-up-your-ads-token" title="Link to this heading">¶</a></h4>
+<p>Fetching goes to NASA ADS, which has no anonymous API, so <em>adding</em> a new
+citation needs a free API token:</p>
+<ol class="arabic">
+<li><p>Sign in at <a class="reference external" href="https://ui.adsabs.harvard.edu/">ADS</a> (an ORCID, Google or
+institutional account all work).</p></li>
+<li><p>Go to Account → Customize Settings → API Token and generate one.</p></li>
+<li><p>Put it in your environment as <code class="docutils literal notranslate"><span class="pre">ADS_DEV_KEY</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">ADS_DEV_KEY</span><span class="o">=</span><span class="s2">&quot;your-token-here&quot;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Where that <code class="docutils literal notranslate"><span class="pre">export</span></code> goes is up to you <code class="docutils literal notranslate"><span class="pre">direnv</span></code> (see <em>Extra Handy Tools</em> below)
+is an easy way to do this if you don’t want it in your shell config: add the
+line to the project’s <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> and the token is loaded whenever you <code class="docutils literal notranslate"><span class="pre">cd</span></code> in and
+unset when you leave.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="o">.</span><span class="n">venv</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">activate</span>
+<span class="n">export</span> <span class="n">ADS_DEV_KEY</span><span class="o">=</span><span class="s2">&quot;your-token-here&quot;</span>
+</pre></div>
+</div>
+<p>then run <code class="docutils literal notranslate"><span class="pre">direnv</span> <span class="pre">allow</span></code>.  <code class="docutils literal notranslate"><span class="pre">.envrc</span></code> is in our <code class="docutils literal notranslate"><span class="pre">.gitignore</span></code>, so a token kept there
+can’t be committed by accident.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ADS_API_TOKEN</span></code> is accepted as an alternative name, since that’s what some other
+ADS tooling uses.</p>
+<p>This is a contributor-only requirement.  Because the generated bibliography
+ships with the package, <strong>users never need a token or a network connection</strong> —
+which is the whole reason the file is committed rather than fetched on demand.</p>
+</section>
+</section>
+<section id="getting-a-bibliography-out">
+<h3>Getting a bibliography out<a class="headerlink" href="#getting-a-bibliography-out" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">gather_bibtex</span></code> takes a function, method, or class and returns bibtex for
+everything it cites:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">arsenal_gear.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">gather_bibtex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">arsenal_gear.formation.dist_funcs.imf</span><span class="w"> </span><span class="kn">import</span> <span class="n">Salpeter</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">gather_bibtex</span><span class="p">(</span><span class="n">Salpeter</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@ARTICLE</span><span class="p">{</span><span class="mi">1955</span><span class="n">ApJ</span><span class="o">..</span><span class="mf">.121</span><span class="o">.</span><span class="mf">.161</span><span class="n">S</span><span class="p">,</span>
+       <span class="n">author</span> <span class="o">=</span> <span class="p">{{</span><span class="n">Salpeter</span><span class="p">},</span> <span class="n">Edwin</span> <span class="n">E</span><span class="o">.</span><span class="p">},</span>
+        <span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;{The Luminosity Function and Stellar Evolution.}&quot;</span><span class="p">,</span>
+      <span class="n">journal</span> <span class="o">=</span> <span class="p">{</span>\<span class="n">apj</span><span class="p">},</span>
+         <span class="n">year</span> <span class="o">=</span> <span class="mi">1955</span><span class="p">,</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>It finds far more than the citations sitting directly on the target.  Starting
+from the target it walks the call graph — the names referenced in a function’s
+body, the methods a class defines, and everything in its MRO — so citations
+attached to a base class, to an inherited method, or to a class only reached
+indirectly all get collected.  A citation the bibliography is missing becomes a
+<code class="docutils literal notranslate"><span class="pre">%</span> <span class="pre">Could</span> <span class="pre">not</span> <span class="pre">resolve</span> <span class="pre">...</span></code> comment rather than an exception, so one stale
+reference doesn’t cost you the rest of the bibliography.</p>
+</section>
+<section id="how-it-fits-together">
+<h3>How it fits together<a class="headerlink" href="#how-it-fits-together" title="Link to this heading">¶</a></h3>
+<p>The system is split across two modules, and the split is worth preserving:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">arsenal_gear/utils/citations.py</span></code> is what the package uses at runtime.  It
+holds the <code class="docutils literal notranslate"><span class="pre">cite</span></code> decorator, the <code class="docutils literal notranslate"><span class="pre">REGISTRY</span></code> of every identifier seen, the
+call-graph walk in <code class="docutils literal notranslate"><span class="pre">find_citations</span></code>, and the bibliography reader.  It performs
+<strong>no network access</strong> and never writes <code class="docutils literal notranslate"><span class="pre">citations.bib</span></code> — it only reads it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">arsenal_gear/utils/refresh_citations.py</span></code> is the maintainer tool.  It is the
+only part of the package that talks to NASA ADS, checks identifier shapes, and
+writes the bibliography.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">citations.bib</span></code> is an ordinary <code class="docutils literal notranslate"><span class="pre">.bib</span></code> file — you can point LaTeX straight at it
+— with a <code class="docutils literal notranslate"><span class="pre">%%ID</span> <span class="pre">&lt;identifier&gt;</span></code> comment before each entry recording which citation
+it answers.  Bibtex ignores text outside an entry, so those markers cost
+nothing.  Note that ADS exports use journal macros (<code class="docutils literal notranslate"><span class="pre">\apj</span></code>, <code class="docutils literal notranslate"><span class="pre">\mnras</span></code>), which
+need <code class="docutils literal notranslate"><span class="pre">aastex</span></code> or a similar package to compile.</p>
+</section>
+</section>
+<section id="github-actions">
+<h2>GitHub Actions<a class="headerlink" href="#github-actions" title="Link to this heading">¶</a></h2>
+<p>We use GitHub Actions to run our automated tests on every pull request and push
+to the main branch. Currently, we have three workflows:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">documentation.yml</span></code>: This workflow builds the sphinx documentation and deploys it to GitHub Pages.  See <a class="reference internal" href="docs.html"><span class="std std-doc">here</span></a> for more information.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pylint.yml</span></code>: This workflow runs <code class="docutils literal notranslate"><span class="pre">pylint</span></code> to check for any errors that can be caught by static analysis.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pytest.yml</span></code>: This workflow runs our unit tests using <code class="docutils literal notranslate"><span class="pre">pytest</span></code>.</p></li>
+</ul>
+</section>
+<section id="extra-handy-tools">
+<h2>Extra Handy Tools<a class="headerlink" href="#extra-handy-tools" title="Link to this heading">¶</a></h2>
+<p>In addition to the key tools that will be setup when you <code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">setup_dev</span></code>,
+there are some useful tools that many of the <code class="docutils literal notranslate"><span class="pre">arsenal_gear</span></code> developers use.</p>
+<section id="local-actions">
+<h3>Local Actions<a class="headerlink" href="#local-actions" title="Link to this heading">¶</a></h3>
+<p>While all our tests can be run locally, you may want to run the tests and/or
+linter exactly as it will be run by GitHub.  There is a very cool tool developed
+for this called  <a class="reference external" href="https://github.com/nektos/act">act</a>.  <code class="docutils literal notranslate"><span class="pre">act</span></code> uses a Docker
+container for a GitHub Actions runner to run your workflows locally.</p>
+<p>You will need to set up Docker on your local machine, so follow the instructions
+for your operating system <a class="reference external" href="https://docs.docker.com/get-docker/">here</a>.  Docker
+is also in many Linux distributions’ package managers, so you may be able to
+install it with a package manager like <code class="docutils literal notranslate"><span class="pre">apt</span></code> or <code class="docutils literal notranslate"><span class="pre">dnf</span></code> (or load it as a module on
+some HPC systems).   Once Docker is set up, you can install <code class="docutils literal notranslate"><span class="pre">act</span></code> following the
+instructions <a class="reference external" href="https://nektosact.com/installation/index.html">here</a>.</p>
+<p>Running act is straightforward.  To simulate a push, you just run</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">act</span> <span class="n">push</span>
+</pre></div>
+</div>
+<p>and <code class="docutils literal notranslate"><span class="pre">act</span></code> will pull the docker container, spin it up, and run your workflows.</p>
+</section>
+<section id="direnv">
+<h3>direnv<a class="headerlink" href="#direnv" title="Link to this heading">¶</a></h3>
+<p>Sometimes you need to do more than just set up a python virtual environment, but
+also load or change environment variables.  If you don’t want to do this
+globally, <a class="reference external" href="https://direnv.net/">direnv</a> is a great tool to manage
+directory-specific environment variables.  Once installed, you can create a
+<code class="docutils literal notranslate"><span class="pre">.envrc</span></code> that contains anything you would normally put in your <code class="docutils literal notranslate"><span class="pre">.bashrc</span></code> or
+<code class="docutils literal notranslate"><span class="pre">.profile</span></code>, and direnv will automatically load it when you <code class="docutils literal notranslate"><span class="pre">cd</span></code> into the
+directory.</p>
+</section>
+<section id="vs-code">
+<h3>VS Code<a class="headerlink" href="#vs-code" title="Link to this heading">¶</a></h3>
+<p>I’m as opinionated as the next person about my editor of choice, but even an old
+vim freak like me has to admit that <a class="reference external" href="https://code.visualstudio.com/">VS Code</a>
+has some handy features.  If you decide to use it, the following extensions can
+make your development experience better:</p>
+<ul class="simple">
+<li><p><em>direnv</em> (<code class="docutils literal notranslate"><span class="pre">mkhl.direnv</span></code>): This lets VS code automatically load your directory-specific environment.</p></li>
+<li><p><em>GitHub</em> Actions (<code class="docutils literal notranslate"><span class="pre">github.vscode-github-actions</span></code>): Monitor the result of GitHub Actions workflows.</p></li>
+<li><p><em>GitHub</em> Copilot (<code class="docutils literal notranslate"><span class="pre">github.copilot</span></code>): LLMs are controversial, but as glorified autocomplete and boilerplate generators they work quite well.</p></li>
+<li><p><em>Pylance</em> (<code class="docutils literal notranslate"><span class="pre">ms-python.vscode-pylance</span></code>): Python language server with type checking and code completion.</p></li>
+<li><p><em>Python</em> (<code class="docutils literal notranslate"><span class="pre">ms-python.python</span></code>): Python support for VS Code.</p></li>
+<li><p><em>Pylint</em> (<code class="docutils literal notranslate"><span class="pre">ms-python.pylint</span></code>): Linting support for Python using pylint.</p></li>
+<li><p><em>Python Debugger</em> (<code class="docutils literal notranslate"><span class="pre">ms-python.debugpy</span></code>): Debugging support for Python.</p></li>
+<li><p><em>Python Environments</em> (<code class="docutils literal notranslate"><span class="pre">ms-python.vscode-python-envs</span></code>): Automatically manage and activate your virtual environments.</p></li>
+<li><p><em>Vim</em> (<code class="docutils literal notranslate"><span class="pre">vscodevim.vim</span></code>): Essential if you have incurable vim brain.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Developers Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#recommended-development-environment">Recommended Development Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#linting-and-code-style">Linting and Code Style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#automated-tests">Automated Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#citations">Citations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#github-actions">GitHub Actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#extra-handy-tools">Extra Handy Tools</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="troubleshooting.html"
+                          title="previous chapter">Troubleshooting and Known Issues</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="docs.html"
+                          title="next chapter">Arsenal Sphinx Documentation</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/developers.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="docs.html" title="Arsenal Sphinx Documentation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="troubleshooting.html" title="Troubleshooting and Known Issues"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Developers Guide</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
+    </div>
+  </body>
+</html>

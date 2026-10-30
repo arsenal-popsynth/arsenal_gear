@@ -1,0 +1,33 @@
+arsenal\_gear.stellar\_evolution.se\_data\_structures
+=====================================================
+
+.. automodule:: arsenal_gear.stellar_evolution.se_data_structures
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Isochrone
+      IsochroneSet
+      StellarTrack
+      TrackSet
+   
+   
+
+   
+   
+   
+
+
+
