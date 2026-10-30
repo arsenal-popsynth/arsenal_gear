@@ -1,0 +1,791 @@
+"""
+data_reader.py
+==========
+
+This file defines classes for acquiring stellar and binary evolution data from
+binary evolution codes and converting it into tables in a uniform format:
+one row per track point, with a "model" column naming the track.
+Singles tables have columns model, time, mass, logL, logT, logR; binaries
+tables have the same quantities for the primary and secondary, prefixed by
+"p_" and "s_". The read_* methods turn these tables into TrackSet and
+BinaryTrackSet data structures.
+"""
+
+from abc import ABC, abstractmethod
+from multiprocessing.pool import ThreadPool
+from pathlib import Path
+
+import astropy.constants as const
+import astropy.units as u
+import numpy as np
+import pandas as pd
+import tqdm
+
+from ..stellar_evolution.se_data_structures import StellarTrack, TrackSet
+from ..utils import downloader, untar, unzip
+from ..utils.array_utils import make_monotonic_increasing
+from ..utils.citations import cite
+from .be_data_structures import BinaryTrack, BinaryTrackSet
+
+# variable names of the track quantities in StellarTrack.qs, shared by all tracks
+_TRACK_NAMES = {
+    "age_name": "time",
+    "mass_name": "mass",
+    "lteff_name": "logT",
+    "llbol_name": "logL",
+    "lrad_name": "logR",
+    "lgrav_name": "logg",
+}
+# the same names for TrackSet, which has no current-mass column name
+_SET_NAMES = {k: v for k, v in _TRACK_NAMES.items() if k != "mass_name"}
+# log10(G Msun / Rsun^2 / (cm/s^2)), the solar surface gravity
+_LOGG_SUN = np.log10((const.G * u.Msun / u.Rsun**2).to(u.cm / u.s**2).value)
+
+
+def _model_name(m1: float, q: float | None = None, logp: float | None = None) -> str:
+    """
+    Name of a track: "MMMMM" for single stars, "MMMMM_QQQ_PPP" for binaries,
+    from 100 * the initial (primary) mass, mass ratio and log10(period/days).
+    """
+    name = f"{round(100 * m1):05d}"
+    if q is not None:
+        name += f"_{round(100 * q):03d}_{round(100 * logp):03d}"
+    return name
+
+
+def _star_columns(prefix: str, mass, logL, logT, logR) -> dict:
+    """
+    Columns for one star, in the order used by all tables: mass/Msun,
+    log10(Lbol/Lsun), log10(Teff/K) and log10(R/Rsun).
+    """
+    values = (mass, logL, logT, logR)
+    return {
+        prefix + key: np.asarray(value, dtype=float)
+        for key, value in zip(("mass", "logL", "logT", "logR"), values)
+    }
+
+
+def _interp_star(prefix: str, time, src_time, src) -> dict:
+    """
+    Columns for one star at the given times, linearly interpolated from a
+    source track (with mass, logL, logT and logR). Beyond the source's last
+    time the star's mass is held and its logL, logT and logR are NaN.
+    """
+    beyond = np.asarray(time) > src_time[-1]
+    columns = {}
+    for key in ("mass", "logL", "logT", "logR"):
+        value = np.interp(time, src_time, np.asarray(src[key], dtype=float))
+        if key != "mass":
+            value[beyond] = np.nan
+        columns[prefix + key] = value
+    return columns
+
+
+def _pad(x: np.ndarray, n: int, fill: float = np.nan) -> np.ndarray:
+    """Pad x to length n with the value fill."""
+    return np.concatenate((x, np.full(n - len(x), fill)))
+
+
+def _parse_model_name(name: str) -> tuple[float, float | None, float | None]:
+    """
+    Inverse of _model_name: the initial (primary) mass, and for binaries the
+    initial mass ratio and log10(period/days); None for single stars.
+    """
+    values = [int(part) / 100 for part in name.split("_")]
+    if len(values) == 1:
+        return values[0], None, None
+    return values[0], values[1], values[2]
+
+
+def _logg(mass: np.ndarray, log_r: np.ndarray) -> np.ndarray:
+    """
+    log10(surface gravity / (cm/s^2)) from mass/Msun and log10(R/Rsun);
+    NaN where the star has no (positive) mass or radius.
+    """
+    with np.errstate(divide="ignore", invalid="ignore"):
+        logg = _LOGG_SUN + np.log10(mass) - 2 * log_r
+    return np.where(mass > 0, logg, np.nan)
+
+
+class BinaryDataReader(ABC):
+    """
+    Abstract base class for acquiring and converting data from binary evolution
+    codes. Subclasses provide the source-specific parts: getting the data, and
+    finding and reading single-star and binary model files.
+    """
+
+    # valid metallicity strings, default metallicity, and data directory name
+    mets: list[str] = []
+    default_met = None
+    source: str = ""
+    # a primary more massive than the initial M1 + M2 by more than this fraction
+    # is flagged in BinaryTrackSet.mass_excess. In the z014 BPASS mergers the
+    # excess is either <= 0 or >= 6.6%, and BPASS's models merged at t = 0 start
+    # up to 3% above it (masses rounded to 0.1 Msun)
+    mass_excess_tol = 0.05
+
+    def __init__(self, **kwargs) -> None:
+        """
+        Args:
+            kwargs: Keyword arguments for the reader, including
+                met: metallicity, in the native form of the source
+                rootdir: directory holding the source's data
+                         (default: binary_evolution/data/<source>)
+                output_dir: directory for the converted tables
+                            (default: <rootdir>/processed)
+                force_download: always download the raw data (and rebuild the
+                                tables), even if it is already present
+                delete_archives: delete downloaded archives once their
+                                 contents have been extracted (default: True)
+                convert: convert the data into tables if they don't exist yet
+                         (default: True); if False, stop once the raw data
+                         is available
+                overwrite: rebuild the converted tables even if they exist
+                verbose: decides on verbose output
+        """
+        self.met = kwargs.get("met", self.default_met)
+        self.verbose = kwargs.get("verbose", False)
+        self.force_download = kwargs.get("force_download", False)
+        self.delete_archives = kwargs.get("delete_archives", True)
+        self.convert = kwargs.get("convert", True)
+        # freshly downloaded raw data always replaces the converted tables
+        self.overwrite = kwargs.get("overwrite", False) or self.force_download
+        # make data storage directories if they don't exist
+        rootdir = kwargs.get("rootdir")
+        if rootdir is None:
+            rootdir = Path(__file__).parent.absolute() / "data" / self.source
+        self.rootdir = Path(rootdir)
+        self.output_dir = Path(kwargs.get("output_dir") or self.rootdir / "processed")
+        self.rootdir.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.metstr = self._metstr(self.met)
+        if self.metstr not in self.mets:
+            raise ValueError("Metallicity must be one of: " + str(self.mets))
+
+        self.get_data()
+
+    def get_data(self) -> None:
+        """
+        Makes sure the converted tables exist: if any is missing (or overwrite
+        or force_download is True), makes sure the raw data is available
+        (downloading it if force_download is True), then converts it.
+        The raw model files are left in place.
+        """
+        kinds = [
+            kind
+            for kind in ("singles", "binaries")
+            if self.overwrite or not self._table_path(kind).exists()
+        ]
+        if not kinds:
+            print(f"{self.source} tables already available in {self.output_dir}.")
+            return
+        self._get_raw_data()
+        if not self.convert:
+            return
+        converters = {
+            "singles": self.convert_single_data,
+            "binaries": self.convert_binary_data,
+        }
+        # singles first: the BPASS binaries need them
+        for kind in kinds:
+            converters[kind]()
+
+    @abstractmethod
+    def _get_raw_data(self) -> None:
+        """
+        Makes sure the source's raw model files are available locally: always
+        downloads them if force_download is True, otherwise uses the extracted
+        files or extracts local archives, or raises FileNotFoundError.
+        """
+
+    @staticmethod
+    @abstractmethod
+    def _metstr(met) -> str:
+        """Converts a metallicity into the source's metallicity string."""
+
+    @abstractmethod
+    def _single_files(self) -> list[str]:
+        """Names of the single-star model files."""
+
+    @abstractmethod
+    def _binary_files(self) -> list[str]:
+        """Names of the binary model files."""
+
+    @abstractmethod
+    def _extract_single(self, model: str) -> pd.DataFrame:
+        """Reads one single-star model file into a singles table."""
+
+    @abstractmethod
+    def _extract_binary(self, model: str) -> pd.DataFrame:
+        """Reads one binary model into a binaries table."""
+
+    def convert_single_data(self) -> None:
+        """Converts the single-star models into a singles table on disk."""
+        self._convert("singles", "single-star", self._single_files(), self._extract_single)
+
+    def convert_binary_data(self) -> None:
+        """Converts the binary models into a binaries table on disk."""
+        self._convert("binaries", "binary", self._binary_files(), self._extract_binary)
+
+    def _convert(self, kind: str, label: str, files: list[str], extract) -> None:
+        """Reads all model files with extract and saves them as the kind table."""
+        print(
+            f"Converting {len(files)} {self.source} {label} models "
+            f"(metallicity {self.metstr})..."
+        )
+        data = self._extract_all(extract, files, desc=f"{self.source} {kind}")
+        self._save(data, kind)
+
+    @staticmethod
+    def _scan(directory: Path, pattern: str) -> list[str]:
+        """Sorted paths, relative to directory, of the files matching pattern."""
+        files = sorted(
+            str(path.relative_to(directory))
+            for path in directory.glob(pattern)
+            if path.is_file()
+        )
+        if not files:
+            raise FileNotFoundError(f"No files matching {pattern} in {directory}")
+        return files
+
+    @staticmethod
+    def _extract_all(extract, files: list[str], desc: str = "") -> pd.DataFrame:
+        """
+        Reads all files in parallel with extract, and combines the results
+        into one table sorted by model (keeping the time order within each).
+        Each model's time is made strictly increasing: late-phase timesteps can
+        be shorter than the printed precision of the raw time column, giving
+        repeated (or slightly decreasing) times, which are spread between their
+        neighbours. desc labels the progress bar.
+        """
+        with ThreadPool() as pool:
+            frames = list(
+                tqdm.tqdm(
+                    pool.imap(extract, files), total=len(files), desc=desc, unit="model"
+                )
+            )
+        for frame in frames:
+            time = frame["time"].to_numpy(float).copy()
+            rows = np.arange(len(time), dtype=float)
+            frame["time"] = make_monotonic_increasing(rows, time)
+        print("Combining and sorting the models...")
+        data = pd.concat(frames, ignore_index=True)
+        return data.sort_values("model", kind="stable", ignore_index=True)
+
+    def _table_path(self, kind: str) -> Path:
+        """Path of the converted singles or binaries table."""
+        return self.output_dir / f"{kind}_{self.metstr}.pkl.gz"
+
+    def _save(self, data: pd.DataFrame, kind: str) -> None:
+        """Saves a converted table, unless it exists and overwrite is False."""
+        path = self._table_path(kind)
+        if path.exists() and not self.overwrite:
+            print(f"{path} already exists. Set overwrite=True to replace it.")
+            return
+        print(
+            f"Saving {kind} table ({data.model.nunique()} models, "
+            f"{len(data)} rows) to {path}"
+        )
+        data.to_pickle(path, compression="gzip")
+
+    def _load(self, kind: str) -> pd.DataFrame:
+        """Loads a converted table."""
+        path = self._table_path(kind)
+        if not path.exists():
+            raise FileNotFoundError(
+                f"'{path}' not found. Run convert_{kind[:-1]}_data() first."
+            )
+        return pd.read_pickle(path, compression="gzip")
+
+    @staticmethod
+    def _models(table: pd.DataFrame):
+        """
+        Yields (model name, rows) for each model of a converted table, checking
+        that its time strictly increases (as conversion guarantees).
+        """
+        for name, rows in table.groupby("model", sort=False):
+            if np.any(np.diff(rows.time.to_numpy()) <= 0):
+                raise ValueError(
+                    f"Time does not strictly increase in model {name}. The table "
+                    "may predate this check; rebuild it with overwrite=True."
+                )
+            yield name, rows
+
+    @staticmethod
+    def _track(rows: pd.DataFrame, prefix: str, m0: float) -> StellarTrack:
+        """
+        StellarTrack of one star from its rows in a converted table, where its
+        columns start with prefix ("" for single stars, "p_" or "s_" in binaries).
+        """
+        qs = {"time": rows.time.to_numpy(float)}
+        for col in ("mass", "logL", "logT", "logR"):
+            qs[col] = rows[prefix + col].to_numpy(float)
+        qs["logg"] = _logg(qs["mass"], qs["logR"])
+        return StellarTrack(m0=m0 * u.Msun, eeps=None, elems=[], qs=qs, **_TRACK_NAMES)
+
+    @staticmethod
+    def _set_fields(tracks: list) -> dict:
+        """TrackSet fields shared by single-star and binary track sets."""
+        ages = [track.age.to(u.yr).value for track in tracks]
+        return {
+            "min_ages": np.array([age.min() for age in ages]) * u.yr,
+            "max_ages": np.array([age.max() for age in ages]) * u.yr,
+            "max_eep": None,
+            "eep_name": None,
+            "elems": [],
+            **_SET_NAMES,
+        }
+
+    def read_single_data(self) -> TrackSet:
+        """
+        Reads the converted single-star table into a TrackSet, with one
+        StellarTrack per model and no EEPs.
+        """
+        tracks = [
+            self._track(rows, "", _parse_model_name(name)[0])
+            for name, rows in self._models(self._load("singles"))
+        ]
+        return TrackSet(
+            masses=u.Quantity([track.m0 for track in tracks]),
+            hdr_list=list(tracks[0].qs),
+            tracks=tracks,
+            **self._set_fields(tracks),
+        )
+
+    def read_binary_data(self) -> BinaryTrackSet:
+        """
+        Reads the converted binaries table into a BinaryTrackSet, with one
+        BinaryTrack per system. For both BPASS and MPA/Bonn, the initial mass
+        ratio and period come from the model names; the initial eccentricity e0
+        is 0, i.e. orbits are assumed circular, since neither source provides
+        it. The orbit's evolution is not stored yet (see #45).
+        Systems whose primary becomes more massive than the initial M1 + M2
+        (beyond mass_excess_tol), which is unphysical, are kept but flagged in
+        the set's mass_excess array.
+        """
+        binaries = []
+        for name, rows in self._models(self._load("binaries")):
+            m1, q, logp = _parse_model_name(name)
+            binaries.append(
+                BinaryTrack(
+                    primary=self._track(rows, "p_", m1),
+                    secondary=self._track(rows, "s_", q * m1),
+                    q0=q,
+                    P0=10**logp * u.d,
+                    e0=0.0,
+                )
+            )
+        return BinaryTrackSet(
+            masses=u.Quantity([b.primary.m0 for b in binaries]),
+            hdr_list=list(binaries[0].primary.qs),
+            tracks=binaries,
+            q0=np.array([b.q0 for b in binaries]),
+            P0=u.Quantity([b.P0 for b in binaries]),
+            e0=np.array([b.e0 for b in binaries]),
+            mass_excess=np.array(
+                [
+                    b.mass1.max() > b.primary.m0 * (1 + b.q0) * (1 + self.mass_excess_tol)
+                    for b in binaries
+                ]
+            ),
+            **self._set_fields(binaries),
+        )
+
+
+@cite("10.1017/pasa.2017.51", "10.1093/mnras/sty1353")
+class BPASSReader(BinaryDataReader):
+    """
+    Class for acquiring BPASS stellar models and converting them into tables.
+    This is an instantiation of the BinaryDataReader abstract base class.
+
+    In a BPASS binary model, the primary absorbs the secondary in a merger, but
+    the secondary's own columns are left unchanged, so a merger shows up as a
+    rise in the total mass M1 + M2. The converter detects mergers that way and
+    removes the secondary from the start of the merger on. It never adds mass;
+    note however that in some low-mass mergers (M1 ~ 2-4 Msun) BPASS's primary
+    alone ends up more massive than the initial M1 + M2 (see
+    BinaryTrackSet.mass_excess). Some low-mass models are already merged at
+    t = 0: they start with the combined mass and a placeholder companion, and
+    are treated as merged throughout.
+
+    Otherwise, once the binary model ends the companion continues along the
+    single-star model of its (effective) mass. When the primary becomes a
+    white dwarf, BPASS follows its cooling for much longer but no longer
+    evolves the companion, so the companion continues from the white dwarf's
+    formation, while the primary keeps its cooling sequence.
+    """
+
+    source = "BPASS"
+    default_met = 0.014
+    mets = [
+        "zem5",
+        "zem4",
+        "z001",
+        "z002",
+        "z003",
+        "z004",
+        "z006",
+        "z008",
+        "z010",
+        "z014",
+        "z020",
+        "z030",
+        "z040",
+    ]
+    # dl=0 changed to dl=1 in the Dropbox link to force download
+    url = "https://www.dropbox.com/scl/fo/mpuas1xh5owmdadu0vpev/h?dl=1&e=1&rlkey=7vlk7ra6kvoztzmae8wr34kmz"
+    # name of the release on the server, and the only member of it that we need
+    zip_name = "BPASSv2.2.1_release-07-18-Tuatara.zip"
+    tar_name = "bpass-v2.2-newmodels.tar.gz"
+    # directory created by extracting tar_name
+    models_name = "NEWBINMODS"
+    # 0-indexed data columns of mass, logL, logT and logR for each star
+    primary_cols = [5, 4, 3, 2]
+    secondary_cols = [37, 48, 47, 46]
+    # single-step relative rise of M1 + M2 that marks a merger. In the z014
+    # models, systems without a merger rise by at most 0.16% in a step and
+    # mergers by at least 2.9% (99% of them), so any value in between works
+    merger_rise = 0.01
+    # companion mass below which a model is already merged at t = 0: BPASS's
+    # placeholder companion has 1e-5 Msun, real companions at least 0.01 Msun
+    placeholder_mass = 1e-3
+    # log10(R/Rsun) below which the primary is a white dwarf. It forms at the
+    # start of the primary's final run below this value: in some z014 models
+    # (M1 ~ 2 Msun) the stripped primary dips below it briefly, then expands
+    # again before becoming a white dwarf
+    wd_log_radius = -1.0
+
+    def __init__(self, **kwargs) -> None:
+        """
+        Args:
+            kwargs: Keyword arguments for BinaryDataReader. With
+                delete_archives (default), the (~13 GB) release zip and the
+                models tar file are deleted once the models are extracted.
+        """
+        # singles table and its masses, loaded by convert_binary_data
+        self._singles = None
+        self._single_masses = None
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def _metstr(met: float) -> str:
+        """Converts a metallicity mass fraction Z to a BPASS string, e.g. z014."""
+        if met >= 1e-3:
+            return f"z{round(met * 1000):03d}"
+        return f"zem{-round(np.log10(met)):01d}"
+
+    def _get_raw_data(self) -> None:
+        """
+        Downloads the BPASS release if force_download is True; otherwise looks
+        for the extracted models, then the models tar file, then the release
+        zip, and unzips/untars what is needed. The zip and tar files are
+        deleted once extracted (unless delete_archives is False).
+        """
+        models_dir = self.rootdir / self.models_name
+        tar_path = self.rootdir / self.tar_name
+        zip_path = self.rootdir / self.zip_name
+
+        if self.force_download:
+            downloader(zip_path, self.url, "Downloading stellar models...")
+        elif models_dir.is_dir():
+            return
+        if self.force_download or not tar_path.is_file():
+            if not zip_path.is_file():
+                raise FileNotFoundError(
+                    f"BPASS data not found in {self.rootdir}; "
+                    "set force_download=True to download it. "
+                    "This will download ~13 GB of data."
+                )
+            unzip(
+                zip_path,
+                self.rootdir,
+                target_file=self.tar_name,
+                delete_zip=self.delete_archives,
+            )
+        untar(tar_path, self.rootdir, delete_tar=self.delete_archives)
+        if not models_dir.is_dir():
+            raise FileNotFoundError(
+                f"Extracting {tar_path} did not produce {models_dir}. "
+                "The layout of the BPASS release may have changed."
+            )
+        print(f"BPASS data now available in {self.rootdir}.")
+
+    def _single_dir(self) -> Path:
+        return self.rootdir / "NEWSINMODS" / self.metstr
+
+    def _binary_dir(self) -> Path:
+        return self.rootdir / "NEWBINMODS" / "NEWBINMODS" / self.metstr
+
+    def _single_files(self) -> list[str]:
+        return self._scan(self._single_dir(), "sneplot*")
+
+    def _binary_files(self) -> list[str]:
+        return self._scan(self._binary_dir(), "sneplot*")
+
+    def _extract_single(self, model: str) -> pd.DataFrame:
+        data = np.genfromtxt(self._single_dir() / model)
+        m1 = float(model.split("-")[-1])
+        return pd.DataFrame(
+            {
+                "model": _model_name(m1),
+                "time": data[:, 1].astype(float),  # time in yr
+                **_star_columns("", *data[:, self.primary_cols].T),
+            }
+        )
+
+    def convert_binary_data(self) -> None:
+        """
+        Converts the binary models into a binaries table on disk. Companions
+        that outlive the binary model continue along single-star models, so the
+        singles table (from convert_single_data) is loaded first.
+        """
+        print("Loading the singles table, used to continue companions...")
+        self._singles = self._load("singles")
+        self._single_masses = (
+            np.unique(np.round(self._singles.model.values.astype(float)).astype(int))
+            / 100
+        )
+        super().convert_binary_data()
+
+    def _extract_binary(self, model: str) -> pd.DataFrame:
+        data = np.genfromtxt(self._binary_dir() / model)
+        m1, q, logp = (float(x) for x in model.split("-")[-3:])
+        model_name = _model_name(m1, q, logp)
+
+        combined_df = pd.DataFrame(
+            {
+                "model": model_name,
+                "time": data[:, 1].astype(float),  # time in yr
+                **_star_columns("p_", *data[:, self.primary_cols].T),
+                **_star_columns("s_", *data[:, self.secondary_cols].T),
+            }
+        )
+
+        # Check for mergers: the total mass rises as the primary absorbs the
+        # secondary, whose own columns BPASS leaves unchanged
+        total = combined_df.p_mass.to_numpy() + combined_df.s_mass.to_numpy()
+        rise = np.diff(total) / total[:-1]
+        jumps = np.flatnonzero(rise > self.merger_rise)
+        if combined_df.s_mass.iloc[0] < self.placeholder_mass:
+            # already merged at t = 0: the companion is only a placeholder
+            start = 0
+        elif jumps.size:
+            # the merger starts with the unbroken rise that contains the first jump
+            step = jumps[0]
+            while step > 0 and rise[step - 1] > 0:
+                step -= 1
+            start = step + 1
+        else:
+            start = None
+        if start is not None:
+            # from then on the secondary no longer exists as a separate star
+            combined_df.loc[start:, "s_mass"] = 0.0
+            combined_df.loc[start:, ["s_logL", "s_logT", "s_logR"]] = np.nan
+            return combined_df
+
+        # The binary phase ends with the model (e.g. at the primary's supernova),
+        # or when the primary becomes a white dwarf: at the start of its final
+        # run of rows below wd_log_radius. BPASS then follows its cooling, but
+        # no longer evolves the companion
+        log_r = combined_df.p_logR.to_numpy()
+        i_end = len(log_r) - 1
+        if log_r[-1] < self.wd_log_radius:
+            i_end = np.flatnonzero(log_r >= self.wd_log_radius)[-1] + 1
+        binary_df = combined_df.iloc[: i_end + 1]
+        # the primary from the end of the binary phase on, no longer coupled to
+        # the companion: its white-dwarf cooling rows, or only its last row
+        uncoupled_df = combined_df.iloc[i_end:].copy()
+        # strictly increasing times (see _extract_all) to interpolate the primary
+        uncoupled_time = uncoupled_df.time.to_numpy(float).copy()
+        uncoupled_df["time"] = make_monotonic_increasing(
+            np.arange(len(uncoupled_time), dtype=float), uncoupled_time
+        )
+
+        # Companion's effective mass: rejuvenated if it accreted > 5% and is >= 2 Msun
+        m2_init = binary_df.s_mass.values[0]
+        m2_max = np.max(binary_df.s_mass.values)
+        rejuvenated = (m2_max > 1.05 * m2_init) and (m2_max >= 2)
+        m2_eff = m2_max if rejuvenated else m2_init
+        # the companion is treated as born when it first reaches m2_eff
+        i_birth = np.flatnonzero(binary_df.s_mass.values == m2_eff)[0]
+        t_birth = binary_df.time.values[i_birth]
+        # companion's age at the end of the binary phase
+        age_end = binary_df.time.values[-1] - t_birth
+        # continue with the nearest-mass single-star model, strictly after that age
+        masses = self._single_masses
+        m_single = masses[np.argmin(np.abs(masses - m2_eff))]
+        track = self._singles[self._singles.model == _model_name(m_single)]
+        # companion age -> system time, so the join moves forward in time
+        track_time = t_birth + track.time.values
+        # after the join: the primary's uncoupled rows (if any beyond the last
+        # binary row) and the companion's single-star rows, each star
+        # interpolated onto both
+        time = np.union1d(
+            uncoupled_df.time.values[1:], track_time[track.time.values > age_end]
+        )
+        evolved_df = pd.DataFrame(
+            {
+                "model": model_name,
+                "time": time,
+                **_interp_star(
+                    "p_",
+                    time,
+                    uncoupled_df.time.values,
+                    uncoupled_df.rename(columns=lambda c: c.removeprefix("p_")),
+                ),
+                **_interp_star("s_", time, track_time, track),
+            }
+        )
+        return pd.concat([binary_df, evolved_df], ignore_index=True)
+
+
+class MPAReader(BinaryDataReader):
+    """
+    Class for acquiring MPA/Bonn stellar models and converting them into tables.
+    This is an instantiation of the BinaryDataReader abstract base class.
+    """
+
+    source = "MPA"
+    default_met = "MW"
+    mets = ["MW", "LMC", "SMC"]
+    url = "https://wwwmpa.mpa-garching.mpg.de/stellgrid/data/BonnGrids/"
+    # leading path of the members of the binary tarballs (the server's layout)
+    server_prefix = "afs/mpa/project/stellgrid2/web/data/BonnGrids/"
+    # model columns of mass, logL, logT and logR
+    star_cols = ["star_mass", "log_L", "log_Teff", "log_R"]
+
+    def __init__(self, **kwargs) -> None:
+        """
+        Args:
+            kwargs: Keyword arguments for BinaryDataReader, plus
+                username, password: credentials for the MPA/Bonn data server,
+                                    only needed to download
+        """
+        self.username = kwargs.get("username")
+        self.password = kwargs.get("password")
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def _metstr(met: str) -> str:
+        """MPA/Bonn metallicities are already strings: MW, LMC or SMC."""
+        return met
+
+    def _archives(self) -> list[tuple]:
+        """
+        For each model set of this metallicity: its name on the server, the
+        local tarball, where to extract it, how many leading directories to
+        strip from its members, and the directory its model files end up in.
+        The binary tarballs store the server's full path, the singles none.
+        """
+        strip = self.server_prefix.count("/")
+        met = self.met
+        return [
+            (f"{met}/primary", f"{met}_primary.tar", self.rootdir, strip,
+             self._primary_dir()),
+            (f"{met}/secondary", f"{met}_secondary.tar", self.rootdir, strip,
+             self._secondary_dir()),
+            (f"single_{met}/single_{met}", f"single_{met}.tar", self._single_dir(),
+             0, self._single_dir()),
+        ]
+
+    @staticmethod
+    def _has_files(directory: Path) -> bool:
+        """Whether directory holds any model file (empty subdirectories don't count)."""
+        return any(directory.rglob("*_compressed.pkl.gz"))
+
+    def _get_raw_data(self) -> None:
+        """
+        Downloads the MPA/Bonn tarballs if force_download is True; otherwise
+        uses the extracted model directories, extracting any local tarballs
+        whose directory is missing. Tarballs are deleted once extracted
+        (unless delete_archives is False).
+        """
+        archives = self._archives()
+        if self.force_download:
+            if self.username is None:
+                raise ValueError(
+                    "Downloading MPA/Bonn data needs a username and password"
+                )
+            for model_set, tarball, *_ in archives:
+                downloader(
+                    self.rootdir / tarball,
+                    self.url + model_set + ".tar",
+                    "Downloading stellar models...",
+                    self.username,
+                    self.password,
+                )
+        for _, tarball, target, strip, data_dir in archives:
+            if self._has_files(data_dir) and not self.force_download:
+                continue
+            tar_path = self.rootdir / tarball
+            if not tar_path.is_file():
+                raise FileNotFoundError(
+                    f"MPA/Bonn data not found: neither {data_dir} nor {tar_path} "
+                    "exists; set force_download=True to download it."
+                    "This will download ~30 GB of data."
+                )
+            untar(
+                tar_path,
+                target,
+                delete_tar=self.delete_archives,
+                strip_components=strip,
+            )
+            if not self._has_files(data_dir):
+                raise FileNotFoundError(
+                    f"Extracting {tar_path} did not produce {data_dir}. "
+                    "The layout of the MPA/Bonn data may have changed."
+                )
+
+    def _single_dir(self) -> Path:
+        return self.rootdir / f"single_{self.met}"
+
+    def _primary_dir(self) -> Path:
+        return self.rootdir / self.met / "primary"
+
+    def _secondary_dir(self) -> Path:
+        return self.rootdir / self.met / "secondary"
+
+    def _single_files(self) -> list[str]:
+        return self._scan(self._single_dir(), "*_0_compressed.pkl.gz")
+
+    def _binary_files(self) -> list[str]:
+        return self._scan(self._primary_dir(), "*/*_compressed.pkl.gz")
+
+    def _extract_single(self, model: str) -> pd.DataFrame:
+        df = pd.read_pickle(self._single_dir() / model, compression="gzip")
+        # the file name starts with log10(M), then the rotation rate
+        log_m = float(model.split("_")[0])
+        return pd.DataFrame(
+            {
+                "model": _model_name(10**log_m),
+                "time": df.star_age.to_numpy(float),  # time in yr
+                **_star_columns("", *(df[col] for col in self.star_cols)),
+            }
+        )
+
+    def _extract_binary(self, model: str) -> pd.DataFrame:
+        # the file name stores log10(M1), q and log10(P/days), e.g. 1.300_0.500_-0.050
+        log_m1, q, logp = (float(x) for x in Path(model).name.split("_")[:3])
+        model_name = _model_name(10**log_m1, q, logp)
+        df_1 = pd.read_pickle(self._primary_dir() / model, compression="gzip")
+        df_2 = pd.read_pickle(self._secondary_dir() / model, compression="gzip")
+
+        # both stars share the time grid of the longer model; the shorter one is
+        # padded with NaN, except that the primary keeps its final mass
+        n = max(len(df_1), len(df_2))
+        longer = df_2 if len(df_2) > len(df_1) else df_1
+        p_cols = [df_1[col].to_numpy(float) for col in self.star_cols]
+        s_cols = [df_2[col].to_numpy(float) for col in self.star_cols]
+        return pd.DataFrame(
+            {
+                "model": model_name,
+                "time": longer.star_age.to_numpy(float),  # time in yr
+                **_star_columns(
+                    "p_",
+                    _pad(p_cols[0], n, p_cols[0][-1]),
+                    *(_pad(col, n) for col in p_cols[1:]),
+                ),
+                **_star_columns("s_", *(_pad(col, n) for col in s_cols)),
+            }
+        )
