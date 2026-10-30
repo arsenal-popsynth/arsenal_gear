@@ -35,9 +35,9 @@ def downloader(fname, url, message):
         response = requests.get(url, stream=True, timeout=10)
         response.raise_for_status()
     except requests.exceptions.Timeout as e:
-        raise TimeoutError("Request timed out. Check internet connection.") from e
+        raise DownloadError("Request timed out. Check internet connection.") from e
     except requests.exceptions.ConnectionError as e:
-        raise ConnectionError("Connection error. Check internet connection.") from e
+        raise DownloadError("Connection error. Check internet connection.") from e
     except requests.exceptions.HTTPError as e:
         raise DownloadError(f"HTTP error occurred: {e}") from e
     except requests.exceptions.TooManyRedirects as e:
