@@ -10,6 +10,11 @@ Functions:
 import requests
 from tqdm import tqdm
 
+
+class DownloadError(RuntimeError):
+    """Raised when file download fails."""
+
+
 def downloader(fname, url, message):
     """
     Method for downloading isochrone data from the web where available.
@@ -28,24 +33,30 @@ def downloader(fname, url, message):
 
     try:
         response = requests.get(url, stream=True, timeout=10)
+        response.raise_for_status()
     except requests.exceptions.Timeout as e:
-        raise TimeoutError('Request timed out. Check internet connection.') from e
+        raise DownloadError("Request timed out. Check internet connection.") from e
     except requests.exceptions.ConnectionError as e:
-        raise ConnectionError('Connection error. Check internet connection.') from e
+        raise DownloadError("Connection error. Check internet connection.") from e
     except requests.exceptions.HTTPError as e:
-        raise RuntimeError(f'HTTP error occurred: {e}') from e
+        raise DownloadError(f"HTTP error occurred: {e}") from e
     except requests.exceptions.TooManyRedirects as e:
-        raise RuntimeError('Too many redirects. Check the URL.') from e
+        raise DownloadError("Too many redirects. Check the URL.") from e
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f'Download failed: {e}') from e
+        raise DownloadError(f"Download failed: {e}") from e
 
     # Get file size
-    total_size = int(response.headers.get('content-length', 0))
+    total_size = int(response.headers.get("content-length", 0))
     # create a progress bar
-    tqdm_args = {"desc": "Downloading", "total": total_size, "unit": 'B',
-                    "unit_scale": True, "unit_divisor": 1024}
+    tqdm_args = {
+        "desc": "Downloading",
+        "total": total_size,
+        "unit": "B",
+        "unit_scale": True,
+        "unit_divisor": 1024,
+    }
     # write the file
-    with open(fname, 'wb') as f, tqdm(**tqdm_args) as prog_bar:
+    with open(fname, "wb") as f, tqdm(**tqdm_args) as prog_bar:
         for chunk in response.iter_content(chunk_size=1024):
             f.write(chunk)
             prog_bar.update(len(chunk))

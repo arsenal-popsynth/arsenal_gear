@@ -1,5 +1,5 @@
 """
-limongichieffi2018
+limongichieffi
 ==========
 
 This submodule contains all the code required to load yields from
@@ -13,7 +13,6 @@ from typing import List
 
 import astropy.units as u
 import numpy as np
-from astropy.units import Quantity
 
 from ..formation import SinglePop
 from ..utils.citations import cite
@@ -48,7 +47,7 @@ class LimongiChieffi2018(YieldTables):
     rot = np.array([0, 150, 300])
     ccsn_mmax = 25
 
-    def __init__(self, model: str = "R") -> None:
+    def __init__(self, model: str = "R", **kwargs) -> None:
         """
         Args:
             model: choice of model to load, see Limongi & Chieffi (2018) for details
@@ -89,7 +88,7 @@ class LimongiChieffi2018(YieldTables):
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data/LimongiChieffi2018"
         self.name = "Limongi & Chieffi (2018)"
 
@@ -98,8 +97,10 @@ class LimongiChieffi2018(YieldTables):
             self.download_yields(table=f"tab_{model}")
         elif not (self.filedir / f"tab_{model}.tgz").is_file():
             self.download_yields(table=f"tab_{model}")
-
         self.filedir = self.filedir / f"tab_{model}.tgz"
+        if not self.available:
+            return
+
         self.elements, self.atomic_num = self.get_element_list()
 
         # Stellar wind yields
@@ -110,72 +111,23 @@ class LimongiChieffi2018(YieldTables):
         ccsn_yld = self.load_ccsn_yields()
         self.ccsn = Source(self.elements, [self.rot, self.metal, self.mass], ccsn_yld)
 
-    ## Main interface functions
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> dict[str, Quantity["mass"]]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starSop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            Dict of [str, Quantity["mass"]] of yields matching provided element list
-
-        """
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Limongi & Chieffi (2018) ccsn tables"""
         args = [
             starPop.rotation.value * starPop.ones_like,
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
-        return {el: yld_array[i] for i, el in enumerate(elements)}
-
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> dict[str, Quantity["mass"]]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound.
-        Returns:
-            List of yields matching provided element list
-
-        """
-        # TO DO: replace these calls with a default argument parsing function
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Limongi & Chieffi (2018) wind tables"""
         args = [
             starPop.rotation.value * starPop.ones_like,
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        yld_array = (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
-        return {el: yld_array[i] for i, el in enumerate(elements)}
+        return args
 
     ## Internal functions for loading data
     def get_element_list(self) -> None:
@@ -266,19 +218,34 @@ class LimongiChieffi2018(YieldTables):
     ## Function for downloading data from the web
     def download_yields(self, table: str) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import downloader
+        import warnings
 
-        downloader(
-            self.filedir / f"{table}.tgz",
-            f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
-            message=f"Yield file {table}.tgz not found.",
-        )
+        from ..utils.scraper import DownloadError, downloader
 
-        if not (self.filedir / "readme.txt").is_file():
+        try:
             downloader(
-                self.filedir / "readme.txt",
-                f"{self.lc_url}/2018-modelli/yields/legenda",
-                message="See downloaded readme.txt for info about yields.",
+                self.filedir / f"{table}.tgz",
+                f"{self.lc_url}/2018-modelli/yields/{table}.tgz",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
+
+        try:
+            if not (self.filedir / "readme.txt").is_file():
+                downloader(
+                    self.filedir / "readme.txt",
+                    f"{self.lc_url}/2018-modelli/yields/legenda",
+                    message=None,
+                )
+        except DownloadError:
+            warnings.warn(
+                f"{self.__class__.__name__}: Could not found readme.",
+                RuntimeWarning,
             )
 
     # helper functions for reading tables
