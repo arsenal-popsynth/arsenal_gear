@@ -10,8 +10,8 @@ import argparse
 import astropy.units as u
 import numpy as np
 
-from arsenal_gear.formation.dist_funcs import *
 from arsenal_gear.formation import *
+from arsenal_gear.formation.dist_funcs import *
 
 
 def zams_single(

@@ -20,7 +20,8 @@ class Isochrone:
 
     Attributes:
         age: Age of the isochrone
-        eep_name: variable name for equivalent evolutionary phase
+        eep_name: variable name for equivalent evolutionary phase,
+                  None for models without EEPs
         m0_name: variable name for initial stellar masses
         lteff_name: variable name for log_10(effective temperature/K)
         llbol_name: variable name for log_10(bolometric luminosities/L_sun)
@@ -31,7 +32,7 @@ class Isochrone:
     """
 
     age: Quantity["time"]
-    eep_name: str
+    eep_name: str | None
     m0_name: str
     lteff_name: str
     llbol_name: str
@@ -44,6 +45,8 @@ class Isochrone:
     @property
     def eep(self) -> np.ndarray[int]:
         """Equivalent evolutionary phase numbers of the isochrone points."""
+        if self.eep_name is None:
+            raise ValueError("isochrone has no EEPs")
         return self.qs[self.eep_name].astype(int)
 
     @property
@@ -80,20 +83,24 @@ class StellarTrack:
     Data class for storing stellar track data.
 
     Attributes:
-        mass: Initial mass of the stellar track
-        eep_name: variable name for equivalent evolutionary phase
+        m0: Initial mass of the stellar track
+        eeps: Row numbers (1-based) of the primary EEPs along the track,
+              None for models without EEPs
         age_name: variable name for age (in years by default)
+        mass_name: variable name for current stellar mass/M_sun,
+                   None if not available
         lteff_name: variable name for log_10(effective temperature/K)
         llbol_name: variable name for log_10(bolometric luminosities/L_sun)
         lrad_name: variable name for log_10(stellar radii/R_sun)
         lgrav_name: variable name for log_10(surface gravities/cm/s^2)
         qs: Dictionary of stellar track quantities. These should minimally include
-            EEP, log_Teff, and log_L but can include others.
+            age, log_Teff, and log_L but can include others.
     """
 
-    mass: Quantity["mass"]
-    eeps: np.ndarray[int]
+    m0: Quantity["mass"]
+    eeps: np.ndarray[int] | None
     age_name: str
+    mass_name: str | None
     lteff_name: str
     llbol_name: str
     lrad_name: str
@@ -106,6 +113,13 @@ class StellarTrack:
     def age(self) -> Quantity["time"]:
         """Ages of the stellar track points."""
         return self.qs[self.age_name] * u.yr
+
+    @property
+    def mass(self) -> Quantity["mass"]:
+        """Current masses of the stellar track points."""
+        if self.mass_name is None:
+            raise ValueError("stellar track has no current-mass column")
+        return self.qs[self.mass_name] * u.Msun
 
     @property
     def teff(self) -> Quantity["temperature"]:
@@ -166,7 +180,8 @@ class TrackSet:
         masses: List of initial masses of the tracks
         hdr_list: List of column headers for the track data
         tracks: List of Track objects
-        max_eep: Maximum equivalent evolutionary phase number across all tracks
+        max_eep: Maximum equivalent evolutionary phase number across all tracks,
+                 None for models without EEPs
     """
 
     masses: np.ndarray[Quantity["mass"]]
@@ -174,10 +189,10 @@ class TrackSet:
     max_ages: np.ndarray[Quantity["time"]]
     hdr_list: list[str]
     tracks: list[StellarTrack]
-    max_eep: int
+    max_eep: int | None
 
     # names also stored as attributes for ease of access
-    eep_name: str
+    eep_name: str | None
     age_name: str
     lteff_name: str
     llbol_name: str

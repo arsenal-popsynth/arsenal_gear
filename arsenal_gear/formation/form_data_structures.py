@@ -16,8 +16,8 @@ import numpy as np
 from astropy.units import Quantity
 
 if TYPE_CHECKING:
-    from .dist_funcs.imf import IMF
     from .dist_funcs.binaries import MassRatio, Period, Semimajor
+    from .dist_funcs.imf import IMF
 
 @dataclass
 class SinglePop:

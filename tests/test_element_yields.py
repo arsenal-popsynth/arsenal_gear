@@ -7,6 +7,7 @@ which are contained in element_yields
 """
 
 import numpy as np
+import pytest
 from numpy.testing import assert_approx_equal
 
 import arsenal_gear
@@ -69,12 +70,21 @@ class TestLimongiChieffi2018:
             assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
 
 
+@pytest.mark.skip(reason="the NuGrid yield tables can't be downloaded at the moment (#57)")
 class TestNuGrid:
 
-    nugrid = arsenal_gear.element_yields.NuGrid()
-    p16 = arsenal_gear.element_yields.Pignatari2016()
-    r18 = arsenal_gear.element_yields.Ritter2018()
-    bat = arsenal_gear.element_yields.Battino20192021()
+    nugrid: arsenal_gear.element_yields.NuGrid
+    p16: arsenal_gear.element_yields.Pignatari2016
+    r18: arsenal_gear.element_yields.Ritter2018
+    bat: arsenal_gear.element_yields.Battino20192021
+
+    @pytest.fixture(autouse=True, scope="class")
+    def yield_sets(self, request):
+        """Load the yield sets only when the tests run (they download data)."""
+        request.cls.nugrid = arsenal_gear.element_yields.NuGrid()
+        request.cls.p16 = arsenal_gear.element_yields.Pignatari2016()
+        request.cls.r18 = arsenal_gear.element_yields.Ritter2018()
+        request.cls.bat = arsenal_gear.element_yields.Battino20192021()
 
     def test_monotinically_increasing_params(self):
         """Ensure monotonically increasing parameter grid"""
