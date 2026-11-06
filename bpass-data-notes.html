@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Notes on the BPASS Binary Data &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Models Used in Existing Hydrocodes" href="code-models.html" />
+    <link rel="prev" title="Models Used in Arsenal Gear" href="models.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="code-models.html" title="Models Used in Existing Hydrocodes"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="models.html" title="Models Used in Arsenal Gear"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Notes on the BPASS Binary Data</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section class="tex2jax_ignore mathjax_ignore" id="notes-on-the-bpass-binary-data">
+<h1>Notes on the BPASS Binary Data<a class="headerlink" href="#notes-on-the-bpass-binary-data" title="Link to this heading">¶</a></h1>
+<p>These notes record the problems found in the BPASS v2.2.1 stellar models while building
+<code class="docutils literal notranslate"><span class="pre">arsenal_gear.binary_evolution.BPASSReader</span></code>, and how the reader handles each one. All numbers are
+for the full Z = 0.014 (<code class="docutils literal notranslate"><span class="pre">z014</span></code>) grid: 12,663 binary models and 284 single-star models. Column
+numbers are 0-indexed, as in the reader.</p>
+<p>The reader uses only the model files (<code class="docutils literal notranslate"><span class="pre">sneplot-*</span></code> in <code class="docutils literal notranslate"><span class="pre">NEWSINMODS/</span></code> and <code class="docutils literal notranslate"><span class="pre">NEWBINMODS/NEWBINMODS/</span></code>).
+It does not use BPASS’s population input files (<code class="docutils literal notranslate"><span class="pre">input_bpass_*</span></code>, in the IMF tarballs), the
+secondary-star models in <code class="docutils literal notranslate"><span class="pre">NEWBINMODS/NEWSECMODS/</span></code>, or the period column. Merger detection,
+rejuvenation and the companion’s continuation are therefore decided by the reader itself, from the
+mass, luminosity, temperature and radius columns.</p>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Issue</p></th>
+<th class="head"><p>Systems affected</p></th>
+<th class="head"><p>Handling in the reader</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Mergers aren’t marked</p></td>
+<td><p>1,755 mergers (13.9%)</p></td>
+<td><p>detected from a rise in M1 + M2 (<code class="docutils literal notranslate"><span class="pre">merger_rise</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Merged primaries gain mass</p></td>
+<td><p>402 (3.2%)</p></td>
+<td><p>kept, flagged in <code class="docutils literal notranslate"><span class="pre">BinaryTrackSet.mass_excess</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Already merged at t = 0</p></td>
+<td><p>245 (1.9%)</p></td>
+<td><p>merged throughout (<code class="docutils literal notranslate"><span class="pre">placeholder_mass</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Repeated times</p></td>
+<td><p>many files</p></td>
+<td><p>made strictly increasing</p></td>
+</tr>
+<tr class="row-even"><td><p>White-dwarf primaries</p></td>
+<td><p>1,775 (14.0%)</p></td>
+<td><p>companion continues from white-dwarf formation (<code class="docutils literal notranslate"><span class="pre">wd_log_radius</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Join jumps</p></td>
+<td><p>347 jumps &gt; 10%</p></td>
+<td><p>not handled (#47, #50)</p></td>
+</tr>
+<tr class="row-even"><td><p>“Merger” models without a merger</p></td>
+<td><p>224 (1.8%)</p></td>
+<td><p>used as they are</p></td>
+</tr>
+<tr class="row-odd"><td><p>No orbit evolution or eccentricity</p></td>
+<td><p>all</p></td>
+<td><p>initial orbit only, e0 = 0 (#45)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="mergers-aren-t-marked-in-the-model-files">
+<h2>Mergers aren’t marked in the model files<a class="headerlink" href="#mergers-aren-t-marked-in-the-model-files" title="Link to this heading">¶</a></h2>
+<p>When the primary absorbs the secondary, BPASS adds the secondary’s mass to the primary but
+leaves the secondary’s own columns (mass in col 37, and L, T, R in cols 46–48) unchanged. So
+nothing in the file marks the merger, and the secondary appears to keep existing next to the
+merged star.</p>
+<p>The total mass M1 + M2 is a clean signature, though. A merger shows up as a rise in that total:</p>
+<ul class="simple">
+<li><p>In systems without a merger, the total rises by at most 0.16% in a single step (rounding).</p></li>
+<li><p>In mergers, it rises by at least 2.9% in a step, for 99% of them.</p></li>
+</ul>
+<p>The reader treats a single-step rise above <code class="docutils literal notranslate"><span class="pre">BPASSReader.merger_rise</span> <span class="pre">=</span> <span class="pre">0.01</span></code> (1%) as a merger. The
+rise is relative to the current total. The merger starts at the beginning of the unbroken rise
+that contains the first such step; from then on the secondary’s mass is 0 and its L, T and R are
+NaN. In some mergers (e.g. <code class="docutils literal notranslate"><span class="pre">5-0.9-0.2</span></code>) the secondary’s mass column ticks up while it’s being
+absorbed, so a rule that required the secondary to stay exactly constant would miss them.</p>
+<p>BPASS’s population input files label models directly (type 0 = merger model, 1 = normal
+primary). These labels and the reader’s detection agree for all 10,439 type-1 models and for
+2,000 of the 2,224 type-0 models; the other 224 are described under “Merger” models without a merger.</p>
+</section>
+<section id="some-merged-primaries-gain-mass">
+<h2>Some merged primaries gain mass<a class="headerlink" href="#some-merged-primaries-gain-mass" title="Link to this heading">¶</a></h2>
+<p>In 402 mergers (3.2% of all systems, 22.9% of mergers; M1 = 1.9–3.7 Msun), BPASS’s own merged
+primary ends up more massive than the system’s initial M1 + M2: by +6.6% to +45%, with a median of
++21% (e.g. <code class="docutils literal notranslate"><span class="pre">1.9-0.3-0</span></code>). This is in BPASS’s own primary column, not something the reader adds;
+the reader never adds mass.</p>
+<p>The values fall into two clean groups. Mergers either stay at or below the initial total (1,353)
+or exceed it by at least 6.6% (402), and rounding in the already-merged models (next section)
+reaches at most +3.0%. So the 5% threshold <code class="docutils literal notranslate"><span class="pre">BinaryDataReader.mass_excess_tol</span></code> flags exactly these
+402. They are kept, and flagged in <code class="docutils literal notranslate"><span class="pre">BinaryTrackSet.mass_excess</span></code>.</p>
+</section>
+<section id="models-already-merged-at-t-0">
+<h2>Models already merged at t = 0<a class="headerlink" href="#models-already-merged-at-t-0" title="Link to this heading">¶</a></h2>
+<p>245 models (1.9%; M1 = 0.9–2.7 Msun; all type 0) are merged from the first row:</p>
+<ul class="simple">
+<li><p>The primary starts at the combined mass, rounded to BPASS’s 0.1 Msun grid, so up to 3.0% above
+the M1 (1 + q) in the model’s name.</p></li>
+<li><p>The companion is a placeholder: M2 = 1e-5 Msun throughout, with log L = −4 or −25.</p></li>
+</ul>
+<p>The smallest real companion mass in the first row of any other file is 0.01 Msun, so the reader
+treats any first-row M2 below <code class="docutils literal notranslate"><span class="pre">BPASSReader.placeholder_mass</span> <span class="pre">=</span> <span class="pre">1e-3</span></code> Msun as a placeholder. Such
+a system is merged from row 0, with no companion and no single-star continuation. Without this,
+the placeholder was continued as a 0.1 Msun star that doesn’t exist.</p>
+</section>
+<section id="repeated-and-decreasing-times">
+<h2>Repeated and decreasing times<a class="headerlink" href="#repeated-and-decreasing-times" title="Link to this heading">¶</a></h2>
+<p>Ages are printed to 7 significant digits, so late phases with short time steps produce repeated
+(or slightly decreasing) ages. For example, 944 files have repeated ages during the white-dwarf
+cooling phase. The reader makes each model’s time strictly increasing with
+<code class="docutils literal notranslate"><span class="pre">utils.array_utils.make_monotonic_increasing</span></code>, which spreads the repeated values between their
+neighbours. These changes are below the printed precision.</p>
+</section>
+<section id="white-dwarf-primaries-freeze-the-companion">
+<h2>White-dwarf primaries freeze the companion<a class="headerlink" href="#white-dwarf-primaries-freeze-the-companion" title="Link to this heading">¶</a></h2>
+<p>When the primary becomes a white dwarf (log R1 &lt; −1), the file goes on through the white dwarf’s
+cooling, typically for about 100 times longer than the time taken to reach it (a median of 119
+times, measured with an earlier merger rule). Over this phase BPASS stops evolving the companion:</p>
+<ul class="simple">
+<li><p>Its columns are completely frozen in 73% of these files.</p></li>
+<li><p>In the rest its luminosity drifts only slightly: a median change of 0 dex, and 0.4 dex at the
+99th percentile.</p></li>
+<li><p>No companion goes through its own giant phase or death there, even when the cooling phase
+lasts far longer than the companion’s lifetime.</p></li>
+</ul>
+<p>While the primary is still alive, BPASS does evolve the companion, approximately: its mass
+changes in 70% of files and its luminosity in 84%.</p>
+<p>Example: in <code class="docutils literal notranslate"><span class="pre">3-0.7-3</span></code> the primary is a white dwarf at 4.9e8 yr and the file ends at 9.7e10 yr.
+Its 2.1 Msun companion, frozen on the main sequence in the file, becomes a giant and then a white
+dwarf itself at about 1.3e9 yr on its single-star track.</p>
+<p><strong>Detecting white-dwarf formation:</strong> it’s the start of the primary’s <em>final</em> run of rows below
+<code class="docutils literal notranslate"><span class="pre">BPASSReader.wd_log_radius</span> <span class="pre">=</span> <span class="pre">-1.0</span></code>. The first row below −1 isn’t reliable: in 76 systems (mostly
+M1 ≈ 2 Msun) the stripped primary dips just below −1, then grows again to log R ≈ 0–1.7 before
+finally becoming a white dwarf.</p>
+<p><strong>Handling:</strong></p>
+<ul class="simple">
+<li><p>The binary phase ends at the white dwarf’s formation.</p></li>
+<li><p>The primary keeps its whole cooling sequence.</p></li>
+<li><p>The companion continues along its single-star track from that point.</p></li>
+<li><p>After the join, the rows are the cooling rows plus the single-star rows, with each star
+interpolated onto both.</p></li>
+</ul>
+<p>Of the 1,834 systems without a merger whose primary ends as a white dwarf, 1,775 become one
+before the file ends, so their output changes. The other 59 become white dwarfs on the last row.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Effect on the companion at the join</p></th>
+<th class="head"><p>join at file end (before)</p></th>
+<th class="head"><p>join at white-dwarf formation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>companion’s single-star track already over</p></td>
+<td><p>381</p></td>
+<td><p>3</p></td>
+</tr>
+<tr class="row-odd"><td><p>companion’s mass jump &gt; 50%</p></td>
+<td><p>622</p></td>
+<td><p>7</p></td>
+</tr>
+<tr class="row-even"><td><p>companion’s mass jump &gt; 10%</p></td>
+<td><p>863</p></td>
+<td><p>347</p></td>
+</tr>
+<tr class="row-odd"><td><p>median jump</p></td>
+<td><p>37%</p></td>
+<td><p>0.9%</p></td>
+</tr>
+</tbody>
+</table>
+<p>BPASS’s single-star models also continue through white-dwarf cooling, so a companion’s
+continuation can run to ~1e11 yr. For the same reason, the total ages of low-mass BPASS single
+stars aren’t comparable with MIST’s.</p>
+</section>
+<section id="mass-jumps-where-the-companion-joins-its-single-star">
+<h2>Mass jumps where the companion joins its single star<a class="headerlink" href="#mass-jumps-where-the-companion-joins-its-single-star" title="Link to this heading">¶</a></h2>
+<p>When the binary phase ends, the companion continues along the single-star model nearest to its
+effective mass:</p>
+<ul class="simple">
+<li><p>normally its initial mass</p></li>
+<li><p>if rejuvenated (it accreted more than 5% of its mass and is at least 2 Msun, the BPASS v2.1
+criteria), its maximum mass, as if it was born when it reached that mass</p></li>
+</ul>
+<p>The companion’s mass in the binary file and on the single track can differ at the join.</p>
+<p>Among the white-dwarf systems:</p>
+<ul class="simple">
+<li><p>347 jump by more than 10%, and 7 by more than 50%.</p></li>
+<li><p>Rejuvenated companions join smoothly: a median jump of 0.6%, and none above 10%.</p></li>
+</ul>
+<p>The larger jumps come from the spacing of the single-star mass grid and from mass transfer after
+the companion reached its effective mass. These are modelling choices that could be improved
+(#47, #50).</p>
+<p>BPASS v2.2 also defines a revised rejuvenation age (its Eq. 1), which the reader doesn’t use.</p>
+</section>
+<section id="merger-models-without-a-merger">
+<h2>“Merger” models without a merger<a class="headerlink" href="#merger-models-without-a-merger" title="Link to this heading">¶</a></h2>
+<p>224 models (1.8%) that BPASS labels type 0 (“merger model”) show no merger in their files. They
+are used as they are, without any special handling.</p>
+<p><strong>What they look like:</strong></p>
+<ul class="simple">
+<li><p>222 have M1 ≤ 2 Msun, mostly with q = 0.1–0.3, across the whole period range.</p></li>
+<li><p>The companion barely takes part: its mass changes in only 13 files. Where the same M1 and q
+appear at several periods, the primary’s track is identical in 14 of 16 cases.</p></li>
+<li><p>212 end at the primary’s largest radius:</p>
+<ul>
+<li><p>160 as giants at the tip of the red giant branch (log R1 ≈ 2.2)</p></li>
+<li><p>54 on or near the main sequence, often at ~1e11 yr</p></li>
+<li><p>10 as white dwarfs</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Their geometry,</strong> using BPASS’s period column (col 34), the current M1 + M2, and Eggleton’s
+Roche-lobe radius:</p>
+<ul class="simple">
+<li><p><strong>125 come into contact.</strong> R1 + R2 &gt; a in 100 of them, and the primary overflows its Roche lobe
+in all 125.</p>
+<ul>
+<li><p>In 112 of these, the period stays constant (to 0.1%) throughout. The primary grows into a
+~160 Rsun giant around an orbit as small as 0.02 AU, so (R1 + R2)/a reaches ~40.</p></li>
+<li><p>The other 13 show real interaction through a changing period (e.g. <code class="docutils literal notranslate"><span class="pre">7-0.9-0.8</span></code>: stable mass
+transfer strips the primary to a ~1.4 Msun helium star).</p></li>
+</ul>
+</li>
+<li><p><strong>99 never come into contact</strong> (M1 = 0.3–1.2 Msun):</p>
+<ul>
+<li><p>47 giants come close (R1/R_L up to 0.98), so later expansion beyond the file’s end might
+fill the lobe.</p></li>
+<li><p>52 end near the main sequence, far inside their lobes (R1/R_L ≤ 0.35).</p></li>
+</ul>
+</li>
+</ul>
+<p><strong>Interpretation:</strong> for most contact systems, the file follows the primary as if it were an
+isolated star, and BPASS’s merger presumably happens outside the detailed model. Some could
+instead be contact binaries. This can’t be settled from the model files alone; it would need
+BPASS’s population input files or the papers’ description of how they treat these models.</p>
+<p><strong>What the reader does:</strong></p>
+<ul class="simple">
+<li><p>The primary ends where its file ends (for the giants, at the red-giant tip, with its mass held
+and its L, T and R set to NaN afterwards).</p></li>
+<li><p>The companion continues as a single star.</p></li>
+<li><p>In the contact systems, the two stars overlap inside an unchanging orbit before that.</p></li>
+</ul>
+</section>
+<section id="orbits">
+<h2>Orbits<a class="headerlink" href="#orbits" title="Link to this heading">¶</a></h2>
+<p>The reader stores only each system’s initial mass ratio q0, period P0 and eccentricity e0. The
+first two are read from the model’s name.</p>
+<p>BPASS gives the period as it evolves (col 34), but MPA/Bonn files don’t, so orbit evolution is
+left for later (#45). Neither source gives an eccentricity, so orbits are taken to be circular
+(e0 = 0).</p>
+</section>
+<section id="comparison-with-mist-single-stars">
+<h2>Comparison with MIST single stars<a class="headerlink" href="#comparison-with-mist-single-stars" title="Link to this heading">¶</a></h2>
+<p>As a check on the single-star models used for the companions’ continuations, BPASS and MIST
+tracks at 1, 5, 20 and 60 Msun (Z = 0.014 against [Fe/H] = 0) agree well on the main sequence:</p>
+<ul class="simple">
+<li><p>|Δlog L| ≤ 0.009 dex</p></li>
+<li><p>|Δlog Teff| ≤ 0.043 dex, with BPASS slightly cooler, most at 60 Msun</p></li>
+<li><p>BPASS main sequences last 1.01–1.23 times as long as MIST’s</p></li>
+</ul>
+<p>Total lifetimes at 20 and 60 Msun agree to 6%. These comparisons are tested in
+<code class="docutils literal notranslate"><span class="pre">tests/test_be_physics.py</span></code>, on the BPASS subset in <code class="docutils literal notranslate"><span class="pre">tests/data/bpass/</span></code>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Notes on the BPASS Binary Data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#summary">Summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mergers-aren-t-marked-in-the-model-files">Mergers aren’t marked in the model files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#some-merged-primaries-gain-mass">Some merged primaries gain mass</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#models-already-merged-at-t-0">Models already merged at t = 0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#repeated-and-decreasing-times">Repeated and decreasing times</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#white-dwarf-primaries-freeze-the-companion">White-dwarf primaries freeze the companion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mass-jumps-where-the-companion-joins-its-single-star">Mass jumps where the companion joins its single star</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#merger-models-without-a-merger">“Merger” models without a merger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#orbits">Orbits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#comparison-with-mist-single-stars">Comparison with MIST single stars</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Arsenal Gear API</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="models.html"
+                          title="previous chapter">Models Used in Arsenal Gear</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="code-models.html"
+                          title="next chapter">Models Used in Existing Hydrocodes</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/bpass-data-notes.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="code-models.html" title="Models Used in Existing Hydrocodes"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="models.html" title="Models Used in Arsenal Gear"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Notes on the BPASS Binary Data</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
+    </div>
+  </body>
+</html>

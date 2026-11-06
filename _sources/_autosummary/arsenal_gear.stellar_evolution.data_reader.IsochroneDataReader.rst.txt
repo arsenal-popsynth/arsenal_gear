@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.data\_reader.IsochroneDataReader
+=================================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.data_reader
+
+.. autoclass:: IsochroneDataReader
+   :members:
+   :show-inheritance:

@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.se\_data\_structures.IsochroneSet
+==================================================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution.se_data_structures
+
+.. autoclass:: IsochroneSet
+   :members:
+   :show-inheritance:

@@ -1,0 +1,31 @@
+arsenal\_gear.stellar\_evolution.data\_reader
+=============================================
+
+.. automodule:: arsenal_gear.stellar_evolution.data_reader
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      IsochroneDataReader
+      MISTReader
+   
+   
+
+   
+   
+   
+
+
+
