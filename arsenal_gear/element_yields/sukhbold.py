@@ -141,7 +141,7 @@ class Sukhbold2016(YieldTables):
 
     def download_sukhbold_table(self, filename):
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("Sukhbold (2016) tables not found, starting download.")
         try:

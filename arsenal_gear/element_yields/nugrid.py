@@ -354,7 +354,7 @@ class Pignatari2016(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("NuGrid (Pignatari et al., 2016) tables not found, starting download.")
         for file in self.files:
@@ -609,7 +609,7 @@ class Ritter2018(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("NuGrid (Ritter et al., 2018) tables not found, starting download.")
         for file in self.files:
@@ -791,7 +791,7 @@ class Battino20192021(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print(
             "NuGrid (Battinoi et al., 2019, 2021) tables not found, starting download."

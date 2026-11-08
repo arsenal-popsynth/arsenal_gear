@@ -220,7 +220,7 @@ class LimongiChieffi2018(YieldTables):
         """Downloader for tabulated yield files."""
         import warnings
 
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         try:
             downloader(

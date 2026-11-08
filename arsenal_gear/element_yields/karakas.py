@@ -159,7 +159,7 @@ class Karakas2010(YieldTables):
         """Downloader for tabulated yield files."""
         import warnings
 
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("Karakas (2010) tables not found, starting download.")
 
@@ -372,7 +372,7 @@ class Karakas2016(YieldTables):
         """Downloader for tabulated yield files."""
         import warnings
 
-        from ..utils.scraper import DownloadError, downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("Karakas (2016) tables not found, starting download.")
         try:

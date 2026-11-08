@@ -7,8 +7,8 @@ Functions:
     _masked_power: Computes power while handling masked values appropriately.
 """
 
-from astropy.utils.masked import Masked
 import numpy as np
+from astropy.utils.masked import Masked
 
 
 def masked_power(base, exponent):
