@@ -145,6 +145,146 @@ class TestElementYieldModels:
             ), f"Negative remnant at {failed.size} indices using {interp_method} (worst case: {np.min(diff)})"
 
 
+class TestKarakas2010:
+    """Tests for yields from Karakas et al. (2010)"""
+
+    k10 = arsenal_gear.element_yields.Karakas2010()
+    pytestmark = pytest.mark.skipif(
+        not k10.available,
+        reason="Karakas2010 yield tables unavailable",
+    )
+
+    def test_tables(self):
+        """Make sure that online tables did not change by checking random yields."""
+
+        elements = ["H", "C", "O", "Fe"]
+        models = [
+            (0.0001, 1.25),
+            (0.004, 1.9),
+            (0.02, 4.0),
+        ]
+
+        ylds_tot = [
+            [0.41815230, 0.0037338442, 0.0001234212, 0.0000036896],
+            [0.89401174, 0.0093320168, 0.0025642147, 0.0003210919],
+            [2.1436353, 0.0192126137, 0.0292434502, 0.0040889325],
+        ]
+
+        for model, yld_tot in zip(models, ylds_tot):
+            loaded_yld = self.k10.agb.get_yld(
+                elements=elements,
+                params=model,
+                interpolate="nearest",
+                extrapolate=False,
+            )
+
+            _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
+
+
+class TestKarakas2016:
+    """Tests for yields from Karakas et al. (2016)"""
+
+    k16 = arsenal_gear.element_yields.Karakas2016()
+    pytestmark = pytest.mark.skipif(
+        not k16.available,
+        reason="Karakas2014 yield tables unavailable",
+    )
+
+    def test_tables(self):
+        """Make sure that online tables did not change by checking random yields."""
+
+        elements = ["H", "C", "O", "Fe"]
+        models = [
+            (0.007, 1.25),
+            (0.014, 2.25),
+            (0.03, 4.0),
+        ]
+
+        ylds_tot = [
+            [0.444555, 5.91915e-4, 1.87832e-3, 4.30008e-4],
+            [1.08648, 8.34756e-3, 9.57890e-3, 2.17696e-3],
+            [2.07939, 2.61033e-2, 3.72411e-2, 8.92491e-3],
+        ]
+
+        for model, yld_tot in zip(models, ylds_tot):
+            loaded_yld = self.k16.agb.get_yld(
+                elements=elements,
+                params=model,
+                interpolate="nearest",
+                extrapolate=False,
+            )
+
+            _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
+
+
+class TestDoherty2014a:
+    """Tests for yields from Doherty et al. (2014a)"""
+
+    d14a = arsenal_gear.element_yields.Doherty2014a()
+    pytestmark = pytest.mark.skipif(
+        not d14a.available,
+        reason="Doherty2014a yield tables unavailable",
+    )
+
+    def test_tables(self):
+        """Make sure that online tables did not change by checking random yields."""
+
+        elements = ["H", "C", "O", "Fe"]
+        models = [
+            (0.008, 7.0),
+            (0.02, 8.5),
+        ]
+
+        ylds_tot = [
+            [3.870, 0.0053793, 0.016239598, 0.0034256613],
+            [4.494, 0.009032, 0.055454573, 0.010491594],
+        ]
+
+        for model, yld_tot in zip(models, ylds_tot):
+            loaded_yld = self.d14a.sagb.get_yld(
+                elements=elements,
+                params=model,
+                interpolate="nearest",
+                extrapolate=False,
+            )
+
+            _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
+
+
+class TestDoherty2014b:
+    """Tests for yields from Doherty et al. (2014b)"""
+
+    d14b = arsenal_gear.element_yields.Doherty2014b()
+    pytestmark = pytest.mark.skipif(
+        not d14b.available,
+        reason="Doherty2014b yield tables unavailable",
+    )
+
+    def test_tables(self):
+        """Make sure that online tables did not change by checking random yields."""
+
+        elements = ["H", "C", "O", "Fe"]
+        models = [
+            (0.0001, 6.5),
+            (0.001, 7.5),
+        ]
+
+        ylds_tot = [
+            [3.129, 0.0038536, 0.0019205473, 0.0000372613],
+            [4.029, 0.0025469, 0.0033300643, 0.000448434],
+        ]
+
+        for model, yld_tot in zip(models, ylds_tot):
+            loaded_yld = self.d14b.sagb.get_yld(
+                elements=elements,
+                params=model,
+                interpolate="nearest",
+                extrapolate=False,
+            )
+
+            _assert_array_approx_equal(loaded_yld.flatten(), yld_tot, significant=5)
+
+
 class TestLimongiChieffi2018:
     """Tests for yields from Limongi & Chieffi (2018)"""
 
