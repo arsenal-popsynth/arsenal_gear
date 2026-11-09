@@ -1,9 +1,8 @@
 """
 nugrid
-==========
+======
 
-This submodule contains all the code required to load yields from
-NuGrid.
+This submodule contains all the code required to load yields from NuGrid.
 """
 
 import os
@@ -33,6 +32,19 @@ class NuGrid(YieldTables):
 
     References: Pignatari et al., 2016, ApJS, 225, 24; Ritter et al., 2018, MNRAS, 480, 538;
                 Battino et al., 2019, MNRAS, 489, 1082; Battino et al., 2021, Universe, 7, 25;
+
+    Attributes:
+        ng_url: yield source website
+        models: available models
+        mass: tabulated masses (two ranges [low,high])
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the NuGrid tables
@@ -46,37 +58,10 @@ class NuGrid(YieldTables):
 
     def __init__(self, model: str = "delay", **kwargs) -> None:
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the NuGrid yields.
+
+        Arguments:
             model: choise of model to load, see Fryer et al. (2012) for details
-
-        Usage:
-            >> nugrid = arsenal_gear.element_yields.NuGrid()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, nugrid.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            ng_url           Yield source website
-            models           Available models
-            mass             Tabulated masses (two ranges [low,high])
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
@@ -154,6 +139,19 @@ class Pignatari2016(YieldTables):
     Yields available at https://nugrid.github.io/
 
     References: Pignatari et al., 2016, ApJS, 225, 24
+
+    Attributes:
+        p16_url: yield source website
+        files: table filenames
+        mass: tabulated masses (two ranges [low,high])
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: not available for this class
+        agb: source object for stellar winds (asymptotic giant branch)
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the Pignatari (2016) tables
@@ -169,34 +167,7 @@ class Pignatari2016(YieldTables):
 
     def __init__(self, **kwargs) -> None:
         """
-        Usage:
-            >> p16 = arsenal_gear.element_yields.Pignatari2016()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, p16.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            p16_url          Yield source website
-            files            Table filenames
-            mass             Tabulated masses (two ranges [low,high])
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Not available for this class
-            agb              Source object for stellar winds (asymptotic giant branch)
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
+        Initializes tabulated yields and their coordinates for the Pignatari2016 yields.
         """
 
         super().__init__(**kwargs)
@@ -386,6 +357,19 @@ class Ritter2018(YieldTables):
     Yields available at https://nugrid.github.io/
 
     References:  Ritter et al., 2018, MNRAS, 480, 538
+
+    Attributes:
+        r18_url: yield source website
+        files: table filenames
+        mass: tabulated masses (two ranges [low,high])
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the Ritter (2018) tables
@@ -405,37 +389,10 @@ class Ritter2018(YieldTables):
 
     def __init__(self, model: str = "delay", **kwargs) -> None:
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the Pignatari2016 yields.
+
+        Arguments:
             model: choise of model to load, see Fryer et al. (2012) for details
-
-        Usage:
-            >> r18 = arsenal_gear.element_yields.Ritter2018()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, r18.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            r18_url          Yield source website
-            files            Table filenames
-            mass             Tabulated masses (two ranges [low,high])
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
@@ -639,6 +596,18 @@ class Battino20192021(YieldTables):
     Yields available at https://nugrid.github.io/
 
     References: Battino et al., 2019, MNRAS, 489, 1082; Battino et al., 2021, Universe, 7, 25
+
+    Attributes:
+        b19_url: yield source website (Battino et al., 2019)
+        b21_url: yield source website (Battino et al., 2021)
+        files: table filenames
+        mass: tabulated masses
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
     """
 
     # hard-coded parameters of the Battino (2019,2021) tables
@@ -654,33 +623,7 @@ class Battino20192021(YieldTables):
 
     def __init__(self, **kwargs) -> None:
         """
-        Usage:
-            >> bat = arsenal_gear.element_yields.Battino20192021()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, bat.agb_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            b19_url          Yield source website (Battino et al., 2019)
-            b21_url          Yield source website (Battino et al., 2021)
-            files            Table filenames
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
+        Initializes tabulated yields and their coordinates for the Battino20192021 yields.
         """
 
         super().__init__(**kwargs)

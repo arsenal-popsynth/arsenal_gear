@@ -1,6 +1,6 @@
 """
 yields
-==========
+======
 
 This module contains the abstract class used define a set
 chemical yields that will interact with stellar feedback.

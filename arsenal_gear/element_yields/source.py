@@ -1,6 +1,6 @@
 """
 source
-==========
+======
 
 This module contains the class used for defining a source of yields
 and interpolate tabulated data.
@@ -14,18 +14,32 @@ from scipy.interpolate import RegularGridInterpolator
 
 class Source:
     """
-    Class used to store interpolators of yields from a given
-    source (e.g., winds or core-collapse SNe). Makes use of
-    scipy.interpolate.RegularGridInterpolator for flexibility
-    and efficiency.
+    Class used to store interpolators of yields from a given source (e.g., winds or ccsn).
+    Makes use of scipy.interpolate.RegularGridInterpolator for flexibility and efficiency.
+    Assumes that the yield table grid coordinates are stricktly monotonic, either increaing
+    or decreasing.
 
-    Includes functions:
-    get_yield - returns yields of given elements
-    get_mloss - return sum of all yields in table.
-    get_relative - return fraction of mass in given element.
+    Attributes:
+        params: grid coordinates of tabulated yields
+        yields: Dictionary contatining a RegularGridInterpolator for yield of each element.
+        mloss: RegularGridInterpolator for total mass
+        relative: Dictionary contatining a RegularGridInterpolator for fractional yield of each element.
+
+    Functions:
+        get_yield: returns yields of given elements
+        get_mloss: return sum of all yields in table.
+        get_relative: return fraction of mass in given elements.
     """
 
     def __init__(self, elements, params, yields) -> None:
+        """
+        Initializes RegularGridInterpolator for yields, mloss and relative.
+
+        Arguments:
+            elements: list of elements in the provided table
+            params: coordinates of tabulated yields
+            yields: list of tabulated yields at each coordinate in params
+        """
 
         self.params = params
         self.yields = {
@@ -56,18 +70,17 @@ class Source:
         }
 
     def get_yld(self, elements, params, interpolate="nearest", extrapolate=False):
-        """Interpolate yields from class.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then params are set to limits if outside bound.
-        Returns:
-            List of yields matching provided element list
-
         """
+        Interpolate in the yield table to provide yields for given elements and parameters.
 
+        Arguments:
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            params: list of parameters to interpolate to (e.g., mass, metallicity, rotation).
+            interpolate: interpolation method passed to scipy.interpolate.RegularGridInterpolator.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+        Returns:
+            List of yields at coordinates params matching the provided element list.
+        """
         if len(params) != len(self.params):
             raise ValueError("Supplied parameters do not match yield set parameters.")
 
@@ -119,15 +132,16 @@ class Source:
         extrapolate=False,
         accept_negative_remnant=False,
     ):
-        """Interpolate sum of all yields (total mass) from class.
+        """
+        Interpolate in the mloss table to provide mass loss for given parameters.
 
-        Args:
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then params are set to limits if outside bound.
+        Arguments:
+            params: list of parameters to interpolate to (e.g., mass, metallicity, rotation).
+            interpolate: interpolation method passed to scipy.interpolate.RegularGridInterpolator.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+            accept_negative_remnant: allow function to return larger mloss than available mass.
         Returns:
-            Total mass ejected by source (i.e., sum of all elements)
-
+            Mass loss at provided coordinates.
         """
         if len(params) != len(self.params):
             raise ValueError("Supplied parameters do not match yield set parameters.")
@@ -162,18 +176,18 @@ class Source:
         return mloss
 
     def get_relative(self, elements, params, interpolate="nearest", extrapolate=False):
-        """Interpolate relative yields from class.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then params are set to limits if outside bound.
-        Returns:
-            List of relative yields matching provided element list
-
         """
+        Interpolate in the relative table to provide fractional yields for given elements
+        and parameters.
 
+        Arguments:
+            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen).
+            params: list of parameters to interpolate to (e.g., mass, metallicity, rotation).
+            interpolate: interpolation method passed to scipy.interpolate.RegularGridInterpolator.
+            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound.
+        Returns:
+            List of yields at coordinates params matching the provided element list.
+        """
         if len(params) != len(self.params):
             raise ValueError("Supplied parameters do not match yield set parameters.")
 
@@ -220,14 +234,14 @@ class Source:
 
     @staticmethod
     def _convert2array(params):
-        """Internal function to convert list of parameters to a format
-        that RegularGridInterpolator can handle.
+        """
+        Internal function to convert list of parameters to a format that RegularGridInterpolator
+        can work with.
 
-        Args:
-            params: list of parameters of the table (e.g., mass, metallicity, rotation)
+        Arguments:
+            params: list of parameters of the table (e.g., mass, metallicity, rotation).
         Returns:
-            Interpolation points for RegularGridInterpolator
-
+            Interpolation points for RegularGridInterpolator.
         """
         plens = np.array(
             [

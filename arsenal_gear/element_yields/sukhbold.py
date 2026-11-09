@@ -1,6 +1,6 @@
 """
 sukhbold
-==========
+========
 
 This submodule contains all the code necessary to load yields from Sukhbold et al. (2016)
 """
@@ -38,6 +38,22 @@ class Sukhbold2016(YieldTables):
 
     Reference: Sukhbold T, Ertl T, Woosley SE, Brown JM & Janka HT, 2016, ApJ, 821, 38
 
+    Attributes:
+        s16_url: yield source website
+        models: available models (explosion engine)
+        mass: tabulated masses
+        metal: available metallicity (0.02)
+        filedir: directory of yield tables
+        files: files that are downloaded
+        name: name of yields tables
+        model: engine used to drive explosion
+        elements: elements available in table
+        atomic_num: not available in this model
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
+        df_energy: distribution of energies
+        _energy_interp: interpolator for energies
+        has_energies: flag for energies
     """
 
     s16_url = "https://wwwmpa.mpa-garching.mpg.de/ccsnarchive/data/SEWBJ_2015/data/"
@@ -48,33 +64,10 @@ class Sukhbold2016(YieldTables):
 
     def __init__(self, model="N20", **kwargs):
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the Sukhbold2016 yields.
+
+        Arguments:
             model: choise of model to load, see Sukhbold et al. (2016) for details
-
-        Usage:
-            >> s16 = arsenal_gear.element_yields.Sukhbold()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.02
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
-            >> plt.plot(mass, s16.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            s16_url          Yield source website
-            models           Available models (explosion engine)
-            mass             Tabulated masses
-            metal            Available metallicity (0.02)
-            filedir          Directory of yield tables
-            files            Files that are downloaded
-            name             Name of yields tables
-            model            Engine used to drive explosion
-            elements         Elements available in table
-            atomic_num       Not available in this model
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
-            df_energy        Distribution of energies
-            _energy_interp   Interpolator for energies
-            has_energies     Flag for energies
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
@@ -317,7 +310,7 @@ class Sukhbold2016(YieldTables):
         return pd.DataFrame(data)
 
     def add_elemental_sums(self, df):
-        """ """
+        """Sums mass of each element."""
         elemental = {}
         for col in df.columns:
             if col == "mass_Msun" or "_" in col:

@@ -1,9 +1,8 @@
 """
 doherty
-==========
+=======
 
-This submodule contains all the code required to load yields from
-Doherty et al. (2014a,b).
+This submodule contains all the code required to load yields from Doherty et al. (2014a,b).
 """
 
 import re
@@ -22,9 +21,23 @@ from .yieldtables import YieldTables
 @cite("10.1093/mnras/stt1877")
 class Doherty2014a(YieldTables):
     """
-    Yields available in suplementary material of Doherty et al. (2014a)
+    Include yields from super-asymptotic giant branch stars from Doherty et al. (2014a) for majority of
+    elements for stars with mass [6.5, 7.0, 7.5, 8.0, 8.5, 9.0] Msun, with initial metallicities
+    [0.004, 0.008, 0.02].
+
+    Yields available in suplementary material of Doherty et al. (2014a) but cannot be automatically downloaded.
 
     Reference: Doherty et al., 2014a, MNRAS, 437, 195
+
+    Attributes:
+        d14_url: yield source website
+        mass: tabulated masses
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        sagb: source object for stellar winds (super asymptotic giant branch)
     """
 
     models = ["VW93", "VW-M"]
@@ -37,25 +50,10 @@ class Doherty2014a(YieldTables):
 
     def __init__(self, model: str = "VW93", **kwargs):
         """
-        Args:
-            model: Model used for mass loss rates.
-        Usage:
-            >> d14a = arsenal_gear.element_yields.Doherty2014a()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
-            >> plt.plot(mass, d14a.ccsn_yields('H', stars, interpolate='nearest'), '-')
+        Initializes tabulated yields and their coordinates for the Doherty2014a yields.
 
-        Attributes:
-            d14_url          Yield source website
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            sagb             Source object for stellar winds (super asymptotic giant branch)
+        Arguments:
+            model: model used for mass loss rates.
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
@@ -171,9 +169,22 @@ class Doherty2014a(YieldTables):
 @cite("10.1093/mnras/stu571")
 class Doherty2014b(YieldTables):
     """
-    Yields available in suplementary material of Doherty et al. (2014b)
+    Include yields from super-asymptotic giant branch stars from Doherty et al. (2014b) for majority of
+    elements for stars with mass [6.5, 7.0, 7.5] Msun, with initial metallicities [0.0001, 0.001].
+
+    Yields available in suplementary material of Doherty et al. (2014b) but cannot be automatically downloaded
 
     Reference: Doherty et al., 2014b, MNRAS, 441, 582
+
+    Attributes:
+        d14_url: yield source website
+        mass: tabulated masses
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        sagb: source object for stellar winds (super asymptotic giant branch)
     """
 
     models = ["VW93", "B95"]
@@ -186,25 +197,10 @@ class Doherty2014b(YieldTables):
 
     def __init__(self, model: str = "VW93", **kwargs):
         """
-        Args:
-            model: Model used for mass loss rates.
-        Usage:
-            >> d14b = arsenal_gear.element_yields.Doherty2014b()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
-            >> plt.plot(mass, d14b.ccsn_yields('H', stars, interpolate='nearest'), '-')
+        Initializes tabulated yields and their coordinates for the Doherty2014b yields.
 
-        Attributes:
-            d14_url          Yield source website
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            sagb             Source object for stellar winds (super asymptotic giant branch)
+        Arguments:
+            model: model used for mass loss rates.
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")

@@ -1,9 +1,8 @@
 """
 karakas
-==========
+=======
 
-This submodule contains all the code required to load yields from
-Karakas (2010) and Karakas (2016).
+This submodule contains all the code required to load yields from Karakas et al. (2010, 2016).
 """
 
 import io
@@ -23,9 +22,23 @@ from .yieldtables import YieldTables
 @cite("10.1111/j.1365-2966.2009.16198.x")
 class Karakas2010(YieldTables):
     """
+    Include yields from asymptotic giant branch stars from Karakas et al. (2010) for majority of
+    elements for stars with mass [1.0, 1.25, 1.5, 1.75, 1.9, 2.0, 2.25, 2.5, 3.0, 3.5, 4.0, 4.5,
+    5.0, 5.5, 6.0] Msun, with initial metallicities [0.0001, 0.004, 0.008, 0.02].
+
     Yields available at https://cdsarc.cds.unistra.fr/viz-bin/cat/J/MNRAS/403/1413#/browse
 
     Reference: Karakas, 2010, MNRAS, 403, 1413
+
+    Attributes:
+        k10_url: yield source website
+        mass: tabulated masses
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
     """
 
     k10_url = "https://cdsarc.cds.unistra.fr/viz-bin/nph-Cat/tar.gz?J/MNRAS/403/1413"
@@ -37,23 +50,7 @@ class Karakas2010(YieldTables):
 
     def __init__(self, **kwargs):
         """
-        Usage:
-            >> k10 = arsenal_gear.element_yields.Karakas2010()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
-            >> plt.plot(mass, k10.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            k10_url          Yield source website
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
+        Initializes tabulated yields and their coordinates for the Karakas2010 yields.
         """
 
         super().__init__(**kwargs)
@@ -191,10 +188,23 @@ class Karakas2010(YieldTables):
 @cite("10.3847/0004-637X/825/1/26")
 class Karakas2016(YieldTables):
     """
+    Include yields from Karakas et al. (2016) for majority of elements for stars with mass [1.0, 1.25, 1.5,
+    1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 5.5, 6.0, 7.0] Msun,
+    with initial metallicities [0.007, 0.014, 0.03].
 
-    Yields available at
+    Yields available as supplemental data for article at https://iopscience.iop.org/article/10.3847/0004-637X/825/1/26.
 
     References: Karakas, 2016, ApJ, 825, 1
+
+    Attributes:
+        k16_url: yield source website
+        mass: tabulated masses
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
     """
 
     k16_url = "https://content.cld.iop.org/journals/0004-637X/825/1/26/revision1/"
@@ -227,26 +237,10 @@ class Karakas2016(YieldTables):
 
     def __init__(self, include_overshoot: bool = False, **kwargs):
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the Karakas2016 yields.
+
+        Arguments:
             include_overshoot: set True if using models that mixing layer overshoot
-
-        Usage:
-            >> k16 = arsenal_gear.element_yields.Karakas2010()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> metals = u.dimensionless_unscaled * 0.1 * np.ones(100)
-            >> tform = u.Myr * np.zeros(100)
-            >> stars = arsenal_gear.population.SinglePop(mass=mass, metals=metals, tform=tform)
-            >> plt.plot(mass, k16.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            k16_url          Yield source website
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
         """
 
         super().__init__(**kwargs)

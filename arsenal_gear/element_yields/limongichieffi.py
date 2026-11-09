@@ -1,9 +1,8 @@
 """
 limongichieffi
-==========
+==============
 
-This submodule contains all the code required to load yields from
-Limongi & Chieffi (2018).
+This submodule contains all the code required to load yields from Limongi & Chieffi (2018).
 """
 
 import io
@@ -36,6 +35,21 @@ class LimongiChieffi2018(YieldTables):
     Yields available at https://orfeo.oa-roma.inaf.it/
 
     Reference: Limongi M & Chieffi A, 2018, ApJS, 237, 13L
+
+    Attributes:
+        lc_url: yield source website
+        model: available models
+        mass: tabulated masses
+        metal: tabulated metallicities
+        feh: tabulated [Fe/H]
+        rot: tabulated stellar rotation velocities
+        ccsn_max: assumed minimum mass for direct collase to black hole
+        filedir: directory of this file (used for relative path)
+        name: name of yield tables
+        elements: elements available in table.
+        atomic_num: atomic numbers of available elements.
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the Limongi & Chieffi (2018) tables
@@ -49,40 +63,10 @@ class LimongiChieffi2018(YieldTables):
 
     def __init__(self, model: str = "R", **kwargs) -> None:
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the LimongiChieffi2018 yields.
+
+        Arguments:
             model: choice of model to load, see Limongi & Chieffi (2018) for details
-
-        Usage:
-            >> lc2018 = arsenal_gear.element_yields.LimongiChieffi2018()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        rotation=0.0 * u.dimensionless_unscaled,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, yields.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            lc_url           Yield source website
-            model            Available models
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            feh              Tabulated [Fe/H]
-            rot              Tabulated stellar rotation velocities
-            ccsn_max         Assumed minimum mass for direct collase to black hole
-            filedir          Directory of this file (used for relative path)
-            name             Name of yield tables
-            elements         Elements available in table.
-            atomic_num       Atomic numbers of available elements.
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
         """
 
         if model not in self.models:
