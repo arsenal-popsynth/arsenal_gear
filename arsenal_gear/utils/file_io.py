@@ -24,6 +24,10 @@ import requests
 from tqdm import tqdm
 
 
+class DownloadError(RuntimeError):
+    """Raised when file download fails."""
+
+
 def downloader(fname, url, message=None, username=None, password=None):
     """
     Method for downloading data from the web where available.
@@ -56,15 +60,15 @@ def downloader(fname, url, message=None, username=None, password=None):
         )
         response.raise_for_status()
     except requests.exceptions.Timeout as e:
-        raise TimeoutError("Request timed out. Check internet connection.") from e
+        raise DownloadError("Request timed out. Check internet connection.") from e
     except requests.exceptions.ConnectionError as e:
-        raise ConnectionError("Connection error. Check internet connection.") from e
+        raise DownloadError("Connection error. Check internet connection.") from e
     except requests.exceptions.HTTPError as e:
-        raise RuntimeError(f"HTTP error occurred: {e}") from e
+        raise DownloadError(f"HTTP error occurred: {e}") from e
     except requests.exceptions.TooManyRedirects as e:
-        raise RuntimeError("Too many redirects. Check the URL.") from e
+        raise DownloadError("Too many redirects. Check the URL.") from e
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Download failed: {e}") from e
+        raise DownloadError(f"Download failed: {e}") from e
 
     # Get file size
     total_size = int(response.headers.get("content-length", 0))
