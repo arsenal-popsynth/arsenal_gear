@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from arsenal_gear.file_io.record import TimeRecord, add_record
+from arsenal_gear.file_io.record import add_record
 
 
 @pytest.fixture
@@ -36,52 +36,24 @@ def energies():
     return np.linspace(1, 10, 10) * 1e51 * u.erg
 
 
-# --- TimeRecord construction ----------------------------------------------
-
-
-def test_time_record_from_quantity(times):
-    record = TimeRecord(times)
-    assert record.type == "array"
-    assert record.time is times
-
-
-def test_time_record_from_str():
-    record = TimeRecord("other")
-    assert record.type == "link"
-    assert record.time == "other"
+# --- time handling --------------------------------------------------------
 
 
 @pytest.mark.parametrize("bad_time", [np.arange(5.0), [1.0, 2.0], 1.0, None], ids=repr)
-def test_time_record_rejects_other_types(bad_time):
+def test_rejects_other_time_types(h5file, energies, bad_time):
     with pytest.raises(TypeError):
-        TimeRecord(bad_time)
+        add_record(h5file, "a", bad_time, energies)
+    assert "data" not in h5file
 
 
-# --- TimeRecord.write -----------------------------------------------------
-
-
-def test_array_write_keeps_units(h5file, times):
-    TimeRecord(times).write(h5file, "a")
-    ds = h5file["data/a/time"]
-    assert_allclose(ds[()], times.value)
-    assert u.Unit(ds.attrs["units"]) == u.Myr
-
-
-def test_array_write_converts_units(h5file, times):
-    TimeRecord(times).write(h5file, "a", time_units=u.yr)
-    ds = h5file["data/a/time"]
-    assert_allclose(ds[()], times.to_value(u.yr))
-    assert u.Unit(ds.attrs["units"]) == u.yr
-
-
-def test_array_write_rejects_incompatible_units(h5file, times):
+def test_rejects_incompatible_time_units(h5file, times, energies):
     with pytest.raises(u.UnitConversionError):
-        TimeRecord(times).write(h5file, "a", time_units=u.cm)
+        add_record(h5file, "a", times, energies, time_units=u.cm)
 
 
-def test_link_write_makes_softlink(h5file, times):
-    TimeRecord(times).write(h5file, "a")
-    TimeRecord("a").write(h5file, "b")
+def test_link_makes_softlink(h5file, times, energies):
+    add_record(h5file, "a", times, energies)
+    add_record(h5file, "b", "a", energies)
 
     link = h5file["data/b"].get("time", getlink=True)
     assert isinstance(link, h5py.SoftLink)
@@ -90,40 +62,40 @@ def test_link_write_makes_softlink(h5file, times):
     assert h5file["data/b/time"].attrs["units"] == h5file["data/a/time"].attrs["units"]
 
 
-def test_link_written_before_target(h5file, times):
+def test_link_written_before_target(h5file, times, energies):
     """A soft link may dangle until the record it points to is written."""
-    TimeRecord("a").write(h5file, "b")
+    add_record(h5file, "b", "a", energies)
     with pytest.raises(KeyError):
         h5file["data/b/time"]  # pylint: disable=pointless-statement
-    TimeRecord(times).write(h5file, "a")
+    add_record(h5file, "a", times, energies)
     assert_allclose(h5file["data/b/time"][()], times.value)
 
 
-def test_link_chain(h5file, times):
-    TimeRecord(times).write(h5file, "a")
-    TimeRecord("a").write(h5file, "b")
-    TimeRecord("b").write(h5file, "c")
+def test_link_chain(h5file, times, energies):
+    add_record(h5file, "a", times, energies)
+    add_record(h5file, "b", "a", energies)
+    add_record(h5file, "c", "b", energies)
     assert_allclose(h5file["data/c/time"][()], times.value)
 
 
-def test_link_ignores_time_units(h5file, times):
+def test_link_ignores_time_units(h5file, times, energies):
     """A linked record shares its target's times, units and all."""
-    TimeRecord(times).write(h5file, "a")
-    TimeRecord("a").write(h5file, "b", time_units=u.yr)
+    add_record(h5file, "a", times, energies)
+    add_record(h5file, "b", "a", energies, time_units=u.yr)
     assert u.Unit(h5file["data/b/time"].attrs["units"]) == u.Myr
 
 
-def test_write_same_name_twice_fails(h5file, times):
-    TimeRecord(times).write(h5file, "a")
+def test_same_name_twice_fails(h5file, times, energies):
+    add_record(h5file, "a", times, energies)
     with pytest.raises(ValueError):
-        TimeRecord(times).write(h5file, "a")
+        add_record(h5file, "a", times, energies)
 
 
 # --- add_record -----------------------------------------------------------
 
 
 def test_add_record_keeps_units(h5file, times, energies):
-    add_record(h5file, "E", TimeRecord(times), energies)
+    add_record(h5file, "E", times, energies)
     qty = h5file["data/E/qty"]
     assert_allclose(qty[()], energies.value)
     assert u.Unit(qty.attrs["units"]) == u.erg
@@ -135,7 +107,7 @@ def test_add_record_converts_units(h5file, times, energies):
     add_record(
         h5file,
         "E",
-        TimeRecord(times),
+        times,
         energies,
         record_units=u.J,
         time_units=u.Gyr,
@@ -149,7 +121,7 @@ def test_add_record_converts_units(h5file, times, energies):
 
 def test_add_record_roundtrips_to_quantity(h5file, times, energies):
     """What's written can be turned back into the original quantity."""
-    add_record(h5file, "E", TimeRecord(times), energies, record_units=u.J)
+    add_record(h5file, "E", times, energies, record_units=u.J)
     qty = h5file["data/E/qty"]
     restored = qty[()] * u.Unit(qty.attrs["units"])
     assert_allclose(restored.to_value(u.erg), energies.to_value(u.erg))
@@ -157,8 +129,8 @@ def test_add_record_roundtrips_to_quantity(h5file, times, energies):
 
 def test_add_record_with_linked_time(h5file, times, energies):
     masses = np.ones(10) * u.Msun
-    add_record(h5file, "E", TimeRecord(times), energies)
-    add_record(h5file, "m", TimeRecord("E"), masses)
+    add_record(h5file, "E", times, energies)
+    add_record(h5file, "m", "E", masses)
 
     assert_allclose(h5file["data/m/qty"][()], masses.value)
     assert u.Unit(h5file["data/m/qty"].attrs["units"]) == u.Msun
@@ -170,8 +142,8 @@ def test_add_record_with_linked_time(h5file, times, energies):
 def test_add_record_survives_reopen(tmp_path, times, energies):
     path = tmp_path / "test.h5"
     with h5py.File(path, "w") as f:
-        add_record(f, "E", TimeRecord(times), energies)
-        add_record(f, "E2", TimeRecord("E"), energies)
+        add_record(f, "E", times, energies)
+        add_record(f, "E2", "E", energies)
     with h5py.File(path, "r") as f:
         assert_allclose(f["data/E/qty"][()], energies.value)
         assert_allclose(f["data/E2/time"][()], times.value)
