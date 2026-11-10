@@ -32,6 +32,7 @@ quickstart.md
 parameters.md
 outputs.md
 models.md
+bpass-data-notes.md
 code-models.md
 architecture.md
 troubleshooting.md
