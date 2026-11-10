@@ -83,7 +83,10 @@ def construct_meta_dataset(f, paramfile: str, bibtex=None) -> None:
     ds = f.create_dataset("metadata/source", data=np.void(get_full_src_tree()))
     ds.attrs["format"] = "tar.gz"
     try:
-        ds.attrs["git-commit"] = git_commit(arsenal_gear.__path__)
-        ds.attrs["git-dirty"] = git_is_dirty(arsenal_gear.__path__)
-    except subprocess.CalledProcessError:
+        ds.attrs["git-commit"] = git_commit(arsenal_gear.__path__[0])
+        ds.attrs["git-dirty"] = git_is_dirty(arsenal_gear.__path__[0])
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Not a git checkout, or git isn't installed.  With no commit to
+        # compare against, the source can't be vouched for as clean.
         ds.attrs["git-commit"] = ""
+        ds.attrs["git-dirty"] = True
