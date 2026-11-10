@@ -11,6 +11,7 @@ from numpy.testing import assert_allclose
 
 from arsenal_gear.formation import dist_funcs
 
+
 class TestLogUniformPeriod:
     """Tests for the Log-Uniform Period distribution."""
 
