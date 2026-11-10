@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from arsenal_gear.file_io.record import add_record
+from arsenal_gear.file_io.record import add_record, write_recordset
 
 
 @pytest.fixture
@@ -147,3 +147,82 @@ def test_add_record_survives_reopen(tmp_path, times, energies):
     with h5py.File(path, "r") as f:
         assert_allclose(f["data/E/qty"][()], energies.value)
         assert_allclose(f["data/E2/time"][()], times.value)
+
+
+# --- write_recordset ------------------------------------------------------
+
+
+def is_link(f, name):
+    return isinstance(f[f"data/{name}"].get("time", getlink=True), h5py.SoftLink)
+
+
+def test_recordset_links_duplicate_times(h5file, times, energies):
+    masses = np.ones(10) * u.Msun
+    other_times = np.linspace(0, 1, 10) * u.Myr
+    records = {
+        "E": {"data": energies, "time": times},
+        "m": {"data": masses, "time": times.copy()},
+        "E2": {"data": energies, "time": other_times},
+        "m2": {"data": masses, "time": other_times.copy()},
+    }
+    write_recordset(h5file, records)
+
+    assert not is_link(h5file, "E")
+    assert not is_link(h5file, "E2")
+    assert h5file["data/m"].get("time", getlink=True).path == "/data/E/time"
+    assert h5file["data/m2"].get("time", getlink=True).path == "/data/E2/time"
+    assert_allclose(h5file["data/m/time"][()], times.value)
+    assert_allclose(h5file["data/m2/time"][()], other_times.value)
+    assert_allclose(h5file["data/m/qty"][()], masses.value)
+    assert u.Unit(h5file["data/m/qty"].attrs["units"]) == u.Msun
+
+
+def test_recordset_does_not_modify_input(h5file, times, energies):
+    records = {
+        "a": {"data": energies, "time": times},
+        "b": {"data": energies, "time": times},
+    }
+    write_recordset(h5file, records)
+    assert records["b"]["time"] is times
+
+
+def test_recordset_passes_units(h5file, times, energies):
+    records = {
+        "E": {
+            "data": energies,
+            "time": times,
+            "record_units": u.J,
+            "time_units": u.yr,
+        }
+    }
+    write_recordset(h5file, records)
+    assert_allclose(h5file["data/E/qty"][()], energies.to_value(u.J))
+    assert u.Unit(h5file["data/E/qty"].attrs["units"]) == u.J
+    assert_allclose(h5file["data/E/time"][()], times.to_value(u.yr))
+    assert u.Unit(h5file["data/E/time"].attrs["units"]) == u.yr
+
+
+def test_recordset_keeps_differing_time_units_separate(h5file, times, energies):
+    """Linking would silently drop the second record's requested time units."""
+    records = {
+        "a": {"data": energies, "time": times},
+        "b": {"data": energies, "time": times, "time_units": u.yr},
+    }
+    write_recordset(h5file, records)
+    assert not is_link(h5file, "b")
+    assert u.Unit(h5file["data/b/time"].attrs["units"]) == u.yr
+
+
+def test_recordset_accepts_explicit_links(h5file, times, energies):
+    records = {
+        "b": {"data": energies, "time": "a"},
+        "a": {"data": energies, "time": times},
+    }
+    write_recordset(h5file, records)
+    assert is_link(h5file, "b")
+    assert_allclose(h5file["data/b/time"][()], times.value)
+
+
+def test_recordset_rejects_bad_time(h5file, energies):
+    with pytest.raises(TypeError):
+        write_recordset(h5file, {"a": {"data": energies, "time": [1.0, 2.0]}})
