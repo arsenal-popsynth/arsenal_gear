@@ -70,12 +70,13 @@ def git_is_dirty(path="."):
     return bool(out.strip())
 
 
-def construct_meta_dataset(f, bibtex=None):
+def construct_meta_dataset(f, paramfile: str, bibtex=None) -> None:
     """
     Add a metadata dataset to the h5py file object f.
     """
     f.create_dataset("metadata/rundate", data=datetime.now().isoformat())
     f.create_dataset("metadata/hostname", data=gethostname())
+    f.create_dataset("metadata/paramfile", data=paramfile)
     if bibtex is not None:
         f.create_dataset("metadata/bibtex", data=bibtex)
 
