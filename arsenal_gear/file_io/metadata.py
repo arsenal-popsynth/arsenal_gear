@@ -13,6 +13,7 @@ import subprocess
 import tarfile
 from io import BytesIO
 
+import h5py
 import numpy as np
 
 import arsenal_gear
@@ -68,12 +69,14 @@ def git_is_dirty(path="."):
     return bool(out.strip())
 
 
-def construct_meta_dataset(f):
+def construct_meta_dataset(f, bibtex=None):
     """
     Add a metadata dataset to the h5py file object f.
     """
     ds = f.create_dataset("metadata/source", data=np.void(get_full_src_tree()))
     ds.attrs["format"] = "tar.gz"
+    if bibtex is not None:
+        f.create_dataset("metadata/bibtex", data=bibtex, dtype=h5py.string_dtype())
     try:
         ds.attrs["git-commit"] = git_commit(arsenal_gear.__path__)
         ds.attrs["git-dirty"] = git_is_dirty(arsenal_gear.__path__)
