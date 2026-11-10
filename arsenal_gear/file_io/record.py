@@ -16,7 +16,8 @@ def write_recordset(f, records: dict):
     and the value for that key is itself a two-item dict.  The 'data' item
     contains the data, and the 'time' unit contains the time, both of which
     will get get passed to add record.  They may also include optional
-    record_units and time_units keys.
+    record_units and time_units keys, as well as a string descriptor explaining
+    what quantity the record contains.
 
     The function does a first pass over all the records to find the non-unique
     time arrays, and then replaces all duplicates with strings indicating the
@@ -32,6 +33,9 @@ def write_recordset(f, records: dict):
             unit = record.get("time_units")
             unit = time.unit if unit is None else unit
             values = time.to_value(unit)
+            # This key is a bit more complicated than seems necessary because
+            # the tobytes() return could in rare occasions cause collisions if
+            # two arrays have different shape AND different dtypes
             key = (unit.name, values.shape, values.dtype.str, values.tobytes())
             if key in first_seen:
                 time = first_seen[key]
@@ -47,10 +51,13 @@ def write_recordset(f, records: dict):
             record["data"],
             record_units=record.get("record_units"),
             time_units=record.get("time_units"),
+            descriptor=record.get("descriptor"),
         )
 
 
-def add_record(f, name, time, data: Quantity, record_units=None, time_units=None):
+def add_record(
+    f, name, time, data: Quantity, record_units=None, time_units=None, descriptor=""
+):
     """
     Add a record to the data/ group in the hdf5 file.  Each record
     consists of an array of data values and an array of times.
@@ -69,6 +76,7 @@ def add_record(f, name, time, data: Quantity, record_units=None, time_units=None
         data=data.to_value(data.unit if record_units is None else record_units),
     )
     ds.attrs["units"] = data.unit.name if record_units is None else record_units.name
+    ds.attrs["descriptor"] = descriptor
 
     if isinstance(time, str):
         f[f"data/{name}/time"] = h5py.SoftLink(f"/data/{time}/time")
