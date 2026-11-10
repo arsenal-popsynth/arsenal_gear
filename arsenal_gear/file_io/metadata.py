@@ -11,9 +11,10 @@ from __future__ import annotations
 import os
 import subprocess
 import tarfile
+from datetime import datetime
 from io import BytesIO
+from socket import gethostname
 
-import h5py
 import numpy as np
 
 import arsenal_gear
@@ -73,10 +74,13 @@ def construct_meta_dataset(f, bibtex=None):
     """
     Add a metadata dataset to the h5py file object f.
     """
+    f.create_dataset("metadata/rundate", data=datetime.now().isoformat())
+    f.create_dataset("metadata/hostname", data=gethostname())
+    if bibtex is not None:
+        f.create_dataset("metadata/bibtex", data=bibtex)
+
     ds = f.create_dataset("metadata/source", data=np.void(get_full_src_tree()))
     ds.attrs["format"] = "tar.gz"
-    if bibtex is not None:
-        f.create_dataset("metadata/bibtex", data=bibtex, dtype=h5py.string_dtype())
     try:
         ds.attrs["git-commit"] = git_commit(arsenal_gear.__path__)
         ds.attrs["git-dirty"] = git_is_dirty(arsenal_gear.__path__)
