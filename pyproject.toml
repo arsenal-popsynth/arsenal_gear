@@ -25,9 +25,14 @@ dependencies = [
     "myst-parser",
     "pandas",
     "pyerf",
+<<<<<<< HEAD
     "matplotlib",
     "marimo>=0.23.13",
 ]
+=======
+    "requests",
+    ]
+>>>>>>> 004a2efdee4f06130fd68851f9006e5c8a36fd49
 dynamic = ["version"]
 
 [project.scripts]
@@ -42,3 +47,6 @@ packages = ["arsenal_gear",
     "arsenal_gear.utils",
     "arsenal_gear.scripts",
     "arsenal_gear.stellar_evolution",]
+
+[tool.setuptools.package-data]
+"arsenal_gear.utils" = ["citations.bib"]

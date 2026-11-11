@@ -14,7 +14,7 @@ repos:
     - id: trailing-whitespace
     - id: end-of-file-fixer
     - id: no-commit-to-branch
-      args: [--branch, master]
+      args: [--branch, main]
     - id: check-shebang-scripts-are-executable
     - id: check-executables-have-shebangs
     - id: check-yaml
@@ -56,3 +56,13 @@ repos:
           "-rn", # Only display messages
           "-sn", # Don't display the score
         ]
+    # Catches a @cite that was added, changed or deleted without the
+    # bibliography being regenerated. Offline: no ADS token needed to notice
+    # the problem, only to fix it.
+    - id: citations
+      name: citations.bib is up to date
+      entry: python -m arsenal_gear.utils.refresh_citations --check
+      language: system
+      files: \.(py|bib)$
+      pass_filenames: false
+      require_serial: true
