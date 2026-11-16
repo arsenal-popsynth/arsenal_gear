@@ -25,14 +25,10 @@ dependencies = [
     "myst-parser",
     "pandas",
     "pyerf",
-<<<<<<< HEAD
     "matplotlib",
     "marimo>=0.23.13",
-]
-=======
     "requests",
-    ]
->>>>>>> 004a2efdee4f06130fd68851f9006e5c8a36fd49
+]
 dynamic = ["version"]
 
 [project.scripts]
