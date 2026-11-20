@@ -197,10 +197,15 @@ class PiecewisePowerLaw(IMF):
 
         self.weights = []
         for i in range(len(self.betas)):
-            b_plus_1 = self.betas[i] + 1
-            w = (self.alphas[i] / b_plus_1) * (
-                self.m_pts[i + 1] ** b_plus_1 - self.m_pts[i] ** b_plus_1
-            )
+            m_lo = self.m_pts[i]
+            m_hi = self.m_pts[i + 1]
+            if np.isclose(self.betas[i], -1.0):
+                w = self.alphas[i] * np.log(m_hi / m_lo)
+            else:
+                b_plus_1 = self.betas[i] + 1
+                w = (self.alphas[i] / b_plus_1) * (
+                    self.m_pts[i + 1] ** b_plus_1 - self.m_pts[i] ** b_plus_1
+                )
             self.weights.append(w)
 
         self.weights = np.array(self.weights)
@@ -231,18 +236,25 @@ class PiecewisePowerLaw(IMF):
             cond = (q >= prev_q) & (q <= self.cum_weights[i])
 
             if np.any(cond):
-                b_plus_1 = self.betas[i] + 1
+                m_lo = self.m_pts[i]
+                m_hi = self.m_pts[i + 1]
                 w_prior = self.weights[:i].sum() if i > 0 else 0.0
-
                 q_valid = q[cond]
 
-                base = (q_valid * self.total_area - w_prior) * b_plus_1 / self.alphas[
-                    i
-                ] + self.m_pts[i] ** b_plus_1
-
-                base = np.maximum(base, 0.0)
-
-                final[cond] = base ** (1.0 / b_plus_1)
+                if np.isclose(self.betas[i], -1.0):
+                    frac = np.clip(
+                        (q_valid * self.total_area - w_prior) / self.weights[i],
+                        0.0,
+                        1.0,
+                    )
+                    final[cond] = m_lo * (m_hi / m_lo) ** frac
+                else:
+                    b_plus_1 = self.betas[i] + 1
+                    base = (
+                        q_valid * self.total_area - w_prior
+                    ) * b_plus_1 / self.alphas[i] + self.m_pts[i] ** b_plus_1
+                    base = np.maximum(base, 0.0)
+                    final[cond] = base ** (1.0 / b_plus_1)
 
             prev_q = self.cum_weights[i]
 
