@@ -7,9 +7,8 @@
    :toctree: _autosummary
    :recursive:
 
-   dist_funcs
    feedbacks
    file_io
-   population
+   formation
    stellar_evolution
 ```

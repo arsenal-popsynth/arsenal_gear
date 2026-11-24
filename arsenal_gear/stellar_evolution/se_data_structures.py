@@ -1,6 +1,6 @@
 """
 se_data_structures.py
-==========
+=====================
 
 This file defines various data structures used in the interpolation of
 results from stellar evolution models

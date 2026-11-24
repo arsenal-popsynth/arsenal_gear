@@ -1,6 +1,6 @@
 """
 data_reader.py
-==========
+==============
 
 This file defines classes for reading stellar evolution data from
 various sources into a uniform data structure format defined in
