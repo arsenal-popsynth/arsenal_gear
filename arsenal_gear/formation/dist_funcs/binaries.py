@@ -403,15 +403,14 @@ class Period(rv_continuous):
 
 class LogUniformPeriod(Period):
     """
-    A simple step function distribution of semi-major axes, with a log-uniform
-    distribution above and below the changeover semi-major axis
+    A simple log-uniform distribution of orbital periods
 
-    :param sma: Changeover semi-major axis
-    :type sma: astropy length unit
-    :param ratio: Ratio of probabilities for close and wide binaries
-    :type ratio: float
-    A simple loguniform distribution of semi-major axes
-
+    :param min_p: Minimum orbital period
+    :type min_p: astropy time unit
+    :param max_p: Maximum orbital period
+    :type max_p: astropy time unit
+    :param name: Name for the scipy.stats rv_continuous instance
+    :type name: str
     """
 
     def __init__(
@@ -462,14 +461,14 @@ class Semimajor(rv_continuous):
 
 class LogUniformSemimajor(Semimajor):
     """
-    A simple step function distribution of semi-major axes, with a log-uniform
-    distribution above and below the changeover semi-major axis
+    A simple log-uniform distribution of semi-major axes
 
-    :param sma: Changeover semi-major axis
-    :type sma: astropy length unit
-    :param ratio: Ratio of probabilities for close and wide binaries
-    :type ratio: float
-    A simple loguniform distribution of semi-major axes
+    :param min_a: Minimum semi-major axis
+    :type min_a: astropy length unit
+    :param max_a: Maximum semi-major axis
+    :type max_a: astropy length unit
+    :param name: Name for the scipy.stats rv_continuous instance
+    :type name: str
     """
 
     def __init__(
