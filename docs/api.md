@@ -9,6 +9,7 @@
 
    dist_funcs
    feedbacks
+   file_io
    population
    stellar_evolution
 ```
