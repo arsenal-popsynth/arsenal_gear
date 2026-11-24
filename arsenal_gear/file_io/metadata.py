@@ -37,6 +37,10 @@ def get_full_src_tree() -> bytes:
     This function generates a tarball of the entire source tree returned by
     arsenal_gear.__path__ and returns it as a bytes object.  Subdirectories
     named 'data' or '__pycache__' are excluded.
+
+    :return: Gzipped tarball of the source tree, with all paths rooted at
+        ``arsenal_gear/``
+    :rtype: bytes
     """
     buf = BytesIO()
     # we are writing the tarfile to memory in buf
@@ -72,7 +76,18 @@ def git_is_dirty(path="."):
 
 def construct_meta_dataset(f, paramfile: str, bibtex=None) -> None:
     """
-    Add a metadata dataset to the h5py file object f.
+    Add a metadata group to the h5py file object f, recording when, where,
+    and with what source and parameters the run was made.  This writes
+    ``metadata/rundate``, ``metadata/hostname``, ``metadata/paramfile``,
+    ``metadata/source`` (with ``format``, ``git-commit`` and ``git-dirty``
+    attributes), and ``metadata/bibtex`` if one is given.
+
+    :param f: Open, writable hdf5 file to add the metadata to
+    :type f: h5py.File
+    :param paramfile: Full text of the parameter file used for the run
+    :type paramfile: str
+    :param bibtex: BibTeX for the models used in the run
+    :type bibtex: str, optional
     """
     f.create_dataset("metadata/rundate", data=datetime.now().isoformat())
     f.create_dataset("metadata/hostname", data=gethostname())

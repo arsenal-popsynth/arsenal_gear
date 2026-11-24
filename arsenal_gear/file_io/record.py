@@ -11,19 +11,29 @@ from astropy.units import Quantity
 
 def write_recordset(f, records: dict):
     """
-    This function takes a dictionary of records and uses add_record to write
-    them into the hdf5 file f.  Each record's key is the name of the record,
-    and the value for that key is itself a two-item dict.  The 'data' item
-    contains the data, and the 'time' unit contains the time, both of which
-    will get get passed to add record.  They may also include optional
-    record_units and time_units keys, as well as a string descriptor explaining
-    what quantity the record contains.
+    Write a complete set of records into the hdf5 file f, using add_record for
+    each one.
 
     The function does a first pass over all the records to find the non-unique
     time arrays, and then replaces all duplicates with strings indicating the
     first instance of that particular time array.  That then allows add_record
     to write the first instance as an actual array dataset, and then subsequent
-    ones as softlinks.
+    ones as softlinks.  Time arrays only count as duplicates if they have the
+    same units, shape, dtype, and values once converted to the units they will
+    be written in.
+
+    :param f: Open, writable hdf5 file to write the records into
+    :type f: h5py.File
+    :param records: Records to write, keyed by record name.  Each value is a
+        dict with required keys ``data`` (a Quantity array of values) and
+        ``time`` (a Quantity array of times, or the name of another record to
+        share times with), and optional keys ``record_units``, ``time_units``
+        (astropy units to convert to before writing) and ``descriptor`` (a
+        short string describing the record, default ``""``).
+    :type records: dict
+    :raises TypeError: If any record's time is not a Quantity or a str
+    :raises astropy.units.UnitConversionError: If a requested unit is
+        incompatible with the record's data or times
     """
     first_seen = {}  # the time values as they would be written -> record name
     times = {}
@@ -60,11 +70,34 @@ def add_record(
 ):
     """
     Add a record to the data/ group in the hdf5 file.  Each record
-    consists of an array of data values and an array of times.
+    consists of an array of data values and an array of times, written to
+    ``data/<name>/qty`` and ``data/<name>/time``.
 
     The times can either be a Quantity array, which is written as a new
     dataset, or a str naming another record, in which case a SoftLink to that
-    record's times is written instead (and time_units is ignored).
+    record's times is written instead (and time_units is ignored).  The linked
+    record does not need to have been written yet.
+
+    :param f: Open, writable hdf5 file to write the record into
+    :type f: h5py.File
+    :param name: Name of the record, used as its group name under ``data/``
+    :type name: str
+    :param time: Times the data values apply at, or the name of another
+        record whose times should be shared via a SoftLink
+    :type time: Quantity["time"] or str
+    :param data: Values of the record
+    :type data: Quantity
+    :param record_units: Units to convert data to before writing (defaults to
+        the units of data)
+    :type record_units: astropy.units.Unit, optional
+    :param time_units: Units to convert time to before writing (defaults to
+        the units of time; ignored if time is a str)
+    :type time_units: astropy.units.Unit, optional
+    :param descriptor: Short human-readable description of the record
+    :type descriptor: str, optional
+    :raises TypeError: If time is not a Quantity or a str
+    :raises astropy.units.UnitConversionError: If record_units or time_units
+        is incompatible with data or time
     """
     if not isinstance(time, (Quantity, str)):
         raise TypeError(
