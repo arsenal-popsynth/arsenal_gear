@@ -1,0 +1,39 @@
+﻿arsenal\_gear.formation
+=======================
+
+.. automodule:: arsenal_gear.formation
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Formation
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   dist_funcs
+   form_data_structures
+

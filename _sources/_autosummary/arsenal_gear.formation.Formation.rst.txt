@@ -1,0 +1,8 @@
+arsenal\_gear.formation.Formation
+=================================
+
+.. currentmodule:: arsenal_gear.formation
+
+.. autoclass:: Formation
+   :members:
+   :show-inheritance:

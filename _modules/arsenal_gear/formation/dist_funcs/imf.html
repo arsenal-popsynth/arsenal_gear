@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.formation.dist_funcs.imf &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../formation.html" accesskey="U">arsenal_gear.formation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.formation.dist_funcs.imf</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.formation.dist_funcs.imf</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">imf</span>
+<span class="sd">==========</span>
+
+<span class="sd">This submodule contains all the code required to sample from an IMF.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">astropy.units</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">u</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scipy.special</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">astropy.units</span><span class="w"> </span><span class="kn">import</span> <span class="n">Quantity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">rv_continuous</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">...utils.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;IMF&quot;</span><span class="p">,</span> <span class="s2">&quot;Salpeter&quot;</span><span class="p">,</span> <span class="s2">&quot;Kroupa1993&quot;</span><span class="p">,</span> <span class="s2">&quot;Kroupa2001&quot;</span><span class="p">,</span> <span class="s2">&quot;MillerScalo&quot;</span><span class="p">,</span> <span class="s2">&quot;Chabrier&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="IMF">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.IMF.html#arsenal_gear.formation.dist_funcs.imf.IMF">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IMF</span><span class="p">(</span><span class="n">rv_continuous</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is the superclass of all Initial Mass Functions (IMFs)</span>
+
+<span class="sd">    :param min_mass: Least massive star in the IMF</span>
+<span class="sd">    :type min_mass: astropy mass unit</span>
+<span class="sd">    :param max_mass: Most massive star in the IMF</span>
+<span class="sd">    :type max_mass: astropy mass unit</span>
+<span class="sd">    :param name: Name for the scipy.stats rv_continuous instance</span>
+<span class="sd">    :type name: str</span>
+<span class="sd">    :param seed: Random seed for sampling</span>
+<span class="sd">    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="IMF.MassDist">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.IMF.html#arsenal_gear.formation.dist_funcs.imf.IMF.MassDist">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">MassDist</span><span class="p">(</span><span class="n">rv_continuous</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This sub-class defines the mass distribtuion for an IMF.</span>
+<span class="sd">        Since this only defines the PDF in terms of the IMF&#39;s PDF, calculation of all other</span>
+<span class="sd">        derived functions (CDF, PPF, etc.) is handled *numerically* by rv_continuous, meaning</span>
+<span class="sd">        that these functions can be slow. This class should only be used for plots and simple</span>
+<span class="sd">        calls like:</span>
+<span class="sd">        &gt;&gt; half_mass_mass = imf.mass_dist.ppf(0.5)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">imf</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_imf</span> <span class="o">=</span> <span class="n">imf</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mean_mass</span> <span class="o">=</span> <span class="n">imf</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">value</span>  <span class="c1"># in Msun</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="n">imf</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="n">imf</span><span class="o">.</span><span class="n">max_mass</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">imf</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_mass&quot;</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_imf</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">mean_mass</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">min_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">max_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">min_mass</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">max_mass</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;(min_mass,max_mass) (</span><span class="si">{</span><span class="n">min_mass</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">max_mass</span><span class="si">}</span><span class="s2">) must both be positive. Stars cannot have zero or negative mass.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;min_mass (</span><span class="si">{</span><span class="n">min_mass</span><span class="si">}</span><span class="s2">) must be less than max_mass (</span><span class="si">{</span><span class="n">max_mass</span><span class="si">}</span><span class="s2">).&quot;</span>
+            <span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mass_dist</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mass_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mass_dist</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mass_dist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MassDist</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mass_dist</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_imf</span><span class="p">(</span><span class="n">imf_identifier</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">registry</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;salpeter&quot;</span><span class="p">:</span> <span class="n">Salpeter</span><span class="p">,</span>
+            <span class="s2">&quot;kroupa1993&quot;</span><span class="p">:</span> <span class="n">Kroupa1993</span><span class="p">,</span>
+            <span class="s2">&quot;kroupa2001&quot;</span><span class="p">:</span> <span class="n">Kroupa2001</span><span class="p">,</span>
+            <span class="s2">&quot;millerscalo&quot;</span><span class="p">:</span> <span class="n">MillerScalo</span><span class="p">,</span>
+            <span class="s2">&quot;chabrier&quot;</span><span class="p">:</span> <span class="n">Chabrier</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">imf_identifier</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">imf_identifier</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">registry</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">registry</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown IMF string: </span><span class="si">{</span><span class="n">imf_identifier</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">imf_identifier</span>
+
+<div class="viewcode-block" id="IMF.sample_mass">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.IMF.html#arsenal_gear.formation.dist_funcs.imf.IMF.sample_mass">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_mass</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mtot</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Draw a sample from the IMF with target total mass</span>
+
+<span class="sd">        :param mtot: Targer total mass of the sample</span>
+<span class="sd">        :type mtot: Quantity[&quot;mass&quot;]</span>
+<span class="sd">        :return: List of masses of stars</span>
+<span class="sd">        :rtype: Quantity[&quot;mass&quot;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">N_samp</span> <span class="o">=</span> <span class="nb">round</span><span class="p">((</span><span class="n">mtot</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">N_samp</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IMF.sample">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.IMF.html#arsenal_gear.formation.dist_funcs.imf.IMF.sample">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Draw a sample from the IMF with a specific number of stars</span>
+
+<span class="sd">        :param N: Number of stars to draw</span>
+<span class="sd">        :type N: int</span>
+<span class="sd">        :return: List of masses of stars</span>
+<span class="sd">        :rtype: Quantity[&quot;mass&quot;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">)</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Salpeter">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.Salpeter.html#arsenal_gear.formation.dist_funcs.imf.Salpeter">[docs]</a>
+<span class="nd">@cite</span><span class="p">(</span><span class="s2">&quot;10.1086/145971&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Salpeter</span><span class="p">(</span><span class="n">IMF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A simple, classic Salpeter 1955 (slope 2.35) IMF.</span>
+
+<span class="sd">    :param min_mass: Least massive star in the IMF</span>
+<span class="sd">    :type min_mass: astropy mass unit</span>
+<span class="sd">    :param max_mass: Most massive star in the IMF</span>
+<span class="sd">    :type max_mass: astropy mass unit</span>
+<span class="sd">    :param alpha: The IMF slope (note that the slope applied is -alpha, so this</span>
+<span class="sd">                  should be positive)</span>
+<span class="sd">    :type alpha: float</span>
+<span class="sd">    :param seed: Random seed for sampling</span>
+<span class="sd">    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">min_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.08</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">max_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.35</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span> <span class="o">=</span> <span class="n">min_mass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span> <span class="o">=</span> <span class="n">max_mass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;Salpeter&quot;</span>
+        <span class="k">assert</span> <span class="n">alpha</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">min_mass</span><span class="p">,</span> <span class="n">max_mass</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">upper</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="n">lower</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="n">norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span> <span class="o">/</span> <span class="n">norm</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">upper</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="n">lower</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">q</span> <span class="o">*</span> <span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span> <span class="o">+</span> <span class="n">lower</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Salpeter.mean">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.Salpeter.html#arsenal_gear.formation.dist_funcs.imf.Salpeter.mean">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">):</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span>
+        <span class="c1"># Analytical power law mean</span>
+        <span class="n">num</span> <span class="o">=</span> <span class="p">(</span><span class="n">m2</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">m1</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">den</span> <span class="o">=</span> <span class="p">(</span><span class="n">m2</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">-</span> <span class="n">m1</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">num</span> <span class="o">/</span> <span class="n">den</span><span class="p">)</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PiecewisePowerLaw">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.PiecewisePowerLaw.html#arsenal_gear.formation.dist_funcs.imf.PiecewisePowerLaw">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PiecewisePowerLaw</span><span class="p">(</span><span class="n">IMF</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">min_mass</span><span class="p">,</span> <span class="n">max_mass</span><span class="p">,</span> <span class="n">masses</span><span class="p">,</span> <span class="n">betas</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;PPL&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generic class for N-part piecewise power law IMFs.</span>
+<span class="sd">        :param masses: List/Array of transition masses (e.g., [0.5, 1.0])</span>
+<span class="sd">        :param betas: List/Array of slopes (e.g., [-1.3, -2.3, -2.7])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">min_mass</span><span class="p">,</span> <span class="n">max_mass</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="n">m_min_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span>
+        <span class="n">m_max_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span>
+
+        <span class="n">all_pts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="s2">&quot;unit&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">masses</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">internal_pts</span> <span class="o">=</span> <span class="n">all_pts</span><span class="p">[(</span><span class="n">all_pts</span> <span class="o">&gt;</span> <span class="n">m_min_val</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">all_pts</span> <span class="o">&lt;</span> <span class="n">m_max_val</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(([</span><span class="n">m_min_val</span><span class="p">],</span> <span class="n">internal_pts</span><span class="p">,</span> <span class="p">[</span><span class="n">m_max_val</span><span class="p">]))</span>
+
+        <span class="c1"># Dynamic beta selection ensures the correct slope if used for</span>
+        <span class="c1"># segments in self.m_pts</span>
+        <span class="n">full_bounds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(([</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">],</span> <span class="n">all_pts</span><span class="p">,</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">]))</span>
+        <span class="n">matched_betas</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">midpoint</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">full_bounds</span><span class="p">,</span> <span class="n">midpoint</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">matched_betas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">betas</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">betas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">matched_betas</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">**</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">weights</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">)):</span>
+            <span class="n">b_plus_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">/</span> <span class="n">b_plus_1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="n">b_plus_1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">**</span> <span class="n">b_plus_1</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cum_weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="c1"># check which segment x falls into based on m_pts</span>
+        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">))</span>
+        <span class="p">]</span>
+        <span class="n">conditions</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">))</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">conditions</span><span class="p">,</span> <span class="n">results</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generalized inverse CDF (sampling) logic.&quot;&quot;&quot;</span>
+        <span class="n">is_scalar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+
+        <span class="n">final</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">prev_q</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">)):</span>
+            <span class="n">cond</span> <span class="o">=</span> <span class="p">(</span><span class="n">q</span> <span class="o">&gt;=</span> <span class="n">prev_q</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">q</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cum_weights</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">cond</span><span class="p">):</span>
+                <span class="n">b_plus_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">betas</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">w_prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[:</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+                <span class="n">q_valid</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="n">cond</span><span class="p">]</span>
+
+                <span class="n">base</span> <span class="o">=</span> <span class="p">(</span><span class="n">q_valid</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span> <span class="o">-</span> <span class="n">w_prior</span><span class="p">)</span> <span class="o">*</span> <span class="n">b_plus_1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span>
+                    <span class="n">i</span>
+                <span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">**</span> <span class="n">b_plus_1</span>
+
+                <span class="n">base</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+                <span class="n">final</span><span class="p">[</span><span class="n">cond</span><span class="p">]</span> <span class="o">=</span> <span class="n">base</span> <span class="o">**</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">b_plus_1</span><span class="p">)</span>
+
+            <span class="n">prev_q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cum_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">final</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">is_scalar</span> <span class="k">else</span> <span class="n">final</span>
+
+<div class="viewcode-block" id="PiecewisePowerLaw.mean">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.PiecewisePowerLaw.html#arsenal_gear.formation.dist_funcs.imf.PiecewisePowerLaw.mean">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Analytical mean sum of [Integral of m * PDF(m)] for each segment&quot;&quot;&quot;</span>
+        <span class="n">mmin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span>
+        <span class="n">mmax</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.integrate</span><span class="w"> </span><span class="kn">import</span> <span class="n">quad</span>
+
+        <span class="n">res</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">m</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pdf</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="n">mmin</span><span class="p">,</span> <span class="n">mmax</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Kroupa2001">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.Kroupa2001.html#arsenal_gear.formation.dist_funcs.imf.Kroupa2001">[docs]</a>
+<span class="nd">@cite</span><span class="p">(</span><span class="s2">&quot;10.1046/j.1365-8711.2001.04022.x&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Kroupa2001</span><span class="p">(</span><span class="n">PiecewisePowerLaw</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Kroupa (2001) IMF implementation</span>
+
+<span class="sd">    :param min_mass: Least massive star in the IMF</span>
+<span class="sd">    :type min_mass: astropy mass unit</span>
+<span class="sd">    :param max_mass: Most massive star in the IMF</span>
+<span class="sd">    :type max_mass: astropy mass unit</span>
+<span class="sd">    :param seed: Random seed for sampling</span>
+<span class="sd">    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">min_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.08</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">max_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">150.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">min_mass</span><span class="o">=</span><span class="n">min_mass</span><span class="p">,</span>
+            <span class="n">max_mass</span><span class="o">=</span><span class="n">max_mass</span><span class="p">,</span>
+            <span class="n">masses</span><span class="o">=</span><span class="p">[</span><span class="mf">0.08</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span>
+            <span class="n">betas</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.3</span><span class="p">],</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Kroupa2001&quot;</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Kroupa1993">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.Kroupa1993.html#arsenal_gear.formation.dist_funcs.imf.Kroupa1993">[docs]</a>
+<span class="nd">@cite</span><span class="p">(</span><span class="s2">&quot;10.1093/mnras/262.3.545&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Kroupa1993</span><span class="p">(</span><span class="n">PiecewisePowerLaw</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Kroupa, Tout &amp; Gilmore (1993) IMF implementation</span>
+
+<span class="sd">    :param min_mass: Least massive star in the IMF</span>
+<span class="sd">    :type min_mass: astropy mass unit</span>
+<span class="sd">    :param max_mass: Most massive star in the IMF</span>
+<span class="sd">    :type max_mass: astropy mass unit</span>
+<span class="sd">    :param seed: Random seed for sampling</span>
+<span class="sd">    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">min_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.08</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">max_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">100.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">min_mass</span><span class="o">=</span><span class="n">min_mass</span><span class="p">,</span>
+            <span class="n">max_mass</span><span class="o">=</span><span class="n">max_mass</span><span class="p">,</span>
+            <span class="n">masses</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span>
+            <span class="n">betas</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">1.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.2</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.7</span><span class="p">],</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Kroupa2001&quot;</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="MillerScalo">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.MillerScalo.html#arsenal_gear.formation.dist_funcs.imf.MillerScalo">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MillerScalo</span><span class="p">(</span><span class="n">PiecewisePowerLaw</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Miller &amp; Scalo (1979) IMF implementation.</span>
+
+<span class="sd">    :param min_mass: Least massive star in the IMF</span>
+<span class="sd">    :type min_mass: astropy mass unit</span>
+<span class="sd">    :param max_mass: Most massive star in the IMF</span>
+<span class="sd">    :type max_mass: astropy mass unit</span>
+<span class="sd">    :param seed: Random seed for sampling</span>
+<span class="sd">    :type seed: None, int, numpy.random.Generator, or numpy.random.RandomState</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">min_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">max_mass</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">100.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">min_mass</span><span class="o">=</span><span class="n">min_mass</span><span class="p">,</span>
+            <span class="n">max_mass</span><span class="o">=</span><span class="n">max_mass</span><span class="p">,</span>
+            <span class="n">masses</span><span class="o">=</span><span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">],</span>
+            <span class="n">betas</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">0.4</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.3</span><span class="p">],</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;MillerScalo&quot;</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Chabrier">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.Chabrier.html#arsenal_gear.formation.dist_funcs.imf.Chabrier">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Chabrier</span><span class="p">(</span><span class="n">IMF</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">min_mass</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span> <span class="o">=</span> <span class="mf">0.08</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">max_mass</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span> <span class="o">=</span> <span class="mf">100.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+        <span class="n">beta</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.3</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">min_mass</span><span class="p">,</span> <span class="n">max_mass</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Chabrier&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">=</span> <span class="mf">0.158</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span> <span class="o">=</span> <span class="mf">0.69</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mc</span> <span class="o">=</span> <span class="mf">0.079</span>
+        <span class="n">val_at_1</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
+            <span class="o">-</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mc</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">A_high</span> <span class="o">=</span> <span class="n">val_at_1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">=</span> <span class="n">beta</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span> <span class="o">=</span> <span class="n">min_mass</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span> <span class="o">=</span> <span class="n">max_mass</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">E_min</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">erf</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mc</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">E_trans</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">erf</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mc</span><span class="p">))</span>
+            <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">area_low</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_integrate_low</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">area_high</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_integrate_high</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">area_low</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">area_high</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_integrate_low</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+        <span class="n">actual_min</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">)</span>  <span class="c1"># 0.01 as a safety floor</span>
+        <span class="n">E_min_actual</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">erf</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">actual_min</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mc</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span>
+        <span class="k">return</span> <span class="n">factor</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">E_trans</span> <span class="o">-</span> <span class="n">E_min_actual</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_integrate_high</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+        <span class="n">actual_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="p">)</span>
+        <span class="n">actual_end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A_high</span> <span class="o">/</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">actual_end</span><span class="o">**</span><span class="n">p</span> <span class="o">-</span> <span class="n">actual_start</span><span class="o">**</span><span class="n">p</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pdf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="n">is_scalar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">slo</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="p">)</span>
+        <span class="n">shi</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">slo</span><span class="p">):</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">slo</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">/</span> <span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="n">slo</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">10</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
+                <span class="o">-</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="n">slo</span><span class="p">])</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mc</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">shi</span><span class="p">):</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">shi</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A_high</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="n">shi</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">beta</span><span class="p">)</span>
+
+        <span class="n">res</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span>
+        <span class="k">return</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">is_scalar</span> <span class="k">else</span> <span class="n">res</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ppf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;inverse CDF for sampling.&quot;&quot;&quot;</span>
+        <span class="n">is_scalar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+        <span class="n">q_break</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">area_low</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_area</span>
+        <span class="n">slo</span> <span class="o">=</span> <span class="n">q</span> <span class="o">&lt;</span> <span class="n">q_break</span>
+        <span class="n">shi</span> <span class="o">=</span> <span class="p">(</span><span class="n">q</span> <span class="o">&gt;=</span> <span class="n">q_break</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">q</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="c1"># Segment 1: Low mass log-normal</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">slo</span><span class="p">):</span>
+            <span class="n">target_erf</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">q</span><span class="p">[</span><span class="n">slo</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">E_trans</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">E_min</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">q_break</span> <span class="k">if</span> <span class="n">q_break</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">E_min</span>
+            <span class="p">)</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">slo</span><span class="p">]</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span> <span class="o">*</span> <span class="n">sp</span><span class="o">.</span><span class="n">erfinv</span><span class="p">(</span><span class="n">target_erf</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mc</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Segment 2: High mass power law</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">shi</span><span class="p">):</span>
+            <span class="n">denom</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">q_break</span>
+            <span class="n">q_scaled</span> <span class="o">=</span> <span class="p">(</span><span class="n">q</span><span class="p">[</span><span class="n">shi</span><span class="p">]</span> <span class="o">-</span> <span class="n">q_break</span><span class="p">)</span> <span class="o">/</span> <span class="n">denom</span> <span class="k">if</span> <span class="n">denom</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">0.0</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">res</span><span class="p">[</span><span class="n">shi</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">q_scaled</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="o">**</span><span class="n">p</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="o">**</span><span class="n">p</span><span class="p">)</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_transition</span><span class="o">**</span><span class="n">p</span>
+            <span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">p</span><span class="p">)</span>
+
+        <span class="n">sout</span> <span class="o">=</span> <span class="o">~</span><span class="p">(</span><span class="n">slo</span> <span class="o">|</span> <span class="n">shi</span><span class="p">)</span>
+        <span class="n">res</span><span class="p">[</span><span class="n">sout</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="k">return</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">is_scalar</span> <span class="k">else</span> <span class="n">res</span>
+
+<div class="viewcode-block" id="Chabrier.mean">
+<a class="viewcode-back" href="../../../../_autosummary/arsenal_gear.formation.dist_funcs.imf.Chabrier.html#arsenal_gear.formation.dist_funcs.imf.Chabrier.mean">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">):</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.integrate</span><span class="w"> </span><span class="kn">import</span> <span class="n">quad</span>
+
+        <span class="n">res</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">quad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">m</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pdf</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_mass</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_mass</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../bpass-data-notes.html">Notes on the BPASS Binary Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../formation.html" >arsenal_gear.formation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.formation.dist_funcs.imf</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
+    </div>
+  </body>
+</html>

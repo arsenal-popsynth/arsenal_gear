@@ -1,0 +1,8 @@
+arsenal\_gear.formation.dist\_funcs.imf.Chabrier
+================================================
+
+.. currentmodule:: arsenal_gear.formation.dist_funcs.imf
+
+.. autoclass:: Chabrier
+   :members:
+   :show-inheritance:

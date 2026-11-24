@@ -1,0 +1,8 @@
+arsenal\_gear.formation.form\_data\_structures.BinaryPop
+========================================================
+
+.. currentmodule:: arsenal_gear.formation.form_data_structures
+
+.. autoclass:: BinaryPop
+   :members:
+   :show-inheritance:

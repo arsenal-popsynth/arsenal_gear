@@ -1,0 +1,8 @@
+arsenal\_gear.stellar\_evolution.Evolution
+==========================================
+
+.. currentmodule:: arsenal_gear.stellar_evolution
+
+.. autoclass:: Evolution
+   :members:
+   :show-inheritance:

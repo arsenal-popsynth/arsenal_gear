@@ -1,0 +1,36 @@
+arsenal\_gear.formation.dist\_funcs.imf
+=======================================
+
+.. automodule:: arsenal_gear.formation.dist_funcs.imf
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Chabrier
+      IMF
+      Kroupa1993
+      Kroupa2001
+      MillerScalo
+      PiecewisePowerLaw
+      Salpeter
+   
+   
+
+   
+   
+   
+
+
+

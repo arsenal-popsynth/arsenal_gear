@@ -1,0 +1,8 @@
+arsenal\_gear.formation.dist\_funcs.imf.Kroupa2001
+==================================================
+
+.. currentmodule:: arsenal_gear.formation.dist_funcs.imf
+
+.. autoclass:: Kroupa2001
+   :members:
+   :show-inheritance:

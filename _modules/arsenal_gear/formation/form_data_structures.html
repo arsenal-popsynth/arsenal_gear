@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.formation.form_data_structures &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../formation.html" accesskey="U">arsenal_gear.formation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.formation.form_data_structures</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.formation.form_data_structures</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">form_data_structures.py</span>
+<span class="sd">=======================</span>
+
+<span class="sd">Specifies containers for the basic properties of a stellar population</span>
+<span class="sd">at the time of their formation. These classes are basically parsing</span>
+<span class="sd">of input parameters and are used to construct the real stellar populations.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">astropy.units</span><span class="w"> </span><span class="kn">import</span> <span class="n">Quantity</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.dist_funcs.binaries</span><span class="w"> </span><span class="kn">import</span> <span class="n">MassRatio</span><span class="p">,</span> <span class="n">Period</span><span class="p">,</span> <span class="n">Semimajor</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.dist_funcs.imf</span><span class="w"> </span><span class="kn">import</span> <span class="n">IMF</span>
+
+<div class="viewcode-block" id="SinglePop">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.formation.form_data_structures.SinglePop.html#arsenal_gear.formation.form_data_structures.SinglePop">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SinglePop</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data class for storing a population of single stars,</span>
+<span class="sd">    BinaryPop extends this for binary star populations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Mtot</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span>
+    <span class="n">tform</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span>
+    <span class="n">Nstar</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span>
+    <span class="n">metallicity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;dimensionless&quot;</span><span class="p">]</span>
+    <span class="c1"># rotation is a dimensionless quantity between 0 and 1</span>
+    <span class="c1"># where 0 is non-rotating and 1 is critical rotation</span>
+    <span class="n">rotation</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;dimensionless&quot;</span><span class="p">]</span>
+    <span class="n">imf</span><span class="p">:</span> <span class="n">IMF</span>
+    <span class="n">mmin</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span>
+    <span class="n">mmax</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span>
+    <span class="n">discrete</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="c1"># set to None if not discrete, otherwise a list of masses</span>
+    <span class="n">masses</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ones_like</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;return an array of unity values of the same length of the mass array&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">masses</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BinaryPop">
+<a class="viewcode-back" href="../../../_autosummary/arsenal_gear.formation.form_data_structures.BinaryPop.html#arsenal_gear.formation.form_data_structures.BinaryPop">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BinaryPop</span><span class="p">(</span><span class="n">SinglePop</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data class for storing a binary star population.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">q_dist</span><span class="p">:</span> <span class="n">MassRatio</span>
+    <span class="n">period_dist</span><span class="p">:</span> <span class="n">Period</span>
+    <span class="n">a_dist</span><span class="p">:</span> <span class="n">Semimajor</span>
+    <span class="c1"># set to None if not discrete</span>
+    <span class="c1"># otherwise a list of mass ratios, periods, and semimajor axes</span>
+    <span class="n">mrats</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;dimensionless&quot;</span><span class="p">]</span>
+    <span class="n">periods</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span>
+    <span class="n">semimajors</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../bpass-data-notes.html">Notes on the BPASS Binary Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../formation.html" >arsenal_gear.formation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.formation.form_data_structures</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+arsenal\_gear.formation.dist\_funcs.imf.PiecewisePowerLaw
+=========================================================
+
+.. currentmodule:: arsenal_gear.formation.dist_funcs.imf
+
+.. autoclass:: PiecewisePowerLaw
+   :members:
+   :show-inheritance:

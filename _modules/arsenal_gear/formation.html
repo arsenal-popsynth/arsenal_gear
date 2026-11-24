@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>arsenal_gear.formation &#8212; arsenal_gear 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.formation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for arsenal_gear.formation</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">formation</span>
+<span class="sd">=================</span>
+
+<span class="sd">Submodule to describe the properties of a stellar population</span>
+<span class="sd">when it is first formed.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">astropy.units</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">u</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="c1"># local imports</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">dist_funcs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.form_data_structures</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinaryPop</span><span class="p">,</span> <span class="n">SinglePop</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Formation&quot;</span><span class="p">,</span> <span class="s2">&quot;SinglePop&quot;</span><span class="p">,</span> <span class="s2">&quot;BinaryPop&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="Formation">
+<a class="viewcode-back" href="../../_autosummary/arsenal_gear.formation.Formation.html#arsenal_gear.formation.Formation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Formation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstract base class for describing the properties of a stellar population</span>
+<span class="sd">    at the time of formation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># get population parameters from kwargs</span>
+        <span class="n">subpop_dicts</span> <span class="o">=</span> <span class="p">[</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;pop&quot;</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nsubpops</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">subpop_dicts</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nsubpops</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">default_pop</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;Mtot&quot;</span><span class="p">:</span> <span class="mf">1e6</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">,</span>
+                <span class="s2">&quot;metallicity&quot;</span><span class="p">:</span> <span class="mf">0.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span><span class="p">,</span>
+                <span class="s2">&quot;rotation&quot;</span><span class="p">:</span> <span class="mf">0.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span><span class="p">,</span>
+                <span class="s2">&quot;imf&quot;</span><span class="p">:</span> <span class="s2">&quot;salpeter&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;mmin&quot;</span><span class="p">:</span> <span class="mf">0.08</span><span class="p">,</span>
+                <span class="s2">&quot;mmax&quot;</span><span class="p">:</span> <span class="mf">100.0</span><span class="p">,</span>
+                <span class="s2">&quot;discrete&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">&quot;seed&quot;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">}</span>
+            <span class="n">subpop_dicts</span> <span class="o">=</span> <span class="p">[</span><span class="n">default_pop</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nsubpops</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">pop_dict</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subpop_dicts</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pop_dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Subpopulation </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> is not a dictionary. &quot;</span>
+                    <span class="s2">&quot;Please provide subpopulation parameters as dictionaries.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+        <span class="n">subpops</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pop_dict</span> <span class="ow">in</span> <span class="n">subpop_dicts</span><span class="p">:</span>
+            <span class="n">pop_type</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;single&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">pop_type</span> <span class="o">==</span> <span class="s2">&quot;single&quot;</span><span class="p">:</span>
+                <span class="n">subpops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_init_single_pop</span><span class="p">(</span><span class="n">pop_dict</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">pop_type</span> <span class="o">==</span> <span class="s2">&quot;binary&quot;</span><span class="p">:</span>
+                <span class="n">subpops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_init_binary_pop</span><span class="p">(</span><span class="n">pop_dict</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid population type: </span><span class="si">{</span><span class="n">pop_type</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="s2">&quot;Must be &#39;single&#39; or &#39;binary&#39;.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subpops</span> <span class="o">=</span> <span class="n">subpops</span>
+        <span class="c1"># Nstar can be a float if one of the populations is not discrete</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tforms</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">pop</span><span class="o">.</span><span class="n">tform</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Myr</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">pop</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subpops</span><span class="p">])</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Myr</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metallicities</span> <span class="o">=</span> <span class="p">[</span><span class="n">pop</span><span class="o">.</span><span class="n">metallicity</span> <span class="k">for</span> <span class="n">pop</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subpops</span><span class="p">]</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_single_pop</span><span class="p">(</span><span class="n">pop_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SinglePop</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize a single population of stars from a dictionary of parameters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check Mtot value</span>
+        <span class="n">Mtot</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Mtot&quot;</span><span class="p">,</span> <span class="mf">1e6</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Mtot</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">):</span>
+            <span class="n">Mtot</span> <span class="o">=</span> <span class="n">Mtot</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Mtot</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="n">Mtot</span> <span class="o">=</span> <span class="n">Mtot</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid Mtot: </span><span class="si">{</span><span class="n">Mtot</span><span class="si">}</span><span class="s2">. Must be a quantity specifying &quot;</span>
+                <span class="s2">&quot;mass or a number specifying mass in Msun.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+        <span class="c1"># check tform value</span>
+        <span class="n">tform</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tform&quot;</span><span class="p">,</span> <span class="mf">0.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Myr</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tform</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">):</span>
+            <span class="n">tform</span> <span class="o">=</span> <span class="n">tform</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Myr</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tform</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="n">tform</span> <span class="o">=</span> <span class="n">tform</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Myr</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid tform: </span><span class="si">{</span><span class="n">tform</span><span class="si">}</span><span class="s2">. Must be a quantity specifying &quot;</span>
+                <span class="s2">&quot;time or a number specifying time in Myr.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+        <span class="c1"># check metallicity</span>
+        <span class="n">metallicity</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metallicity&quot;</span><span class="p">,</span> <span class="mf">0.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">metallicity</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">):</span>
+            <span class="n">metallicity</span> <span class="o">=</span> <span class="n">metallicity</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">metallicity</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="n">metallicity</span> <span class="o">=</span> <span class="n">metallicity</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid metallicity: </span><span class="si">{</span><span class="n">metallicity</span><span class="si">}</span><span class="s2">. Must be a dimensionless quantity &quot;</span>
+                <span class="s2">&quot;or a number specifying metallicity in log10(Z/Zsun).&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+        <span class="c1"># check rotation</span>
+        <span class="n">rotation</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rotation&quot;</span><span class="p">,</span> <span class="mf">0.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rotation</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">):</span>
+            <span class="n">rotation</span> <span class="o">=</span> <span class="n">rotation</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rotation</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="n">rotation</span> <span class="o">=</span> <span class="n">rotation</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">dimensionless_unscaled</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid rotation: </span><span class="si">{</span><span class="n">rotation</span><span class="si">}</span><span class="s2">. Must be a dimensionless quantity &quot;</span>
+                <span class="s2">&quot;or a number specifying rotation as a fraction of critical rotation.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+        <span class="c1"># check IMF</span>
+        <span class="n">imf</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;imf&quot;</span><span class="p">,</span> <span class="s2">&quot;salpeter&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">imf</span><span class="p">,</span> <span class="n">dist_funcs</span><span class="o">.</span><span class="n">imf</span><span class="o">.</span><span class="n">IMF</span><span class="p">):</span>
+            <span class="n">mmin</span> <span class="o">=</span> <span class="n">imf</span><span class="o">.</span><span class="n">min_mass</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+            <span class="n">mmax</span> <span class="o">=</span> <span class="n">imf</span><span class="o">.</span><span class="n">max_mass</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">imf</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">mmin</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mmin&quot;</span><span class="p">,</span> <span class="mf">0.08</span><span class="p">)</span>
+            <span class="n">mmax</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mmax&quot;</span><span class="p">,</span> <span class="mf">100.0</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mmin</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">):</span>
+                    <span class="n">mmin</span> <span class="o">=</span> <span class="n">mmin</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mmax</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">):</span>
+                    <span class="n">mmax</span> <span class="o">=</span> <span class="n">mmax</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+                <span class="p">(</span><span class="n">mmin</span><span class="p">,</span> <span class="n">mmax</span><span class="p">)</span> <span class="o">=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">mmin</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">mmax</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid mmin or mmax: </span><span class="si">{</span><span class="n">mmin</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">mmax</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="s2">&quot;Must be floats or quantities specifying mass in Msun.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+            <span class="n">mmin</span> <span class="o">*=</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+            <span class="n">mmax</span> <span class="o">*=</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+            <span class="n">seed</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">imf</span> <span class="o">=</span> <span class="n">dist_funcs</span><span class="o">.</span><span class="n">imf</span><span class="o">.</span><span class="n">IMF</span><span class="o">.</span><span class="n">get_imf</span><span class="p">(</span>
+                    <span class="n">imf</span><span class="p">,</span> <span class="n">min_mass</span><span class="o">=</span><span class="n">mmin</span><span class="p">,</span> <span class="n">max_mass</span><span class="o">=</span><span class="n">mmax</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid IMF string: </span><span class="si">{</span><span class="n">imf</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid IMF specified, </span><span class="si">{</span><span class="n">imf</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;Must be an IMF instance or string specifying IMF.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+        <span class="n">Nstar</span> <span class="o">=</span> <span class="p">(</span><span class="n">Mtot</span> <span class="o">/</span> <span class="n">imf</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="o">.</span><span class="n">value</span>
+
+        <span class="n">discrete</span> <span class="o">=</span> <span class="n">pop_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;discrete&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">discrete</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="n">err_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Invalid discrete parameter: </span><span class="si">{</span><span class="n">discrete</span><span class="si">}</span><span class="s2">. Must be a boolean.&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">discrete</span><span class="p">:</span>
+            <span class="n">masses</span> <span class="o">=</span> <span class="n">imf</span><span class="o">.</span><span class="n">sample_mass</span><span class="p">(</span><span class="n">Mtot</span><span class="p">)</span>
+            <span class="n">Nstar</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">masses</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">masses</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">SinglePop</span><span class="p">(</span>
+            <span class="n">Mtot</span><span class="p">,</span> <span class="n">tform</span><span class="p">,</span> <span class="n">Nstar</span><span class="p">,</span> <span class="n">metallicity</span><span class="p">,</span> <span class="n">rotation</span><span class="p">,</span> <span class="n">imf</span><span class="p">,</span> <span class="n">mmin</span><span class="p">,</span> <span class="n">mmax</span><span class="p">,</span> <span class="n">discrete</span><span class="p">,</span> <span class="n">masses</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_binary_pop</span><span class="p">(</span><span class="n">pop_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BinaryPop</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize a binary population of stars from a dictionary of parameters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Binary populations not yet implemented.&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Mtot</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the total mass of the population, which is just the sum of Mtot</span>
+<span class="sd">        for all subpopulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="n">pop</span><span class="o">.</span><span class="n">Mtot</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">pop</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subpops</span><span class="p">])</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Nstar</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the total number of stars in the population, which is just the</span>
+<span class="sd">        sum of Nstar for all subpopulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Nstar</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">pop</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subpops</span><span class="p">:</span>
+            <span class="n">Nstar</span> <span class="o">+=</span> <span class="n">pop</span><span class="o">.</span><span class="n">Nstar</span>
+        <span class="k">return</span> <span class="n">Nstar</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mean_mass</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">u</span><span class="o">.</span><span class="n">Quantity</span><span class="p">[</span><span class="s2">&quot;mass&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the mean mass of the population, which is just Mtot/Nstar.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">Nstar</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span> <span class="o">*</span> <span class="n">u</span><span class="o">.</span><span class="n">Msun</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Mtot</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">Nstar</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">Msun</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters.html">The Arsenal Parameter File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../outputs.html">Arsenal Output Formats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models.html">Models Used in Arsenal Gear</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../bpass-data-notes.html">Notes on the BPASS Binary Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../code-models.html">Models Used in Existing Hydrocodes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Arsenal Gear Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting.html">Troubleshooting and Known Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developers.html">Developers Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs.html">Arsenal Sphinx Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Arsenal Gear API</a></li>
+</ul>
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">arsenal_gear 0.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">arsenal_gear.formation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, BW Keller.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
+    </div>
+  </body>
+</html>
