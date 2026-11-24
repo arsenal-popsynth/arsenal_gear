@@ -51,7 +51,7 @@ def write_recordset(f, records: dict):
             record["data"],
             record_units=record.get("record_units"),
             time_units=record.get("time_units"),
-            descriptor=record.get("descriptor"),
+            descriptor=record.get("descriptor", ""),
         )
 
 

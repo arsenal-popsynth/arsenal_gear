@@ -226,3 +226,19 @@ def test_recordset_accepts_explicit_links(h5file, times, energies):
 def test_recordset_rejects_bad_time(h5file, energies):
     with pytest.raises(TypeError):
         write_recordset(h5file, {"a": {"data": energies, "time": [1.0, 2.0]}})
+
+
+def test_recordset_descriptor_defaults_to_empty(h5file, times, energies):
+    """A record with no descriptor key gets an empty descriptor attribute."""
+    write_recordset(h5file, {"E": {"data": energies, "time": times}})
+    assert h5file["data/E/qty"].attrs["descriptor"] == ""
+
+
+def test_recordset_passes_descriptor(h5file, times, energies):
+    records = {
+        "E": {"data": energies, "time": times, "descriptor": "SN energy"},
+        "F": {"data": energies, "time": times},
+    }
+    write_recordset(h5file, records)
+    assert h5file["data/E/qty"].attrs["descriptor"] == "SN energy"
+    assert h5file["data/F/qty"].attrs["descriptor"] == ""
