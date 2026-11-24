@@ -32,6 +32,7 @@ dynamic = ["version"]
 
 [project.scripts]
 arsenal = "arsenal_gear.scripts:main"
+arsenal-extract-source = "arsenal_gear.scripts.extract_source:main"
 
 [tool.setuptools]
 packages = ["arsenal_gear",
