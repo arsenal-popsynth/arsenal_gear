@@ -9,21 +9,52 @@ files using [h5py](https://docs.h5py.org/). Each file has two top-level groups:
 - `data/` holds the time series data ("records") the run produced.  These can be
   either population-averaged or per star for discrete stellar populations.
 
-```text
-output.h5
-├── metadata/
-│   ├── rundate        ISO 8601 timestamp of when the file was written
-│   ├── hostname       machine the run was executed on
-│   ├── paramfile      full text of the parameter file used for the run
-│   ├── bibtex         (optional) BibTeX for the models used
-│   └── source         gzipped tarball of the arsenal_gear source tree
-│                        attrs: format, git-commit, git-dirty
-└── data/
-    ├── <record name>/
-    │   ├── qty        the record's values           attrs: units, descriptor
-    │   └── time       the times those values apply at   attrs: units
-    └── ...
+```{mermaid}
+---
+caption: An example output file holding two records, the cumulative supernova energy
+  and the cumulative wind mass loss of a population, both sampled at the same N times.
+config: '{"themeVariables": {"edgeLabelBackground": "#ffffff"},
+  "flowchart": {"wrappingWidth": 400},
+  "themeCSS": ".node .label div, .node .nodeLabel, .node .nodeLabel p { text-align: left !important; }
+  .node .nodeLabel code { font-family: Menlo, Consolas, monospace; font-size: 0.85em; color: #6a6a6a; }"}'
+---
+flowchart LR
+    file[("<b>example.h5</b>")] --> metadata["<b>metadata/</b>"] & data["<b>data/</b>"]
+
+    metadata --> rundate("<b>rundate</b> <code>str</code>") & hostname("<b>hostname</b> <code>str</code>") & paramfile("<b>paramfile</b> <code>str</code>")
+    metadata --> bibtex("<b>bibtex</b> <code>str</code> <i>(optional)</i>") & source("<b>source</b> <code>opaque bytes</code><hr/>format = tar.gz<br/>git-commit = 6117e52...<br/>git-dirty = False")
+
+    data --> E["<b>sn_energy/</b>"] & M["<b>wind_mass/</b>"] & more["&lt;record&gt;/ ..."]
+    M --> Mq("<b>qty</b> <code>float64[N]</code><hr/>units = solMass<br/>descriptor = Cumulative wind mass loss") & Mt("<b>time</b> <code>SoftLink</code><br/>to /data/sn_energy/time")
+    %% the longer arrows push sn_energy's datasets one column right, so the
+    %% soft link below is drawn as a short horizontal arrow
+    E ---> Eq("<b>qty</b> <code>float64[N]</code><hr/>units = erg<br/>descriptor = Cumulative SN energy") & Et("<b>time</b> <code>float64[N]</code><hr/>units = Myr")
+    Mt -. SoftLink .-> Et
+
+    classDef group fill:#dbe8f6,stroke:#3a6ea5,stroke-width:2px,color:#1b2b3c
+    classDef dataset fill:#ffffff,stroke:#7a7a7a,color:#222222
+    classDef link fill:#ffffff,stroke:#7a7a7a,stroke-dasharray:4 3,color:#555555
+    classDef faded fill:#f4f4f4,stroke:#bbbbbb,stroke-dasharray:4 3,color:#777777
+    class file,metadata,data,E,M group
+    class rundate,hostname,paramfile,bibtex,source,Eq,Et,Mq dataset
+    class Mt link
+    class more faded
+    %% linkStyle counts edges in the order they're declared above; the soft
+    %% link is the 15th (index 14), so update this if edges are added or removed
+    linkStyle 14 stroke:#3a6ea5,stroke-width:2px,color:#3a6ea5
 ```
+
+This example file comes from a run that recorded two quantities: `sn_energy`, the
+cumulative energy injected by supernovae in erg, and `wind_mass`, the cumulative mass
+lost to stellar winds in solar masses. Both are sampled at the same N times, measured in
+Myr.
+
+Blue boxes are HDF5 groups and white boxes are datasets. Each dataset box gives its
+name and type on the first line, and below the line, its HDF5 attributes. The `units` attributes hold
+astropy unit names (`solMass` is astropy's name for $M_\odot$), so `u.Unit(...)` turns
+them back into units. Because the two records share their times, `wind_mass/time` is a
+soft link (dashed) to `sn_energy/time` rather than a copy, and reading its `units`
+attribute through the link gives `Myr`; see {ref}`shared-time-arrays`.
 
 ### Metadata
 
@@ -95,6 +126,7 @@ with h5py.File("output.h5", "r") as f:
     print(qty.attrs["descriptor"])
 ```
 
+(shared-time-arrays)=
 #### Shared time arrays
 
 Many records are sampled at the same times. Rather than storing an identical `time`

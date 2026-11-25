@@ -23,6 +23,7 @@ dependencies = [
     "pyyaml",
     "tqdm",
     "myst-parser",
+    "sphinxcontrib-mermaid",
     "pandas",
     "pyerf",
     "requests",
