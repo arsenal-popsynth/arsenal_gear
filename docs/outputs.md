@@ -69,6 +69,7 @@ group:
 | `metadata/bibtex`    | BibTeX string for the run, written only if one is given       |
 | `metadata/source`    | The installed `arsenal_gear` package as a `.tar.gz` (opaque bytes) |
 
+#### Arsenal Gear stores its own source in outputs
 The `source` dataset carries three attributes:
 
 - `format`: always `"tar.gz"`.
@@ -82,10 +83,6 @@ file__.  It doesn't matter how or where you have installed arsenal gear, that
 source tarball contains the source that made the hdf5 file: re-running with that
 copy of the source will produce a bitwise-identical result for everything except
 the `metadata/` (as `hostname` and `rundate` may be different).
-
-The tarball leaves out every directory named `data` or `__pycache__`, which keeps
-large downloaded model grids out of each output file. The source of the run is kept
-in the file, but the stellar evolution data it read is not.
 
 To recover the source from an output file, use the `arsenal-extract-source` command
 that is installed with Arsenal Gear:
@@ -101,6 +98,59 @@ $ arsenal-extract-source output.h5 -o src/    # extract to ./src/
 ```
 
 It won't extract into a directory that already contains files unless you pass `--force`.
+
+##### How the source is found and stored
+
+Arsenal Gear doesn't look for its source in a fixed place such as a repository path or
+a configured directory. It asks Python where the running package came from.
+{py:func}`~arsenal_gear.file_io.metadata.get_full_src_tree` reads
+`arsenal_gear.__path__[0]`, the directory the interpreter imported `arsenal_gear` from:
+
+- With an editable install (`pip install -e .`), that is the `arsenal_gear/` directory
+  inside your git checkout.
+- With a regular install, it is the copy under `site-packages/`.
+- If you run from a checkout without installing, or with your own `PYTHONPATH`, it is
+  whichever directory Python actually picked up.
+
+In every case it is the code that is running, not some other copy that happens to be
+on disk.
+
+The snapshot is taken when you `import arsenal_gear`. The first thing the package's
+`__init__.py` does is import `arsenal_gear.file_io.metadata`, which immediately calls
+{py:func}`~arsenal_gear.file_io.metadata.snapshot_source` on that directory and keeps
+the result in memory as `arsenal_gear.file_io.metadata.SOURCE_SNAPSHOT`. That call:
+
+1. Walks the directory with Python's `tarfile` module and builds a gzipped tarball
+   in memory, with every path rooted at `arsenal_gear/`. Nothing is written to a
+   temporary file.
+2. Runs `git rev-parse HEAD` and `git status --porcelain` in the same package
+   directory to get the `git-commit` and `git-dirty` values. For a regular install
+   under `site-packages/` there is no git repository, so `git-commit` is `""` and
+   `git-dirty` is `True`. The tarball itself is still complete.
+
+This takes a few tens of milliseconds and is done once per Python process.
+
+Later, {py:func}`~arsenal_gear.file_io.metadata.construct_meta_dataset` writes that
+snapshot, not whatever is on disk at that moment. It stores the tarball bytes in
+`metadata/source` as an HDF5 opaque dataset (h5py writes a `numpy.void` scalar that
+way), so HDF5 keeps the bytes exactly as given and doesn't try to interpret them. The
+git values become the dataset's attributes. Because the tarball and git state come
+from the same moment, editing the source or committing while a long run is going
+won't change what that run records.
+
+Two caveats:
+
+- Python only reads a submodule's file when that submodule is first imported. Most of
+  the package is imported along with `arsenal_gear` itself, but a module that is
+  first imported later in the run would be read from disk after the snapshot. If you
+  edit it in between, the stored copy won't match the code that ran.
+- `git-dirty` looks at the whole repository, so an uncommitted change outside the
+  package, such as in `docs/`, also marks the source as dirty.
+
+The tarball leaves out every directory named `data` or `__pycache__`, which keeps
+large downloaded model grids out of each output file. The source of the run is kept
+in the file, but the stellar evolution data it read is not.
+
 
 ### Records
 
@@ -212,6 +262,12 @@ units. Any other `time` type raises a `TypeError`, and incompatible units raise
 
 ```{eval-rst}
 .. autofunction:: arsenal_gear.file_io.metadata.construct_meta_dataset
+   :no-index:
+
+.. autofunction:: arsenal_gear.file_io.metadata.snapshot_source
+   :no-index:
+
+.. autoclass:: arsenal_gear.file_io.metadata.SourceSnapshot
    :no-index:
 
 .. autofunction:: arsenal_gear.file_io.metadata.get_full_src_tree
