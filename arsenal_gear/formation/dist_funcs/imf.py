@@ -16,6 +16,14 @@ from ...utils.citations import cite
 __all__ = ["IMF", "Salpeter", "Kroupa1993", "Kroupa2001", "MillerScalo", "Chabrier"]
 
 
+def _power_integral(lo, hi, k):
+    """Evaluate definite integral of m**k from lo to hi"""
+    if k == -1:
+        return np.log(hi / lo)
+    exp = k + 1
+    return (hi**exp - lo**exp) / exp
+
+
 class IMF(rv_continuous):
     """
     This class is the superclass of all Initial Mass Functions (IMFs)
@@ -138,26 +146,24 @@ class Salpeter(IMF):
         self.max_mass = max_mass
         self.alpha = alpha
         self.name = "Salpeter"
-        assert alpha >= 0
+        if alpha < 0:
+            raise ValueError(f"alpha ({alpha}) must be non-negative.")
         super().__init__(min_mass, max_mass, self.name, seed=seed)
 
     def _pdf(self, x: np.float64, *args) -> np.float64:
-        upper = np.power(self.max_mass, 1 - self.alpha)
-        lower = np.power(self.min_mass, 1 - self.alpha)
-        norm = (upper - lower) / (1 - self.alpha)
+        norm = _power_integral(self.min_mass, self.max_mass, -self.alpha)
         return np.power(x, -self.alpha) / norm
 
     def _ppf(self, q: np.float64, *args) -> np.float64:
+        if self.alpha == 1:
+            return self.min_mass * (self.max_mass / self.min_mass) ** q
         upper = np.power(self.max_mass, 1 - self.alpha)
         lower = np.power(self.min_mass, 1 - self.alpha)
         return (q * (upper - lower) + lower) ** (1.0 / (1 - self.alpha))
 
     def mean(self, *args, **kwds):
-        m1, m2 = self.min_mass, self.max_mass
-        a = self.alpha
-        # Analytical power law mean
-        num = (m2 ** (1 - a + 1) - m1 ** (1 - a + 1)) / (1 - a + 1)
-        den = (m2 ** (1 - a) - m1 ** (1 - a)) / (1 - a)
+        num = _power_integral(self.min_mass, self.max_mass, 1 - self.alpha)
+        den = _power_integral(self.min_mass, self.max_mass, -self.alpha)
         return (num / den) * u.Msun
 
 
@@ -197,10 +203,15 @@ class PiecewisePowerLaw(IMF):
 
         self.weights = []
         for i in range(len(self.betas)):
-            b_plus_1 = self.betas[i] + 1
-            w = (self.alphas[i] / b_plus_1) * (
-                self.m_pts[i + 1] ** b_plus_1 - self.m_pts[i] ** b_plus_1
-            )
+            m_lo = self.m_pts[i]
+            m_hi = self.m_pts[i + 1]
+            if np.isclose(self.betas[i], -1.0):
+                w = self.alphas[i] * np.log(m_hi / m_lo)
+            else:
+                b_plus_1 = self.betas[i] + 1
+                w = (self.alphas[i] / b_plus_1) * (
+                    self.m_pts[i + 1] ** b_plus_1 - self.m_pts[i] ** b_plus_1
+                )
             self.weights.append(w)
 
         self.weights = np.array(self.weights)
@@ -231,18 +242,25 @@ class PiecewisePowerLaw(IMF):
             cond = (q >= prev_q) & (q <= self.cum_weights[i])
 
             if np.any(cond):
-                b_plus_1 = self.betas[i] + 1
+                m_lo = self.m_pts[i]
+                m_hi = self.m_pts[i + 1]
                 w_prior = self.weights[:i].sum() if i > 0 else 0.0
-
                 q_valid = q[cond]
 
-                base = (q_valid * self.total_area - w_prior) * b_plus_1 / self.alphas[
-                    i
-                ] + self.m_pts[i] ** b_plus_1
-
-                base = np.maximum(base, 0.0)
-
-                final[cond] = base ** (1.0 / b_plus_1)
+                if np.isclose(self.betas[i], -1.0):
+                    frac = np.clip(
+                        (q_valid * self.total_area - w_prior) / self.weights[i],
+                        0.0,
+                        1.0,
+                    )
+                    final[cond] = m_lo * (m_hi / m_lo) ** frac
+                else:
+                    b_plus_1 = self.betas[i] + 1
+                    base = (
+                        q_valid * self.total_area - w_prior
+                    ) * b_plus_1 / self.alphas[i] + self.m_pts[i] ** b_plus_1
+                    base = np.maximum(base, 0.0)
+                    final[cond] = base ** (1.0 / b_plus_1)
 
             prev_q = self.cum_weights[i]
 
@@ -314,7 +332,7 @@ class Kroupa1993(PiecewisePowerLaw):
             max_mass=max_mass,
             masses=[0.5, 1.0],
             betas=[-1.3, -2.2, -2.7],
-            name="Kroupa2001",
+            name="Kroupa1993",
             seed=seed,
         )
 
@@ -371,12 +389,14 @@ class Chabrier(IMF):
         self.max_mass = max_mass.to(u.Msun).value
         self.m_transition = 1.0
 
+        self.m_lo_end = min(self.max_mass, self.m_transition)
+        self.m_hi_start = max(self.min_mass, self.m_transition)
+
         self.E_min = sp.erf(
             (np.log10(self.min_mass) - np.log10(self.mc)) / (np.sqrt(2) * self.sigma)
         )
-        self.E_trans = sp.erf(
-            (np.log10(self.m_transition) - np.log10(self.mc))
-            / (np.sqrt(2) * self.sigma)
+        self.E_lo_end = sp.erf(
+            (np.log10(self.m_lo_end) - np.log10(self.mc)) / (np.sqrt(2) * self.sigma)
         )
 
         self.area_low = self._integrate_low()
@@ -386,20 +406,14 @@ class Chabrier(IMF):
     def _integrate_low(self):
         if self.min_mass >= self.m_transition:
             return 0.0
-        actual_min = max(self.min_mass, 0.01)  # 0.01 as a safety floor
-        E_min_actual = sp.erf(
-            (np.log10(actual_min) - np.log10(self.mc)) / (np.sqrt(2) * self.sigma)
-        )
         factor = self.A * np.sqrt(np.pi / 2) * self.sigma
-        return factor * (self.E_trans - E_min_actual)
+        return factor * (self.E_lo_end - self.E_min)
 
     def _integrate_high(self):
         if self.max_mass <= self.m_transition:
             return 0.0
-        actual_start = max(self.min_mass, self.m_transition)
-        actual_end = self.max_mass
         p = self.beta + 1
-        return (self.A_high / p) * (actual_end**p - actual_start**p)
+        return (self.A_high / p) * (self.max_mass**p - self.m_hi_start**p)
 
     def _pdf(self, x: np.ndarray, *args) -> np.ndarray:
         is_scalar = np.isscalar(x)
@@ -430,7 +444,7 @@ class Chabrier(IMF):
         # Segment 1: Low mass log-normal
         if np.any(slo):
             target_erf = (
-                q[slo] * (self.E_trans - self.E_min) / (q_break if q_break > 0 else 1)
+                q[slo] * (self.E_lo_end - self.E_min) / (q_break if q_break > 0 else 1)
                 + self.E_min
             )
             res[slo] = 10 ** (
@@ -443,8 +457,7 @@ class Chabrier(IMF):
             q_scaled = (q[shi] - q_break) / denom if denom > 0 else 0.0
             p = self.beta + 1
             res[shi] = (
-                q_scaled * (self.max_mass**p - self.m_transition**p)
-                + self.m_transition**p
+                q_scaled * (self.max_mass**p - self.m_hi_start**p) + self.m_hi_start**p
             ) ** (1.0 / p)
 
         sout = ~(slo | shi)
