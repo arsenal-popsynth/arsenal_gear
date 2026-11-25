@@ -23,11 +23,13 @@ import pytest
 from arsenal_gear.file_io import metadata
 from arsenal_gear.file_io.metadata import (
     IGNORED_DIRS,
+    SourceSnapshot,
     _exclude_ignored_dirs,
     construct_meta_dataset,
     get_full_src_tree,
     git_commit,
     git_is_dirty,
+    snapshot_source,
 )
 
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not found")
@@ -201,13 +203,62 @@ def test_meta_dataset_source_roundtrips(h5file):
         assert "arsenal_gear/file_io/metadata.py" in tar.getnames()
 
 
-def test_meta_dataset_git_attrs(h5file, monkeypatch):
+def test_meta_dataset_writes_import_snapshot(h5file, monkeypatch):
+    """The stored source and git attributes come from the snapshot taken at
+    import, not from the files on disk when the metadata is written."""
+    snap = SourceSnapshot(
+        tarball=b"not really a tarball", git_commit="abc123", git_dirty=True
+    )
+    monkeypatch.setattr(metadata, "SOURCE_SNAPSHOT", snap)
+    construct_meta_dataset(h5file, "")
+    ds = h5file["metadata/source"]
+    assert ds[()].tobytes() == snap.tarball
+    assert ds.attrs["git-commit"] == "abc123"
+    assert ds.attrs["git-dirty"]
+
+
+def test_import_snapshot_is_current_package():
+    """The import-time snapshot holds the package that was imported."""
+    blob = metadata.SOURCE_SNAPSHOT.tarball
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+        names = tar.getnames()
+        stored = tar.extractfile("arsenal_gear/file_io/metadata.py").read()
+    assert "arsenal_gear/__init__.py" in names
+    with open(metadata.__file__, "rb") as src:
+        assert stored == src.read()
+
+
+# --- the source snapshot --------------------------------------------------
+
+
+@pytest.fixture
+def fake_pkg(tmp_path):
+    """A small directory standing in for the arsenal_gear package."""
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("x = 1\n")
+    return pkg
+
+
+def _snapshot_file(snap, name):
+    with tarfile.open(fileobj=io.BytesIO(snap.tarball), mode="r:gz") as tar:
+        return tar.extractfile(f"arsenal_gear/{name}").read()
+
+
+def test_snapshot_unaffected_by_later_edits(fake_pkg, monkeypatch):
+    monkeypatch.setattr(metadata, "git_commit", lambda path: "abc123")
+    monkeypatch.setattr(metadata, "git_is_dirty", lambda path: False)
+    snap = snapshot_source(fake_pkg)
+    (fake_pkg / "__init__.py").write_text("x = 2\n")
+    assert _snapshot_file(snap, "__init__.py") == b"x = 1\n"
+
+
+def test_snapshot_git_attrs(fake_pkg, monkeypatch):
     monkeypatch.setattr(metadata, "git_commit", lambda path: "abc123")
     monkeypatch.setattr(metadata, "git_is_dirty", lambda path: True)
-    construct_meta_dataset(h5file, "")
-    attrs = h5file["metadata/source"].attrs
-    assert attrs["git-commit"] == "abc123"
-    assert attrs["git-dirty"]
+    snap = snapshot_source(fake_pkg)
+    assert snap.git_commit == "abc123"
+    assert snap.git_dirty
 
 
 @pytest.mark.parametrize(
@@ -218,18 +269,18 @@ def test_meta_dataset_git_attrs(h5file, monkeypatch):
     ],
     ids=["not-a-repo", "no-git"],
 )
-def test_meta_dataset_without_git(h5file, monkeypatch, error):
-    """An install outside a git checkout, or without git, still writes
-    metadata, and doesn't claim its source is clean."""
+def test_snapshot_without_git(fake_pkg, monkeypatch, error):
+    """An install outside a git checkout, or without git, still gets a
+    snapshot, and doesn't claim its source is clean."""
 
     def fail(path):
         raise error
 
     monkeypatch.setattr(metadata, "git_commit", fail)
-    construct_meta_dataset(h5file, "")
-    attrs = h5file["metadata/source"].attrs
-    assert attrs["git-commit"] == ""
-    assert attrs["git-dirty"]
+    snap = snapshot_source(fake_pkg)
+    assert snap.git_commit == ""
+    assert snap.git_dirty
+    assert _snapshot_file(snap, "__init__.py") == b"x = 1\n"
 
 
 @needs_git
