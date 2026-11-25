@@ -26,6 +26,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "myst_parser",
+    "sphinxcontrib.mermaid",
 ]
 
 autosummary_generate = True
@@ -38,6 +39,13 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # https://myst-parser.readthedocs.io/en/latest/sphinx/intro.html
 
 myst_enable_extensions = ["dollarmath", "amsmath"]
+
+# -- Options for sphinxcontrib-mermaid ---------------------------------------
+# https://github.com/mgaitan/sphinxcontrib-mermaid
+# The default is a fixed 500px, which shrinks larger diagrams until their text
+# is hard to read; "auto" scales them to the page width instead.
+
+mermaid_height = "auto"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

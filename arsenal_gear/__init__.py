@@ -6,6 +6,10 @@ A lightweight population synthesis code with an emphasis on the quantities
 relevant for stellar feedback from massive stars.
 """
 
+# Snapshot our own source before importing anything else from the package, so
+# outputs store the code that is actually running.  See file_io/metadata.py.
+from .file_io import metadata as _metadata  # isort: skip  # noqa: F401
+
 import time
 import warnings
 

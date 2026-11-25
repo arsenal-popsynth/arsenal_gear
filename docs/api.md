@@ -8,6 +8,7 @@
    :recursive:
 
    feedbacks
+   file_io
    formation
    stellar_evolution
 ```

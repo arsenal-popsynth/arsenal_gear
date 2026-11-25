@@ -23,14 +23,17 @@ dependencies = [
     "pyyaml",
     "tqdm",
     "myst-parser",
+    "sphinxcontrib-mermaid",
     "pandas",
     "pyerf",
     "requests",
+    "h5py",
     ]
 dynamic = ["version"]
 
 [project.scripts]
 arsenal = "arsenal_gear.scripts:main"
+arsenal-extract-source = "arsenal_gear.scripts.extract_source:main"
 
 [tool.setuptools]
 packages = ["arsenal_gear",
@@ -39,6 +42,7 @@ packages = ["arsenal_gear",
     "arsenal_gear.feedbacks",
     "arsenal_gear.element_yields",
     "arsenal_gear.utils",
+    "arsenal_gear.file_io",
     "arsenal_gear.scripts",
     "arsenal_gear.stellar_evolution",
     "arsenal_gear.binary_evolution",]
