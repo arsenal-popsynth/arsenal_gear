@@ -240,7 +240,7 @@ def test_salpeter_negative_alpha():
         Salpeter(alpha=-1.0)
 
 
-pytest.mark.parametrize(
+@pytest.mark.parametrize(
     ("masses", "betas", "lo", "hi"),
     [
         ([1.0], [-1.0, -2.35], 0.1, 100.0),
@@ -248,8 +248,6 @@ pytest.mark.parametrize(
         ([], [-1.0], 0.2, 10.0),
     ],
 )
-
-
 def test_piecewise_power_law_beta_minus_one(masses, betas, lo, hi):
     """PiecewisePowerLaw handles beta == -1 segments cleanly across pdf, ppf, cdf, and mean"""
     imf = PiecewisePowerLaw(
