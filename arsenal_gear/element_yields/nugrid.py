@@ -1,18 +1,17 @@
 """
 nugrid
-==========
+======
 
-This submodule contains all the code required to load yields from
-NuGrid.
+This submodule contains all the code required to load yields from NuGrid.
 """
 
 import os
 import re
+import warnings
 from typing import List
 
 import astropy.units as u
 import numpy as np
-from astropy.units import Quantity
 
 from ..formation import SinglePop
 from ..utils.citations import cite
@@ -33,62 +32,52 @@ class NuGrid(YieldTables):
 
     References: Pignatari et al., 2016, ApJS, 225, 24; Ritter et al., 2018, MNRAS, 480, 538;
                 Battino et al., 2019, MNRAS, 489, 1082; Battino et al., 2021, Universe, 7, 25;
+
+    Attributes:
+        ng_url: yield source website
+        models: available models
+        mass: tabulated masses (two ranges [low,high])
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the NuGrid tables
     ng_url = "https://nugrid.github.io/content/data/"
     models = ["delay", "rapid"]
-    lo_mass = np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
-    hi_mass = np.array([12.0, 15.0, 20.0, 25.0])
+    mass = [
+        np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]),
+        np.array([12.0, 15.0, 20.0, 25.0]),
+    ]
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
-    def __init__(self, model: str = "delay") -> None:
+    def __init__(self, model: str = "delay", **kwargs) -> None:
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the NuGrid yields.
+
+        Arguments:
             model: choise of model to load, see Fryer et al. (2012) for details
-
-        Usage:
-            >> nugrid = arsenal_gear.element_yields.NuGrid()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, nugrid.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            ng_url           Yield source website
-            models           Available models
-            lo_mass          Tabulated masses (low)
-            hi_mass          Tabulated masses (high)
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "NuGrid"
 
         r18 = Ritter2018(model=model)
         bat = Battino20192021()
+        self.available = all(m.available for m in (r18, bat))
+        if not self.available:
+            return
 
         self.elements = r18.elements
-        self.atomic_num = r18.elements
+        self.atomic_num = r18.atomic_num
 
         # Asymptotic giant branch star yields
         agb_yld = r18.load_agb_yields()
@@ -102,7 +91,7 @@ class NuGrid(YieldTables):
         ri, rj = r18_replace.T
         bi, bj = bat_replace.T
         agb_yld[:, ri, rj] = agb_yld_bat[bat_idx[:, None], bi, bj]
-        self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
+        self.agb = Source(self.elements, [self.metal, self.mass[0]], agb_yld)
 
         # Stellar wind yields
         self.wind = r18.wind
@@ -110,95 +99,29 @@ class NuGrid(YieldTables):
         # Core-collapse SNe yields
         self.ccsn = r18.ccsn
 
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for NuGrid ccsn tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
+        return args
 
-        yields = np.zeros_like(starPop.masses.value)
-        yields = self.ccsn.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-        return yields * u.M_sun
-
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for NuGrid wind tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
+        return args
 
-        yields = np.zeros_like(starPop.masses.value)
-        yields = self.wind.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-        return yields * u.M_sun
-
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from AGB stars ejected as winds for specified elements
-        Stellar parameters can be provided as single value, array + single value, or arrays
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: SinglePop object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for NuGrid agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-
-        yields = np.zeros_like(starPop.masses.value)
-        yields = self.agb.get_yld(
-            elements, args, interpolate=interpolate, extrapolate=extrapolate
-        )
-        return yields * u.M_sun
+        return args
 
 
 @cite("10.3847/0067-0049/225/2/24")
@@ -216,6 +139,19 @@ class Pignatari2016(YieldTables):
     Yields available at https://nugrid.github.io/
 
     References: Pignatari et al., 2016, ApJS, 225, 24
+
+    Attributes:
+        p16_url: yield source website
+        files: table filenames
+        mass: tabulated masses (two ranges [low,high])
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: not available for this class
+        agb: source object for stellar winds (asymptotic giant branch)
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the Pignatari (2016) tables
@@ -226,43 +162,15 @@ class Pignatari2016(YieldTables):
         "element_table_set1.2_yields_exp.txt",
         "element_table_set1.2_yields_winds.txt",
     ]
-    lo_mass = np.array([1.65, 2.0, 3.0, 5.0])
-    hi_mass = np.array([15.0, 20.0, 25.0])
+    mass = [np.array([1.65, 2.0, 3.0, 5.0]), np.array([15.0, 20.0, 25.0])]
     metal = np.array([0.01, 0.02])
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """
-        Usage:
-            >> p16 = arsenal_gear.element_yields.Pignatari2016()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, p16.ccsn_yields('H', stars, interpolate='nearest'), '-')
+        Initializes tabulated yields and their coordinates for the Pignatari2016 yields.
+        """
 
-        Attributes:
-            p16_url          Yield source website
-            files            Table filenames
-            lo_mass          Tabulated masses (low)
-            hi_mass          Tabulated masses (high)
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Not available for this class
-            agb              Source object for stellar winds (asymptotic giant branch)
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
-        """
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Pignatari et al. (2016)"
         if not self.filedir.is_dir():
@@ -271,110 +179,46 @@ class Pignatari2016(YieldTables):
         else:
             if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
         # Asymptotic giant branch
         agb_yld = self.load_agb_yields()
-        self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
+        self.agb = Source(self.elements, [self.metal, self.mass[0]], agb_yld)
 
         # Winds (massive stars)
         wind_yld = self.load_wind_yields()
-        self.wind = Source(self.elements, [self.metal, self.hi_mass], wind_yld)
+        self.wind = Source(self.elements, [self.metal, self.mass[1]], wind_yld)
 
         # Core-collapse SNe
         ccsn_yld = self.load_ccsn_yields()
-        self.ccsn = Source(self.elements, [self.metal, self.hi_mass], ccsn_yld)
+        self.ccsn = Source(self.elements, [self.metal, self.mass[1]], ccsn_yld)
 
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Pignatari (2016) ccsn tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Pignatari (2016) wind tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Pignatari (2016) agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.agb.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
     def get_element_list(self) -> None:
         """Read element symbols from tables, atomic numbers not available."""
@@ -395,7 +239,7 @@ class Pignatari2016(YieldTables):
     def load_agb_yields(self) -> np.ndarray:
         """Load tables of yields ejected during agb."""
 
-        agb_yld = np.zeros([len(self.elements), self.metal.size, self.lo_mass.size])
+        agb_yld = np.zeros([len(self.elements), self.metal.size, self.mass[0].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -424,7 +268,7 @@ class Pignatari2016(YieldTables):
     def load_wind_yields(self) -> np.ndarray:
         """Load tables of yields ejected as winds from massive stars."""
 
-        wind_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        wind_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -453,7 +297,7 @@ class Pignatari2016(YieldTables):
     def load_ccsn_yields(self) -> np.ndarray:
         """Load tables of yields ejected by core-collapse supernovae."""
 
-        ccsn_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        ccsn_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "exp" in file:
@@ -481,11 +325,20 @@ class Pignatari2016(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils import downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("NuGrid (Pignatari et al., 2016) tables not found, starting download.")
         for file in self.files:
-            downloader(self.filedir / file, self.p16_url + os.sep + file, message=None)
+            try:
+                downloader(
+                    self.filedir / file, self.p16_url + os.sep + file, message=None
+                )
+            except DownloadError as e:
+                self.available = False
+                warnings.warn(
+                    f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                    RuntimeWarning,
+                )
 
 
 @cite("10.1093/mnras/sty1729")
@@ -504,6 +357,19 @@ class Ritter2018(YieldTables):
     Yields available at https://nugrid.github.io/
 
     References:  Ritter et al., 2018, MNRAS, 480, 538
+
+    Attributes:
+        r18_url: yield source website
+        files: table filenames
+        mass: tabulated masses (two ranges [low,high])
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
+        wind: source object for stellar winds (massive stars)
+        ccsn: source object for core-collapse SNe
     """
 
     # hard-coded parameters of the Ritter (2018) tables
@@ -515,51 +381,25 @@ class Ritter2018(YieldTables):
         "element_yield_table_MESAonly_fryer12_rapid_winds.txt",
     ]
     models = ["delay", "rapid"]
-    lo_mass = np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
-    hi_mass = np.array([12.0, 15.0, 20.0, 25.0])
+    mass = [
+        np.array([1.0, 1.65, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]),
+        np.array([12.0, 15.0, 20.0, 25.0]),
+    ]
     metal = np.array([0.0001, 0.001, 0.006, 0.01, 0.02])
 
-    def __init__(self, model: str = "delay") -> None:
+    def __init__(self, model: str = "delay", **kwargs) -> None:
         """
-        Args:
+        Initializes tabulated yields and their coordinates for the Pignatari2016 yields.
+
+        Arguments:
             model: choise of model to load, see Fryer et al. (2012) for details
-
-        Usage:
-            >> r18 = arsenal_gear.element_yields.Ritter2018()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, r18.ccsn_yields('H', stars, interpolate='nearest'), '-')
-
-        Attributes:
-            r18_url          Yield source website
-            files            Table filenames
-            lo_mass          Tabulated masses (low)
-            hi_mass          Tabulated masses (high)
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
-            wind             Source object for stellar winds (massive stars)
-            ccsn             Source object for core-collapse SNe
         """
         if model not in self.models:
             raise ValueError(f"Model {model} does not exist.")
 
         self.files = [file for file in self.files if model in file]
 
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Ritter et al. (2018)"
 
@@ -569,110 +409,46 @@ class Ritter2018(YieldTables):
         else:
             if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
         # Asymptotic giant branch
         agb_yld = self.load_agb_yields()
-        self.agb = Source(self.elements, [self.metal, self.lo_mass], agb_yld)
+        self.agb = Source(self.elements, [self.metal, self.mass[0]], agb_yld)
 
         # Winds (massive stars)
         wind_yld = self.load_wind_yields()
-        self.wind = Source(self.elements, [self.metal, self.hi_mass], wind_yld)
+        self.wind = Source(self.elements, [self.metal, self.mass[1]], wind_yld)
 
         # Core-collapse SNe
         ccsn_yld = self.load_ccsn_yields()
-        self.ccsn = Source(self.elements, [self.metal, self.hi_mass], ccsn_yld)
+        self.ccsn = Source(self.elements, [self.metal, self.mass[1]], ccsn_yld)
 
-    def ccsn_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from core-collapse supernovae for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to limits if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def ccsn_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Ritter (2018) ccsn tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.ccsn.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
-    def wind_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from massive stars ejected as winds for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def wind_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Ritter (2018) wind tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.wind.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Ritter (2018) agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.agb.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
     def get_element_list(self) -> None:
         """Read element symbols and atomic numbers from tables."""
@@ -694,7 +470,7 @@ class Ritter2018(YieldTables):
     def load_agb_yields(self) -> np.ndarray:
         """Load tables of yields ejected during agb."""
 
-        agb_yld = np.zeros([len(self.elements), self.metal.size, self.lo_mass.size])
+        agb_yld = np.zeros([len(self.elements), self.metal.size, self.mass[0].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -707,9 +483,9 @@ class Ritter2018(YieldTables):
                 if "H Table" in line:
                     m = float(line.split()[-1].split(",")[0].split("=")[-1])
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
-                    if m > max(self.lo_mass):
+                    if m > max(self.mass[0]):
                         continue
-                    ind_mass = np.argmin(np.abs(self.lo_mass - m))
+                    ind_mass = np.argmin(np.abs(self.mass[0] - m))
                     ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
@@ -726,7 +502,7 @@ class Ritter2018(YieldTables):
     def load_wind_yields(self) -> np.ndarray:
         """Load tables of yields ejected as winds from massive stars."""
 
-        wind_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        wind_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "winds" in file:
@@ -739,9 +515,9 @@ class Ritter2018(YieldTables):
                 if "H Table" in line:
                     m = float(line.split()[-1].split(",")[0].split("=")[-1])
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
-                    if m < min(self.hi_mass):
+                    if m < min(self.mass[1]):
                         continue
-                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_mass = np.argmin(np.abs(self.mass[1] - m))
                     ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
@@ -758,7 +534,7 @@ class Ritter2018(YieldTables):
     def load_ccsn_yields(self) -> np.ndarray:
         """Load tables of yields ejected by core-collapse supernovae."""
 
-        total_yld = np.zeros([len(self.elements), self.metal.size, self.hi_mass.size])
+        total_yld = np.zeros([len(self.elements), self.metal.size, self.mass[1].size])
 
         for file in self.files:
             if not "total" in file:
@@ -771,9 +547,9 @@ class Ritter2018(YieldTables):
                 if "H Table" in line:
                     m = float(line.split()[-1].split(",")[0].split("=")[-1])
                     Z = float(line.split()[-1].split(",")[-1][:-1].split("=")[-1])
-                    if m < min(self.hi_mass):
+                    if m < min(self.mass[1]):
                         continue
-                    ind_mass = np.argmin(np.abs(self.hi_mass - m))
+                    ind_mass = np.argmin(np.abs(self.mass[1] - m))
                     ind_met = np.argmin(np.abs(self.metal - Z))
 
                     data = np.genfromtxt(
@@ -790,11 +566,20 @@ class Ritter2018(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils import downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print("NuGrid (Ritter et al., 2018) tables not found, starting download.")
         for file in self.files:
-            downloader(self.filedir / file, self.r18_url + os.sep + file, message=None)
+            try:
+                downloader(
+                    self.filedir / file, self.r18_url + os.sep + file, message=None
+                )
+            except DownloadError as e:
+                self.available = False
+                warnings.warn(
+                    f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                    RuntimeWarning,
+                )
 
 
 @cite("10.1093/mnras/stz2158", "10.3390/universe7020025")
@@ -811,6 +596,18 @@ class Battino20192021(YieldTables):
     Yields available at https://nugrid.github.io/
 
     References: Battino et al., 2019, MNRAS, 489, 1082; Battino et al., 2021, Universe, 7, 25
+
+    Attributes:
+        b19_url: yield source website (Battino et al., 2019)
+        b21_url: yield source website (Battino et al., 2021)
+        files: table filenames
+        mass: tabulated masses
+        metal: tabulated metallicities
+        filedir: directory of yield tables
+        name: name of yields tables
+        elements: elements available in table
+        atomic_num: atomic numbers of available elements
+        agb: source object for stellar winds (asymptotic giant branch)
     """
 
     # hard-coded parameters of the Battino (2019,2021) tables
@@ -824,37 +621,12 @@ class Battino20192021(YieldTables):
     mass = np.array([2.0, 3.0])
     metal = np.array([0.001, 0.01, 0.02, 0.03])
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         """
-        Usage:
-            >> bat = arsenal_gear.element_yields.Battino20192021()
-            >> mass = np.linspace(8, 120, 100)*u.M_sun
-            >> (Mtot,Nstar) = (np.sum(mass), len(mass))
-            >> metallicity = u.dimensionless_unscaled * 0.1
-            >> (mmin, mmax) = (np.min(mass), np.max(mass))
-            >> stars = arsenal_gear.formation.SinglePop(Mtot=Mtot,
-                                                        Nstar=Nstar,
-                                                        metallicity=metallicity,
-                                                        imf=None,
-                                                        mmin=mmin,
-                                                        mmax=mmax,
-                                                        masses=mass,
-                                                        discrete=True)
-            >> plt.plot(mass, bat.agb_yields('H', stars, interpolate='nearest'), '-')
+        Initializes tabulated yields and their coordinates for the Battino20192021 yields.
+        """
 
-        Attributes:
-            b19_url          Yield source website (Battino et al., 2019)
-            b21_url          Yield source website (Battino et al., 2021)
-            files            Table filenames
-            mass             Tabulated masses
-            metal            Tabulated metallicities
-            filedir          Directory of yield tables
-            name             Name of yields tables
-            elements         Elements available in table
-            atomic_num       Atomic numbers of available elements
-            agb              Source object for stellar winds (asymptotic giant branch)
-        """
-        super().__init__()
+        super().__init__(**kwargs)
         self.filedir = self.filedir / "data" / "NuGrid"
         self.name = "Battino et al. (2019, 2021)"
 
@@ -864,6 +636,8 @@ class Battino20192021(YieldTables):
         else:
             if not all([(self.filedir / file).is_file() for file in self.files]):
                 self.download_yields()
+        if not self.available:
+            return
 
         self.elements, self.atomic_num = self.get_element_list()
 
@@ -871,35 +645,13 @@ class Battino20192021(YieldTables):
         agb_yld = self.load_agb_yields()
         self.agb = Source(self.elements, [self.metal, self.mass], agb_yld)
 
-    def agb_yields(
-        self,
-        elements: List[str],
-        starPop: SinglePop,
-        interpolate: str = "nearest",
-        extrapolate: bool = False,
-    ) -> Quantity["mass"]:
-        """Interpolate yields from stars on the asymptotic giant branch for specified elements.
-        Stellar parameters can be provided as single value, array + single value, or arrays.
-
-        Args:
-            elements: list of elements, as specified by symbols (e.g., ['H'] for hydrogen)
-            starPop: stellar population object
-            interpolate: passed as method to scipy.interpolate.RegularGridInterpolator
-            extrapolate: if False, then mass, metal, and rot are set to table if outside bound
-        Returns:
-            List of yields matching provided element list
-
-        """
+    def agb_args(self, starPop: SinglePop) -> List:
+        """Argument structure for Battino (2019,2021) agb tables"""
         args = [
             starPop.metallicity.value * starPop.ones_like,
             starPop.masses.to(u.M_sun).value,
         ]
-        return (
-            self.agb.get_yld(
-                elements, args, interpolate=interpolate, extrapolate=extrapolate
-            )
-            * u.M_sun
-        )
+        return args
 
     def get_element_list(self) -> None:
         """Read element symbols from tables, atomic numbers not available."""
@@ -982,21 +734,37 @@ class Battino20192021(YieldTables):
 
     def download_yields(self) -> None:
         """Downloader for tabulated yield files."""
-        from ..utils import downloader
+        from ..utils.file_io import DownloadError, downloader
 
         print(
             "NuGrid (Battinoi et al., 2019, 2021) tables not found, starting download."
         )
-        downloader(
-            self.filedir / self.files[0],
-            self.b19_url + os.sep + "Yields_table.txt",
-            message=None,
-        )
-        downloader(
-            self.filedir / self.files[1],
-            self.b21_url + os.sep + "Yields_Table.txt",
-            message=None,
-        )
+
+        try:
+            downloader(
+                self.filedir / self.files[0],
+                self.b19_url + os.sep + "Yields_table.txt",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
+
+        try:
+            downloader(
+                self.filedir / self.files[1],
+                self.b21_url + os.sep + "Yields_Table.txt",
+                message=None,
+            )
+        except DownloadError as e:
+            self.available = False
+            warnings.warn(
+                f"{self.__class__.__name__}: Yield tables unavailable: {e}",
+                RuntimeWarning,
+            )
 
     @staticmethod
     def _get_index_from_model(model: str) -> int:
